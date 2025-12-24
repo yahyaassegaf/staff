@@ -1,0 +1,25 @@
+.dragsort--noAnim, .dragsort--noAnim ~ [draggable] {
+  transition: none !important;
+}
+
+.dragsort--dragStart .dragsort--dragElem {
+  opacity: 0;
+}
+
+.dragsort--dragStart .dragsort--hide {
+  width: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-width: 0 !important;
+}
+
+.dragsort--dragStart > * {
+  transition: var(--dragsort-trans-dur, 0.18s) cubic-bezier(0.6, 0.1, 0.4, 1.2);
+}
+
+.dragsort--dragStart > * > * {
+  pointer-events: none;
+}
+
+/*# sourceMappingURL=dragsort.css.map */

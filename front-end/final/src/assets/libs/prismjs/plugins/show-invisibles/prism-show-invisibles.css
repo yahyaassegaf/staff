@@ -1,0 +1,38 @@
+@charset "UTF-8";
+.token.tab:not(:empty),
+.token.cr,
+.token.lf,
+.token.space {
+  position: relative;
+}
+
+.token.tab:not(:empty):before,
+.token.cr:before,
+.token.lf:before,
+.token.space:before {
+  color: #808080;
+  opacity: 0.6;
+  position: absolute;
+}
+
+.token.tab:not(:empty):before {
+  content: "⇥";
+}
+
+.token.cr:before {
+  content: "␍";
+}
+
+.token.crlf:before {
+  content: "␍␊";
+}
+
+.token.lf:before {
+  content: "␊";
+}
+
+.token.space:before {
+  content: "·";
+}
+
+/*# sourceMappingURL=prism-show-invisibles.css.map */

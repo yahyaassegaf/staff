@@ -1,0 +1,6 @@
+::slotted(.swiper-slide-zoomed) {
+  cursor: move;
+  touch-action: none;
+}
+
+/*# sourceMappingURL=zoom-element.min.css.map */
