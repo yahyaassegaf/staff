@@ -15,6 +15,7 @@ export default defineComponent({
   setup() {
     const route = useRoute();
     const loading = ref(false);
+    const errors = ref<any>({});
     const suratData = ref({
       id: "",
       prodi_id: 0,
@@ -27,6 +28,8 @@ export default defineComponent({
       kelas_pondok: "",
       tanggal: "",
     });
+
+    const isDataReady = ref(false);
 
     async function getSurat() {
       try {
@@ -52,6 +55,8 @@ export default defineComponent({
             kelas_pondok: data.kelas_pondok || "",
             tanggal: data.tanggal || "",
           };
+
+          isDataReady.value = true;
         }
       } catch (error) {
         console.log(error);
@@ -63,6 +68,7 @@ export default defineComponent({
     async function submit(form: any) {
       try {
         loading.value = true;
+        errors.value = {};
         const response = await apiPut(`/sklmk/${form.id}`, form);
         if (response.success == true) {
           toast.success("Surat berhasil diupdate", {
@@ -74,13 +80,18 @@ export default defineComponent({
           });
           router.push({ path: "/sklmk" });
         } else {
-          toast.error("Surat gagal diupdate", {
-            theme: "auto",
-            icon: true,
-            hideProgressBar: true,
-            autoClose: true,
-            position: "top-right",
-          });
+          if ((response.error as any)?.response?.status === 422) {
+            errors.value = (response.error as any).response.data.errors;
+            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+          } else {
+            toast.error("Surat gagal diupdate", {
+              theme: "auto",
+              icon: true,
+              hideProgressBar: true,
+              autoClose: true,
+              position: "top-right",
+            });
+          }
         }
       } catch (error) {
         console.log(error);
@@ -105,10 +116,17 @@ export default defineComponent({
       suratData,
       submit,
       loading,
+      errors,
+      isDataReady,
     };
   },
 });
 </script>
 <template>
-  <SuratComponent @submit="submit" :modelValue="suratData" :isEdit="true" />
+  <SuratComponent
+    @submit="submit"
+    :modelValue="suratData"
+    :isEdit="true"
+    :errors="errors"
+  />
 </template>

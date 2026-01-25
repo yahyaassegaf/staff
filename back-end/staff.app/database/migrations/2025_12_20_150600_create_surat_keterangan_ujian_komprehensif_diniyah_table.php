@@ -24,9 +24,11 @@ return new class extends Migration
             $table->text('alamat_rumah');
             $table->string('kelas_pondok');
             $table->date('tanggal');
+            $table->enum('jenis_kelamin', ['L', 'P'])->nullable();
             $table->string('drive_file_id')->nullable();
             $table->string('local_path')->nullable();
             $table->string('drive_link')->nullable();
+            $table->integer('user_id')->nullable();
             $table->enum('status', ['pending', 'uploaded', 'failed'])->default('pending');
             $table->string('ttd')->nullable();
             $table->timestamps();

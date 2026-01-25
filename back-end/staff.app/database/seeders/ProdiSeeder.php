@@ -292,5 +292,20 @@ class ProdiSeeder extends Seeder
                 $item
             );
         }
+
+
+        DB::table('fakultas')->insert([
+            [
+                'kode'=>'01',
+                'nama'=>'Tarbiyah',
+                'dekan'=>'Djunaidi',
+            ],
+        ]);
+        DB::table('fakultas_prodi')->insert([
+            [
+                'fakultas_id' => 1,
+                'prodi_id'    => 10,
+            ],
+        ]);
     }
 }

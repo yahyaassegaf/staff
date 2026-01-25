@@ -14,6 +14,7 @@ export default defineComponent({
   setup() {
     const route = useRoute();
     const loading = ref(false);
+    const errors = ref<any>({});
     const suratData = ref({
       id: "",
       nomor: "",
@@ -65,9 +66,10 @@ export default defineComponent({
 
     async function submit(form: any) {
       try {
+        errors.value = {};
         loading.value = true;
         const response = await apiPut(`/surat-tugas/${form.id}`, form);
-        if (response.success || response.data.status) {
+        if (response.success == true) {
           toast.success("Surat berhasil diupdate", {
             theme: "auto",
             icon: true,
@@ -77,13 +79,18 @@ export default defineComponent({
           });
           router.push({ path: "/st" });
         } else {
-          toast.error("Surat gagal diupdate", {
-            theme: "auto",
-            icon: true,
-            hideProgressBar: true,
-            autoClose: true,
-            position: "top-right",
-          });
+          if ((response.error as any)?.response?.status === 422) {
+            errors.value = (response.error as any).response.data.errors;
+            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+          } else {
+            toast.error("Surat gagal diupdate", {
+              theme: "auto",
+              icon: true,
+              hideProgressBar: true,
+              autoClose: true,
+              position: "top-right",
+            });
+          }
         }
       } catch (error) {
         console.log(error);
@@ -107,6 +114,7 @@ export default defineComponent({
       suratData,
       submit,
       loading,
+      errors,
     };
   },
 });
@@ -114,9 +122,9 @@ export default defineComponent({
 
 <template>
   <FormComponent
-    v-if="suratData.id"
     @submit="submit"
     :modelValue="suratData"
     :isEdit="true"
+    :errors="errors"
   />
 </template>

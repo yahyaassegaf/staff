@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('surat_keterangan_transfer', function (Blueprint $table) {
             $table->id();
             $table->string('nomor');
-            $table->string('dekan');
             $table->string('nama');
             $table->date('tanggal_lahir');
             $table->string('nim');
@@ -24,7 +23,7 @@ return new class extends Migration
             $table->date('tanggal');
             $table->integer('user_id');
             $table->integer('prodi_id');
-            $table->string('jenis_kelamin');
+            $table->enum('jenis_kelamin', ['L', 'P'])->nullable();
             $table->string('drive_file_id')->nullable();
             $table->string('local_path')->nullable();
             $table->string('drive_link')->nullable();

@@ -17,12 +17,19 @@ use App\Http\Controllers\Api\SuratKeteranganController;
 use App\Http\Controllers\Api\SuratTugasController;
 use App\Http\Controllers\Api\SuratKeteranganTransferController;
 use App\Http\Controllers\Api\SuratIzinPenelitianController;
+use App\Http\Controllers\Api\HasilRapatController;
+use App\Http\Controllers\Api\TandaTanganController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\SuratKeteranganKknController;
+use App\Http\Controllers\Api\SuratKeteranganPplController;
+
 // Route::get('/user', function (Request $request) {
 //     return $request->user();
 // })->middleware('auth:sanctum');
 
 Route::post('/login', [LoginController::class, 'login'])->name('api.login');
 Route::get('/profile', [LoginController::class, 'profile'])->middleware('auth:sanctum');
+Route::put('/profile', [LoginController::class, 'updateProfile'])->middleware('auth:sanctum');
 Route::get('/logout', [LoginController::class, 'logout'])->middleware('auth:sanctum');
 Route::get('/get-level', [LoginController::class, 'getLevel'])->middleware('auth:sanctum');
 Route::get('/data-users', [LoginController::class, 'dataUsers'])->middleware('auth:sanctum');
@@ -31,6 +38,11 @@ Route::put('/data-users/{id}', [LoginController::class, 'update'])->middleware('
 Route::post('/data-users', [LoginController::class, 'store'])->middleware('auth:sanctum');
 Route::delete('/data-users/{id}', [LoginController::class, 'destroy'])->middleware('auth:sanctum');
 Route::get('/get-prodi', [LoginController::class, 'getProdi'])->middleware('auth:sanctum');
+Route::get('/get-all-prodi', [LoginController::class, 'getProdi'])->middleware('auth:sanctum');
+Route::get('/get-all-tanda-tangan', [LoginController::class, 'getTandaTangan'])->middleware('auth:sanctum');
+
+Route::get('/dashboard', [DashboardController::class, 'index'])->middleware('auth:sanctum');
+Route::get('/dashboard/cards', [DashboardController::class, 'cards'])->middleware('auth:sanctum');
 
 // Prodi Routes
 Route::get('/prodi', [ProdiController::class, 'index'])->middleware('auth:sanctum');
@@ -51,7 +63,7 @@ Route::post('/sklmk', [SuratKeteranganLulusMataKuliahController::class, 'store']
 Route::put('/sklmk/{id}', [SuratKeteranganLulusMataKuliahController::class, 'update'])->middleware('auth:sanctum');
 Route::delete('/sklmk/{id}', [SuratKeteranganLulusMataKuliahController::class, 'destroy'])->middleware('auth:sanctum');
 Route::get('/get-prodi', [SuratKeteranganLulusMataKuliahController::class, 'getProdi'])->middleware('auth:sanctum');
-Route::get('/get-mhs/{search}', [MahasiswaController::class, 'search'])->middleware('auth:sanctum');
+Route::get('/get-mhs/{search?}', [MahasiswaController::class, 'search'])->middleware('auth:sanctum');
 Route::get('/get-mhss/{search}', [MahasiswaController::class, 'search']);
 Route::get('/download-pdf/{id}', [SuratKeteranganLulusMataKuliahController::class, 'downloadPdf']);
 
@@ -126,6 +138,7 @@ Route::post('/surat-keterangan-transfer', [SuratKeteranganTransferController::cl
 Route::put('/surat-keterangan-transfer/{id}', [SuratKeteranganTransferController::class, 'update'])->middleware('auth:sanctum');
 Route::delete('/surat-keterangan-transfer/{id}', [SuratKeteranganTransferController::class, 'destroy'])->middleware('auth:sanctum');
 Route::get('/surat-keterangan-transfer/download-pdf/{id}', [SuratKeteranganTransferController::class, 'downloadPdf']);
+Route::get('/get-th-akademik', [SuratKeteranganTransferController::class, 'getThAkademik'])->middleware('auth:sanctum');
 
 // Surat Izin Penelitian Routes
 Route::get('/surat-izin-penelitian', [SuratIzinPenelitianController::class, 'index'])->middleware('auth:sanctum');
@@ -134,3 +147,34 @@ Route::post('/surat-izin-penelitian', [SuratIzinPenelitianController::class, 'st
 Route::put('/surat-izin-penelitian/{id}', [SuratIzinPenelitianController::class, 'update'])->middleware('auth:sanctum');
 Route::delete('/surat-izin-penelitian/{id}', [SuratIzinPenelitianController::class, 'destroy'])->middleware('auth:sanctum');
 Route::get('/surat-izin-penelitian/download-pdf/{id}', [SuratIzinPenelitianController::class, 'downloadPdf']);
+
+// Hasil Rapat Routes
+Route::get('/hasil-rapat', [HasilRapatController::class, 'index'])->middleware('auth:sanctum');
+Route::get('/hasil-rapat/{id}', [HasilRapatController::class, 'show'])->middleware('auth:sanctum');
+Route::post('/hasil-rapat', [HasilRapatController::class, 'store'])->middleware('auth:sanctum');
+Route::put('/hasil-rapat/{id}', [HasilRapatController::class, 'update'])->middleware('auth:sanctum');
+Route::delete('/hasil-rapat/{id}', [HasilRapatController::class, 'destroy'])->middleware('auth:sanctum');
+Route::get('/hasil-rapat/download-pdf/{id}', [HasilRapatController::class, 'downloadPdf']);
+
+// Tanda Tangan Routes
+Route::get('/tanda-tangan', [TandaTanganController::class, 'index'])->middleware('auth:sanctum');
+Route::get('/tanda-tangan/{id}', [TandaTanganController::class, 'show'])->middleware('auth:sanctum');
+Route::post('/tanda-tangan', [TandaTanganController::class, 'store'])->middleware('auth:sanctum');
+Route::put('/tanda-tangan/{id}', [TandaTanganController::class, 'update'])->middleware('auth:sanctum');
+Route::delete('/tanda-tangan/{id}', [TandaTanganController::class, 'destroy'])->middleware('auth:sanctum');
+
+// Surat Keterangan KKN Routes
+Route::get('/skk', [SuratKeteranganKknController::class, 'index'])->middleware('auth:sanctum');
+Route::get('/skk/{id}', [SuratKeteranganKknController::class, 'show'])->middleware('auth:sanctum');
+Route::post('/skk', [SuratKeteranganKknController::class, 'store'])->middleware('auth:sanctum');
+Route::put('/skk/{id}', [SuratKeteranganKknController::class, 'update'])->middleware('auth:sanctum');
+Route::delete('/skk/{id}', [SuratKeteranganKknController::class, 'destroy'])->middleware('auth:sanctum');
+Route::get('/skk/download-pdf/{id}', [SuratKeteranganKknController::class, 'downloadPdf']);
+
+// Surat Keterangan PPL Routes
+Route::get('/skp', [SuratKeteranganPplController::class, 'index'])->middleware('auth:sanctum');
+Route::get('/skp/{id}', [SuratKeteranganPplController::class, 'show'])->middleware('auth:sanctum');
+Route::post('/skp', [SuratKeteranganPplController::class, 'store'])->middleware('auth:sanctum');
+Route::put('/skp/{id}', [SuratKeteranganPplController::class, 'update'])->middleware('auth:sanctum');
+Route::delete('/skp/{id}', [SuratKeteranganPplController::class, 'destroy'])->middleware('auth:sanctum');
+Route::get('/skp/download-pdf/{id}', [SuratKeteranganPplController::class, 'downloadPdf']);

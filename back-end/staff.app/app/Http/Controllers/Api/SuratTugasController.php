@@ -14,6 +14,8 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class SuratTugasController extends Controller
 {
@@ -46,6 +48,13 @@ class SuratTugasController extends Controller
             });
         }
 
+        $auth = Auth::user()->jenis_kelamin;
+        if ($auth == 'L') {
+            $data->where('surat_tugas.jenis_kelamin', 'L');
+        } else {
+            $data->where('surat_tugas.jenis_kelamin', 'P');
+        }
+
         $data->orderBy(
             $request->input('sortBy', 'id'),
             $request->input('sortType', 'desc')
@@ -62,8 +71,9 @@ class SuratTugasController extends Controller
 
     public function store(Request $request)
     {
+        Log::info($request->all());
         try {
-            $request->validate([
+            $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required',
                 'nama_dosen' => 'required|string|max:255',
                 'alamat_dosen' => 'required|string|max:255',
@@ -73,10 +83,19 @@ class SuratTugasController extends Controller
                 'nim_nik' => 'required|string|max:255',
                 'fakultas_prodi' => 'required|string|max:255',
                 'judul_skripsi' => 'required|string',
-                'masa_penugasan' => 'required|string|max:255',
+                'masa_penugasan' => 'required|date',
                 'tanggal' => 'required|date',
-                'jenis_kelamin' => 'required|string',
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
 
             $login = Auth::user()->prodi->alias;
             $no = NoSurat::orderByDesc('id')->value('nomor') ?? 0;
@@ -87,19 +106,19 @@ class SuratTugasController extends Controller
 
             $st = new SuratTugas();
             $st->nomor = $formattedNoSurat;
-            $st->nama_dosen = $request->nama_dosen;
-            $st->alamat_dosen = $request->alamat_dosen;
-            $st->tugas_dosen = $request->tugas_dosen;
-            $st->tugasnya = $request->tugasnya;
-            $st->nama_mhs = $request->nama_mhs;
-            $st->nim_nik = $request->nim_nik;
-            $st->fakultas_prodi = $request->fakultas_prodi;
-            $st->judul_skripsi = $request->judul_skripsi;
-            $st->masa_penugasan = $request->masa_penugasan;
-            $st->tanggal = $request->tanggal;
+            $st->nama_dosen = $validate['nama_dosen'];
+            $st->alamat_dosen = $validate['alamat_dosen'];
+            $st->tugas_dosen = $validate['tugas_dosen'];
+            $st->tugasnya = $validate['tugasnya'];
+            $st->nama_mhs = $validate['nama_mhs'];
+            $st->nim_nik = $validate['nim_nik'];
+            $st->fakultas_prodi = $validate['fakultas_prodi'];
+            $st->judul_skripsi = $validate['judul_skripsi'];
+            $st->masa_penugasan = $validate['masa_penugasan'];
+            $st->tanggal = $validate['tanggal'];
             $st->user_id = Auth::user()->id;
-            $st->prodi_id = $request->prodi_id;
-            $st->jenis_kelamin = $request->jenis_kelamin;
+            $st->prodi_id = $validate['prodi_id'];
+            $st->jenis_kelamin = Auth::user()->jenis_kelamin;
             $st->status = 'pending';
             $st->save();
 
@@ -153,7 +172,7 @@ class SuratTugasController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            $request->validate([
+            $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required',
                 'nama_dosen' => 'required|string|max:255',
                 'alamat_dosen' => 'required|string|max:255',
@@ -168,6 +187,16 @@ class SuratTugasController extends Controller
                 'jenis_kelamin' => 'required|string',
             ]);
 
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
+
             $st = SuratTugas::find($id);
             if (!$st) {
                 return response()->json([
@@ -176,18 +205,18 @@ class SuratTugasController extends Controller
                 ], 404);
             }
 
-            $st->nama_dosen = $request->nama_dosen;
-            $st->alamat_dosen = $request->alamat_dosen;
-            $st->tugas_dosen = $request->tugas_dosen;
-            $st->tugasnya = $request->tugasnya;
-            $st->nama_mhs = $request->nama_mhs;
-            $st->nim_nik = $request->nim_nik;
-            $st->fakultas_prodi = $request->fakultas_prodi;
-            $st->judul_skripsi = $request->judul_skripsi;
-            $st->masa_penugasan = $request->masa_penugasan;
-            $st->tanggal = $request->tanggal;
-            $st->prodi_id = $request->prodi_id;
-            $st->jenis_kelamin = $request->jenis_kelamin;
+            $st->nama_dosen = $validate['nama_dosen'];
+            $st->alamat_dosen = $validate['alamat_dosen'];
+            $st->tugas_dosen = $validate['tugas_dosen'];
+            $st->tugasnya = $validate['tugasnya'];
+            $st->nama_mhs = $validate['nama_mhs'];
+            $st->nim_nik = $validate['nim_nik'];
+            $st->fakultas_prodi = $validate['fakultas_prodi'];
+            $st->judul_skripsi = $validate['judul_skripsi'];
+            $st->masa_penugasan = $validate['masa_penugasan'];
+            $st->tanggal = $validate['tanggal'];
+            $st->prodi_id = $validate['prodi_id'];
+            $st->jenis_kelamin = Auth::user()->jenis_kelamin;
             $st->save();
 
             return response()->json([
@@ -231,15 +260,17 @@ class SuratTugasController extends Controller
     public function downloadPdf($id)
     {
         try {
-            $data = SuratTugas::join('prodi', 'prodi.id', '=', 'surat_tugas.prodi_id')
-                ->join('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
-                ->join('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+            $data = SuratTugas::leftJoin('prodi', 'prodi.id', '=', 'surat_tugas.prodi_id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
                 ->select(
                     'surat_tugas.*',
                     'prodi.nama as prodi_name',
                     'prodi.nama_kepala',
                     'prodi.nidn_kepala',
-                    'fakultas.nama as fakultas_name'
+                    'fakultas.nama as fakultas_name',
+                    'tanda_tangan.gambar as ttd'
                 )
                 ->where('surat_tugas.id', $id)
                 ->first();
@@ -250,7 +281,12 @@ class SuratTugasController extends Controller
 
             $kopPath = base_path('../public_html/img/kop.jpg');
             $kopBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath));
+            $tddPath = base_path('../public_html/' . $data->ttd);
 
+            $tddBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tddPath));
+            $stempelPath = base_path('../public_html/img/stempel.png');
+
+            $stempelBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($stempelPath));
             $pdfData = [
                 'nomor' => $data->nomor,
                 'nama_dosen' => $data->nama_dosen,
@@ -266,6 +302,8 @@ class SuratTugasController extends Controller
                 'nama_kepala' => $data->nama_kepala,
                 'nidn_kepala' => $data->nidn_kepala,
                 'kopBase64' => $kopBase64,
+                'ttd' => $tddBase64,
+                'stempel' => $stempelBase64,
             ];
 
             $pdf = Pdf::loadView('pdf.surat_tugas', $pdfData)->setPaper('a4', 'portrait');
@@ -282,7 +320,12 @@ class SuratTugasController extends Controller
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Tugas';
-            UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi_name, SuratTugas::class);
+
+            $googlePath = $data->prodi_name . '/' . $nameTable . '/' . $fileName;
+
+            if (!Storage::disk('google')->exists($googlePath)) {
+                UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi_name, SuratTugas::class);
+            }
 
             return response($pdf->output(), 200, [
                 'Content-Type' => 'application/pdf',

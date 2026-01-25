@@ -8,12 +8,15 @@ use App\Models\LogSurat;
 use App\Models\NoSurat;
 use App\Models\Prodi;
 use App\Models\SuratPernyataanVerifikasiNilai;
+use App\Models\TandaTangan;
 use App\Services\SuratService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class SuratPernyataanVerifikasiNilaiController extends Controller
 {
@@ -44,6 +47,13 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
             });
         }
 
+        $auth = Auth::user()->jenis_kelamin;
+        if ($auth == 'L') {
+            $data->where('surat_pernyataan_verifikasi_nilai.jenis_kelamin', 'L');
+        } else {
+            $data->where('surat_pernyataan_verifikasi_nilai.jenis_kelamin', 'P');
+        }
+
         $data->orderBy(
             $request->input('sortBy', 'id'),
             $request->input('sortType', 'desc')
@@ -64,9 +74,9 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
     {
         Log::info($request->all());
         try {
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required|exists:prodi,id',
-                'nama_penandatangan' => 'required|string|max:255',
+                'tanda_tangan_id' => 'required|exists:tanda_tangan,id',
                 'niy' => 'required|string|max:255',
                 'jabatan' => 'required|string|max:255',
                 'nama_mhs' => 'required|string|max:255',
@@ -74,10 +84,17 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 'prodi' => 'required|string|max:255',
                 'fakultas' => 'required|string|max:255',
                 'tanggal' => 'required|date',
-                'jenis_kelamin' => 'required|string|max:20',
-                'drive_file_id' => 'nullable|string',
-                'status' => 'nullable|in:pending,uploaded,failed',
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
 
             $login = Auth::user()->prodi ? Auth::user()->prodi->alias : 'UMUM';
             $no = NoSurat::orderByDesc('id')->value('nomor') ?? 0;
@@ -89,19 +106,18 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
 
             $surat = new SuratPernyataanVerifikasiNilai();
             $surat->nomor = $noSurat;
-            $surat->nama_penandatangan = $request->nama_penandatangan;
-            $surat->niy = $request->niy;
-            $surat->jabatan = $request->jabatan;
-            $surat->nama_mahasiswa = $request->nama_mhs;
-            $surat->nim = $request->nim;
-            $surat->prodi = $request->prodi;
-            $surat->fakultas = $request->fakultas;
-            $surat->tanggal = $request->tanggal;
-            $surat->prodi_id = $request->prodi_id;
-            $surat->jenis_kelamin = $request->jenis_kelamin;
+            $surat->tanda_tangan_id = $validate['tanda_tangan_id'];
+            $surat->niy = $validate['niy'];
+            $surat->jabatan = $validate['jabatan'];
+            $surat->nama_mahasiswa = $validate['nama_mhs'];
+            $surat->nim = $validate['nim'];
+            $surat->prodi_mhs = $validate['prodi'];
+            $surat->fakultas = $validate['fakultas'];
+            $surat->tanggal = $validate['tanggal'];
+            $surat->prodi_id = $validate['prodi_id'];
+            $surat->jenis_kelamin = Auth::user()->jenis_kelamin;
             $surat->user_id = Auth::user()->id;
-            $surat->drive_file_id = $request->drive_file_id;
-            $surat->status = $request->status ?? 'pending';
+            $surat->status = 'pending';
             $surat->save();
 
             $Nomor              = new NoSurat();
@@ -132,9 +148,11 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
     public function show($id)
     {
         $data = SuratPernyataanVerifikasiNilai::leftJoin('prodi', 'prodi.id', '=', 'surat_pernyataan_verifikasi_nilai.prodi_id')
+            ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_pernyataan_verifikasi_nilai.tanda_tangan_id')
             ->select(
                 'surat_pernyataan_verifikasi_nilai.*',
-                'prodi.nama as nama_prodi'
+                'prodi.nama as nama_prodi',
+                'tanda_tangan.nama as nama_ttd'
             )
             ->where('surat_pernyataan_verifikasi_nilai.id', $id)
             ->first();
@@ -156,9 +174,10 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            $validate = $request->validate([
+
+            $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required|exists:prodi,id',
-                'nama_penandatangan' => 'required|string|max:255',
+                'tanda_tangan_id' => 'required|exists:tanda_tangan,id',
                 'niy' => 'required|string|max:255',
                 'jabatan' => 'required|string|max:255',
                 'nama_mhs' => 'required|string|max:255',
@@ -166,10 +185,17 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 'prodi' => 'required|string|max:255',
                 'fakultas' => 'required|string|max:255',
                 'tanggal' => 'required|date',
-                'jenis_kelamin' => 'required|string|max:20',
-                'drive_file_id' => 'nullable|string',
-                'status' => 'nullable|in:pending,uploaded,failed',
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
 
             $surat = SuratPernyataanVerifikasiNilai::find($id);
             if (!$surat) {
@@ -179,19 +205,16 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 ]);
             }
 
-            $surat->nama_penandatangan = $request->nama_penandatangan;
-            $surat->niy = $request->niy;
-            $surat->jabatan = $request->jabatan;
-            $surat->nama_mahasiswa = $request->nama_mhs;
-            $surat->nim = $request->nim;
-            $surat->prodi = $request->prodi;
-            $surat->fakultas = $request->fakultas;
-            $surat->tanggal = $request->tanggal;
-            $surat->prodi_id = $request->prodi_id;
-            $surat->jenis_kelamin = $request->jenis_kelamin;
-            $surat->drive_file_id = $request->drive_file_id;
-            $surat->status = $request->status ?? $surat->status;
-
+            $surat->tanda_tangan_id = $validate['tanda_tangan_id'];
+            $surat->niy = $validate['niy'];
+            $surat->jabatan = $validate['jabatan'];
+            $surat->nama_mahasiswa = $validate['nama_mhs'];
+            $surat->nim = $validate['nim'];
+            $surat->prodi_mhs = $validate['prodi'];
+            $surat->fakultas = $validate['fakultas'];
+            $surat->tanggal = $validate['tanggal'];
+            $surat->prodi_id = $validate['prodi_id'];
+            $surat->jenis_kelamin = Auth::user()->jenis_kelamin;
             $surat->save();
 
             return response()->json([
@@ -237,13 +260,21 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
     {
         try {
             $data = SuratPernyataanVerifikasiNilai::leftJoin('prodi', 'prodi.id', '=', 'surat_pernyataan_verifikasi_nilai.prodi_id')
+                ->leftJoin('users', 'users.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_pernyataan_verifikasi_nilai.tanda_tangan_id')
                 ->select(
                     'surat_pernyataan_verifikasi_nilai.*',
-                    'prodi.nama as nama_prodi'
+                    'users.name as nama_staff',
+                    'prodi.nama as nama_prodi',
+                    'tanda_tangan.gambar as ttd',
+                    'tanda_tangan.nama as nama_penandatangan',
+                    'fakultas.nama as nama_fakultas'
                 )
                 ->where('surat_pernyataan_verifikasi_nilai.id', $id)
                 ->first();
-
+            Log::info($data);
             if (!$data) {
                 return response()->json([
                     'status' => false,
@@ -254,18 +285,33 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
             $kopPath = base_path('../public_html/img/kop.jpg');
             $kopBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath));
 
+            $tddPath = base_path('../public_html/' . $data->ttd);
+
+            $nama = strtolower($data->nama_mahasiswa);
+            $nim = strtolower($data->nim);
+
+            $tddBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tddPath));
+
+            $stempelPath = base_path('../public_html/img/stempel.png');
+            $stempelBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($stempelPath));
+
+            $jabatan = 'Staff Program Studi ' . ucwords($data->nama_prodi) . ' Fakultas ' . ucwords($data->nama_fakultas);
+            $staff = 'Staff Prodi ' . ucwords($data->nama_prodi);
             $pdfData = [
                 'nomor' => $data->nomor,
                 'nama_penandatangan' => $data->nama_penandatangan,
                 'niy' => $data->niy,
-                'jabatan' => $data->jabatan,
-                'nama_mahasiswa' => $data->nama_mahasiswa,
-                'nim' => $data->nim,
-                'prodi' => $data->prodi,
-                'fakultas' => $data->fakultas,
+                'jabatan' => $jabatan,
+                'staff' => $staff,
+                'nama_mahasiswa' => $nama,
+                'nim' => $nim,
+                'prodi' => $data->nama_prodi,
+                'fakultas' => $data->nama_fakultas,
                 'tanggal' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
                 'jenis_kelamin' => $data->jenis_kelamin,
                 'kopBase64' => $kopBase64,
+                'ttd' => $tddBase64,
+                'stempel' => $stempelBase64,
             ];
 
             $pdf = Pdf::loadView('pdf.surat_pernyataan_verifikasi_nilai', $pdfData)
@@ -284,7 +330,12 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Pernyataan Verifikasi Nilai';
-            UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratPernyataanVerifikasiNilai::class);
+
+            $googlePath = $data->prodi_mhs . '/' . $nameTable . '/' . $fileName;
+
+            if (!Storage::disk('google')->exists($googlePath)) {
+                UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi_mhs, SuratPernyataanVerifikasiNilai::class);
+            }
 
             return response($pdf->output(), 200, [
                 'Content-Type' => 'application/pdf',

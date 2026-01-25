@@ -3,137 +3,221 @@
 
 <head>
     <meta charset="UTF-8">
+    <title>Surat Izin Penelitian</title>
 
     <style>
+        /* WAJIB untuk DomPDF */
         @page {
-            size: A4;
-            margin: 0;
+            margin: 1cm 2cm 1cm 2cm;
         }
 
         body {
-            font-family: 'Times New Roman', Times, serif;
-            font-size: 11pt;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 12pt;
             line-height: 1.5;
-            color: #000;
-            margin: 0;
-        }
-
-        .kop {
-            width: 100%;
-        }
-
-        .kop img {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
-
-        .content {
-            padding-right: 2.5cm;
-            padding-bottom: 1cm;
-            padding-left: 2.5cm;
         }
 
         .text-center {
             text-align: center;
         }
 
-        .text-justify {
-            text-align: justify;
+        .text-right {
+            text-align: right;
         }
 
-        .text-bold {
+        .header-univ {
+            font-size: 14pt;
             font-weight: bold;
+            text-transform: uppercase;
         }
 
-        .text-underline {
+        .nomor {
+            margin-bottom: 20px;
+        }
+
+        .alamat {
+            margin-bottom: 20px;
+        }
+
+        .salam {
+            margin-bottom: 15px;
+        }
+
+        .paragraf {
+            text-align: justify;
+            text-indent: 1.25cm;
+            margin-bottom: 10px;
+        }
+
+        table.data {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            margin-bottom: 15px;
+            margin-left: 30px;
+            /* indent seperti Word */
+        }
+
+        table.data td {
+            padding: 2px 0;
+            vertical-align: top;
+        }
+
+        table.data td.label {
+            width: 180px;
+        }
+
+        table.ttd {
+            width: 100%;
+            margin-top: 40px;
+        }
+
+        .nama-ttd {
+            margin-top: 10px;
+            font-weight: bold;
             text-decoration: underline;
         }
 
-        table {
+        .kop img {
+            margin-top: 5px;
             width: 100%;
-            border-collapse: collapse;
+            max-height: 155px;
+            object-fit: contain;
+            display: block;
         }
 
-        td {
-            vertical-align: top;
-            padding: 3px 0;
+        .text-left {
+            text-align: left;
+            margin-left: 30px;
         }
 
-        .margin-bottom-20 {
-            margin-bottom: 20px;
+        .kop {
+            margin-top: -1cm;
+            /* naik ke atas */
+            margin-left: -1.5cm;
+            /* tembus margin kiri */
+            margin-right: -1.5cm;
+            /* tembus margin kanan */
+        }
+
+        .penutup {
+            margin-top: 20px;
+            text-align: justify;
+            text-indent: 1.25cm;
         }
     </style>
 </head>
 
 <body>
 
+    <!-- HEADER -->
     <div class="kop">
-        @if(isset($kopBase64))
         <img src="{{ $kopBase64 }}" alt="Kop Surat">
-        @endif
     </div>
 
-    <div class="content">
-
-        <div class="text-center text-bold text-underline">
-            SURAT IZIN PENELITIAN
-        </div>
-        <div class="text-center margin-bottom-20">
-            Nomor: {{ $nomor }}
-        </div>
-
-        <p class="text-justify">
-            Yang bertanda tangan di bawah ini menerangkan bahwa:
-        </p>
-
-        <table class="margin-bottom-20">
-            <tr>
-                <td width="30%">Nama</td>
-                <td width="5%">:</td>
-                <td>{{ $nama }}</td>
-            </tr>
-            <tr>
-                <td>NIM</td>
-                <td>:</td>
-                <td>{{ $nim }}</td>
-            </tr>
-            <tr>
-                <td>Semester</td>
-                <td>:</td>
-                <td>{{ $semester }}</td>
-            </tr>
-            <tr>
-                <td>Fakultas / Prodi</td>
-                <td>:</td>
-                <td>{{ $fakultas_name }} / {{ $prodi_name }}</td>
-            </tr>
-        </table>
-
-        <p class="text-justify">
-            Adalah mahasiswa yang diberikan izin untuk melaksanakan penelitian terhitung mulai tanggal {{ $dari_tanggal }} di lingkungan institusi kami.
-        </p>
-
-        <p class="text-justify">
-            Demikian surat izin ini dibuat untuk dipergunakan sebagaimana mestinya.
-        </p>
-
-        <br><br>
-
-        <table>
-            <tr>
-                <td width="55%"></td>
-                <td class="text-center">
-                    Bangil, {{ $tanggal }}<br>
-                    Kepala Prodi<br><br><br><br><br>
-                    <strong>{{ $nama_kepala }}</strong><br>
-                    NIY: {{ $nidn_kepala }}
-                </td>
-            </tr>
-        </table>
-
+    <!-- NOMOR SURAT -->
+    <div class="nomor">
+        Nomor &nbsp;&nbsp;: {{ $nomor }}<br>
+        Lamp. &nbsp;&nbsp;&nbsp;: -<br>
+        Hal &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: Surat Izin Penelitian
     </div>
 
+    <!-- TUJUAN -->
+    <div class="alamat">
+        Kepada Yth.<br>
+        {{ $kepada }}<br>
+        di Tempat
+    </div>
+
+    <!-- SALAM -->
+    <div class="salam">
+        Assalamu'alaikum Warahmatullahi Wabarakatuh,
+    </div>
+
+    <!-- PARAGRAF PEMBUKA -->
+    <div class="paragraf">
+        Bersamaan dengan surat ini mohon dengan hormat, agar mahasiswa/i berikut ini:
+    </div>
+
+    <!-- DATA MAHASISWA -->
+    <table class="data">
+        <tr>
+            <td class="label">Nama</td>
+            <td width="10">:</td>
+            <td>{{ $nama }}</td>
+        </tr>
+        <tr>
+            <td class="label">NIM</td>
+            <td>:</td>
+            <td>{{ $nim }}</td>
+        </tr>
+        <tr>
+            <td class="label">Semester</td>
+            <td>:</td>
+            <td>{{ $semester }}</td>
+        </tr>
+        <tr>
+            <td class="label">Fakultas / Prodi</td>
+            <td>:</td>
+            <td>{{ $fakultas_name }} / {{ $prodi_name }}</td>
+        </tr>
+        <tr>
+            <td class="label">Dari Tanggal</td>
+            <td>:</td>
+            <td>{{ $dari_tanggal }} s/d Selesai</td>
+        </tr>
+    </table>
+
+    <!-- PARAGRAF ISI -->
+    <div class="paragraf">
+        Diberikan kesempatan dan izinnya untuk melaksanakan penelitian di Lembaga Pendidikan
+        yang Bapak / Ibu pimpin, sebagai prasyarat penyelesaian studi atau perkuliahan di
+        Universitas Islam Internasional Darullughah Wadda'wah Bangil, Pasuruan.
+    </div>
+
+    <!-- PENUTUP -->
+    <div class="penutup">
+        Demikian surat permohonan ini, atas pertimbangan dan persetujuannya kami sampaikan
+        terima kasih, jazakumullaahu khairan, insya Allaah, aamiin.
+    </div>
+
+    <div class="salam">
+        Wassalamu'alaikum warahmatullahi wabarakatuh.
+    </div>
+
+    <!-- TANDA TANGAN -->
+    <table class="ttd" width="100%" cellpadding="0" cellspacing="0" style="margin-top:50px;">
+        <tr>
+            <td width="60%"></td>
+
+            <!-- BLOK KANAN -->
+            <td width="40%" style="text-align:center;">
+                Bangil, {{ $tanggal }}<br>
+                Kepala Prodi {{ $prodi_name }}<br>
+
+                <!-- AREA TTD (OVERLAY AMAN) -->
+                <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="
+            height:70px;
+            text-align:center;
+            vertical-align:middle;
+            background-image: url('{{ $stempel }}');
+            background-repeat: no-repeat;
+            background-position: 20% 60%;
+            background-size: 90px 90px;
+        ">
+                            <img src="{{ $ttd }}" style="width:200px;">
+                        </td>
+                    </tr>
+                </table>
+                <div class="nama-ttd" style="margin-top:4px;">
+                    {{ $nama_kepala }}
+                </div>
+                NIDN : {{ $nidn_kepala }}
+            </td>
+        </tr>
+    </table>
 </body>
 
 </html>

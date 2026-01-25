@@ -1,57 +1,55 @@
 <script setup>
-import {
-  ref,
-  reactive,
-  onMounted,
-  onBeforeUnmount,
-  computed
-} from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, computed } from "vue";
 
-import { switcherStore } from '../../stores/switcher'
-import Header from '../components/header/header.vue'
-import Sidebar from '../components/sidebar/sidebar.vue'
-import Footer from '../components/footer/footer.vue'
-import Switcher from '../components/switcher/switcher.vue'
-import BackToTop from '../components/backtotop/backtotop.vue'
+import { switcherStore } from "../../stores/switcher";
+import Header from "../components/header/header.vue";
+import Sidebar from "../components/sidebar/sidebar.vue";
+import Footer from "../components/footer/footer.vue";
+import Switcher from "../components/switcher/switcher.vue";
+import BackToTop from "../components/backtotop/backtotop.vue";
 
 // Reactive store
-const switcher = reactive(switcherStore())
+const switcher = reactive(switcherStore());
 
 // Computed class
 const customClass = computed(() =>
-  switcher.pageStyles === 'flat' ? 'main-body-container' : ''
-)
+  switcher.pageStyles === "flat" ? "main-body-container" : "",
+);
 
 // Scroll progress logic
-const progressRef = ref(null)
+const progressRef = ref(null);
 
 const handleScroll = () => {
-  const scrollTop = document.documentElement.scrollTop || document.body.scrollTop
+  const scrollTop =
+    document.documentElement.scrollTop || document.body.scrollTop;
   const scrollHeight =
-    document.documentElement.scrollHeight - document.documentElement.clientHeight
+    document.documentElement.scrollHeight -
+    document.documentElement.clientHeight;
 
-  if (scrollHeight === 0) return
+  if (scrollHeight === 0) return;
 
-  const scrollPercent = (scrollTop / scrollHeight) * 100
+  const scrollPercent = (scrollTop / scrollHeight) * 100;
 
   if (progressRef.value) {
-    progressRef.value.style.width = `${scrollPercent}%`
+    progressRef.value.style.width = `${scrollPercent}%`;
   }
-}
+};
 
 onMounted(() => {
-  window.addEventListener('scroll', handleScroll)
-  switcher.retrieveFromLocalStorage()
-})
+  window.addEventListener("scroll", handleScroll);
+  switcher.retrieveFromLocalStorage();
+  // Force horizontal navigation style
+  switcher.navigationStylesFn("horizontal");
+});
 
 onBeforeUnmount(() => {
-  window.removeEventListener('scroll', handleScroll)
-})
+  window.removeEventListener("scroll", handleScroll);
+});
 </script>
 
 <template>
   <div ref="progressRef" class="progress-top-bar"></div>
-  <Switcher />
+  <!-- <Switcher /> -->
   <div class="page">
     <Header />
     <Sidebar />

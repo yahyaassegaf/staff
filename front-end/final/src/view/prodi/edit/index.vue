@@ -15,6 +15,7 @@ export default defineComponent({
   setup() {
     const route = useRoute();
     const loading = ref(false);
+    const errors = ref<any>({});
     const prodiData = ref({
       id: "",
       kode: "",
@@ -24,6 +25,7 @@ export default defineComponent({
       jenjang: "S1",
       nidn_kepala: "",
       nama_kepala: "",
+      tanda_tangan: null as {id: number, nama: string} | null,
     });
 
     async function getProdi() {
@@ -31,8 +33,10 @@ export default defineComponent({
         loading.value = true;
         const id = route.params.id;
         const response = await apiGet(`/prodi/${id}`);
-        if (response.data.status) {
+        if (response.success|| response.data?.status) {
           const prodi = response.data.data;
+          console.log('Prodi data from API:', prodi);
+          
           prodiData.value = {
             id: prodi.id,
             kode: prodi.kode || "",
@@ -42,7 +46,13 @@ export default defineComponent({
             jenjang: prodi.jenjang || "S1",
             nidn_kepala: prodi.nidn_kepala || "",
             nama_kepala: prodi.nama_kepala || "",
+            tanda_tangan: prodi.tanda_tangan_id ? {
+              id: prodi.tanda_tangan_id,
+              nama: prodi.tanda_tangan || ''
+            } : null,
           };
+          
+          console.log('Prodi data for form:', prodiData.value);
         }
       } catch (error) {
         console.log(error);
@@ -54,6 +64,7 @@ export default defineComponent({
     async function submit(form: any) {
       try {
         loading.value = true;
+        errors.value = {};
         const response = await apiPut(`/prodi/${form.id}`, form);
         if (response.success == true) {
           toast.success("Prodi berhasil diupdate", {
@@ -65,13 +76,18 @@ export default defineComponent({
           });
           router.push({ name: "prodi" });
         } else {
-          toast.error("Prodi gagal diupdate", {
-            theme: "auto",
-            icon: true,
-            hideProgressBar: true,
-            autoClose: true,
-            position: "top-right",
-          });
+          if ((response.error as any)?.response?.data?.status === 422) {
+            errors.value = (response.error as any).response.data.errors;
+            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+          } else {
+            toast.error("Prodi gagal diupdate", {
+              theme: "auto",
+              icon: true,
+              hideProgressBar: true,
+              autoClose: true,
+              position: "top-right",
+            });
+          }
         }
       } catch (error) {
         console.log(error);
@@ -96,10 +112,16 @@ export default defineComponent({
       prodiData,
       submit,
       loading,
+      errors,
     };
   },
 });
 </script>
 <template>
-  <ProdiComponent @submit="submit" :modelValue="prodiData" :isEdit="true" />
+  <ProdiComponent
+    @submit="submit"
+    :modelValue="prodiData"
+    :isEdit="true"
+    :errors="errors"
+  />
 </template>

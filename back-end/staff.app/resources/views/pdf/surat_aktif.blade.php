@@ -12,8 +12,8 @@
         }
 
         body {
-            font-size: 9pt;
-            line-height: 1.6;
+            font-size: 11pt;
+            line-height: 1.3;
             color: #000;
             margin: 0;
         }
@@ -24,16 +24,16 @@
         }
 
         .kop img {
+            margin-top: 10px;
             width: 100%;
-            height: auto;
+            max-height: 135px;
+            object-fit: contain;
             display: block;
         }
 
         /* ===== KONTEN ===== */
         .content {
-            /* dikurangi */
             padding-right: 2cm;
-            padding-bottom: 1cm;
             padding-left: 2cm;
         }
 
@@ -56,7 +56,7 @@
 
         td {
             vertical-align: top;
-            padding: 2px 0;
+            padding: 1px 0;
         }
     </style>
 </head>
@@ -75,7 +75,7 @@
             SURAT KETERANGAN AKTIF MAHASISWA
         </div>
 
-        <div class="text-center" style="margin-bottom:25px;">
+        <div class="text-center" style="margin-bottom:6px;">
             Nomor : {{ $nomor_surat }}
         </div>
 
@@ -120,11 +120,11 @@
                 <td width="5%">:</td>
                 <td>{{ $nama }}</td>
             </tr>
-            <tr>
+            <!-- <tr>
                 <td>NIK</td>
                 <td>:</td>
                 <td>{{ $nik }}</td>
-            </tr>
+            </tr> -->
             <tr>
                 <td>NIM</td>
                 <td>:</td>
@@ -187,16 +187,33 @@
             mestinya dan apabila terdapat kekeliruan akan diperbaiki sebagaimana mestinya.
         </p>
 
-        <br><br>
-
         <!-- TANDA TANGAN -->
-        <table>
+        <table class="ttd" width="100%" cellpadding="0" cellspacing="0" style="margin-top:50px;">
             <tr>
                 <td width="60%"></td>
-                <td class="text-center">
-                    Bangil,{{ $tanggal_surat }}<br>
-                    Kepala Prodi {{ $prodi_mhs }}<br><br><br><br>
-                    <strong>{{ $nama_kepala_prodi }}</strong><br>
+                <td width="40%" class="text-center">
+                    Bangil, {{ $tanggal_surat }}<br>
+                    Kepala Prodi {{ $prodi_mhs }}<br>
+
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                            <td style="
+                                height:70px;
+                                text-align:center;
+                                vertical-align:middle;
+                                background-image: url('{{ $stempel }}');
+                                background-repeat: no-repeat;
+                                background-position: 20% 60%;
+                                background-size: 90px 90px;
+                            ">
+                                <img src="{{ $ttd }}" style="width:250px;">
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div class="nama-ttd" style="margin-top:4px;">
+                        <strong style="text-decoration: underline;">{{ $nama_kepala_prodi }}</strong>
+                    </div>
                     NIY: {{ $nidn_kepala_prodi }}
                 </td>
             </tr>

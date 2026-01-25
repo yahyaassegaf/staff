@@ -14,21 +14,24 @@ export default defineComponent({
   },
 
   setup() {
-    const { authenticateUser } = useAuthStore(); 
- // use authenticateUser action from  auth store
+    const { authenticateUser } = useAuthStore();
+    // use authenticateUser action from  auth store
 
     const user: any = ref({
       username: null,
-      password:null,
+      password: null,
     });
 
-    watch(() => user.value.password, v => console.log("password:", v));
+    watch(
+      () => user.value.password,
+      (v) => console.log("password:", v),
+    );
 
     const router = useRouter();
 
     const login = async () => {
-        console.log('isinya: ',user.value);
-        
+      console.log("isinya: ", user.value);
+
       let data = await authenticateUser(user.value);
       if (data.authenticated) {
         toast.success("Logged In", {
@@ -38,9 +41,7 @@ export default defineComponent({
           autoClose: true,
           position: "top-right",
         });
-
-        console.log("NAVIGATE NOW");
-         router.push('/users'); 
+        router.push("/dashboard");
       } else {
         toast.error("username dan password salah", {
           theme: "auto",
@@ -52,17 +53,14 @@ export default defineComponent({
       }
     };
     const setBodyClass = (action: string) => {
-
       if (action === "add") {
         document.body.classList.add("authentication-background");
       } else {
         document.body.classList.remove("authentication-background");
       }
-
     };
 
     onMounted(() => {
-
       if (localStorage.getItem("visited") === "true") {
         setBodyClass("add");
       } else {
@@ -86,14 +84,12 @@ export default defineComponent({
         window.removeEventListener("beforeunload", handleBeforeUnload);
         setBodyClass("remove");
       };
-      
     });
 
     return {
       user,
       login,
     };
-
   },
 });
 </script>
@@ -109,9 +105,9 @@ export default defineComponent({
             <div class="mb-4">
               <router-link to="/dashboards/sales">
                 <img
-                  src="/images/brand-logos/toggle-logo.png"
+                  src="/images/logo/uii.png"
                   alt="logo"
-                  class="desktop-dark"
+                  style="height: 60px; width: auto"
                 />
               </router-link>
             </div>
@@ -142,7 +138,7 @@ export default defineComponent({
                 >
                 <div class="position-relative">
                   <PasswordInput
-                     v-model="user.password"
+                    v-model="user.password"
                     name="psw"
                     id="password"
                     placeholder="Password"

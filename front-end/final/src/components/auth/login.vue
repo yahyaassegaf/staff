@@ -37,7 +37,7 @@ export default defineComponent({
         // router.push("dashboards/courses");
         // }, 300);
         console.log("NAVIGATE NOW");
-         router.push('/dashboards/courses'); 
+        router.push("/dashboard");
       } else {
         toast.error("Invalid credentials", {
           theme: "auto",
@@ -104,9 +104,9 @@ export default defineComponent({
             <div class="mb-4">
               <router-link to="/dashboards/sales">
                 <img
-                  src="/images/brand-logos/toggle-logo.png"
+                  src="/images/logo/uii.png"
                   alt="logo"
-                  class="desktop-dark"
+                  style="height: 60px; width: auto"
                 />
               </router-link>
             </div>

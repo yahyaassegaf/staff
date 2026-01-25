@@ -27,6 +27,7 @@ return new class extends Migration
             $table->string('drive_file_id')->nullable();
             $table->string('local_path')->nullable();
             $table->string('drive_link')->nullable();
+            $table->enum('jenis_kelamin',['L','P'])->nullable();
             $table->enum('status', ['pending', 'uploaded', 'failed'])->default('pending');
             $table->date('tanggal');
             $table->timestamps();

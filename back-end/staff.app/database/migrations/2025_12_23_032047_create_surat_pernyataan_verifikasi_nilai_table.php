@@ -14,21 +14,21 @@ return new class extends Migration
         Schema::create('surat_pernyataan_verifikasi_nilai', function (Blueprint $table) {
             $table->id();
             $table->string('nomor');
-            $table->string('nama_penandatangan');
             $table->string('niy');
             $table->string('jabatan');
             $table->string('nama_mahasiswa');
             $table->string('nim');
-            $table->string('prodi_mahasiswa');
+            $table->string('prodi_mhs')->nullable();
             $table->string('fakultas');
             $table->date('tanggal');
             $table->integer('prodi_id');
-            $table->string('jenis_kelamin');
             $table->integer('user_id');
+            $table->enum('jenis_kelamin', ['L', 'P'])->nullable();
             $table->string('drive_file_id')->nullable();
             $table->string('local_path')->nullable();
             $table->string('drive_link')->nullable();
             $table->enum('status', ['pending', 'uploaded', 'failed'])->default('pending');
+            $table->integer('tanda_tangan_id')->nullable();
             $table->timestamps();
         });
     }

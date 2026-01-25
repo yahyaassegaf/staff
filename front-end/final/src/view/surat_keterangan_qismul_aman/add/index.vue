@@ -12,8 +12,10 @@ export default defineComponent({
   },
   setup() {
     const loading = ref(false);
+    const errors = ref<any>({});
     async function submit(params: any) {
       try {
+        errors.value = {};
         const response = await apiPost("/skqa", params);
         console.log("data berhasil :", response);
 
@@ -27,13 +29,18 @@ export default defineComponent({
           });
           router.push({ path: "/skqa" });
         } else {
-          toast.error("Surat gagal Ditambahkan", {
-            theme: "auto",
-            icon: true,
-            hideProgressBar: true,
-            autoClose: true,
-            position: "top-right",
-          });
+          if ((response.error as any)?.response?.status === 422) {
+            errors.value = (response.error as any).response.data.errors;
+            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+          } else {
+            toast.error("Surat gagal Ditambahkan", {
+              theme: "auto",
+              icon: true,
+              hideProgressBar: true,
+              autoClose: true,
+              position: "top-right",
+            });
+          }
         }
       } catch (error) {
         console.log(error);
@@ -43,10 +50,15 @@ export default defineComponent({
     return {
       loading,
       submit,
+      errors,
     };
   },
 });
 </script>
 <template>
-  <SuratKeteranganQismulAmanComponent @submit="submit" :isEdit="false" />
+  <SuratKeteranganQismulAmanComponent
+    @submit="submit"
+    :isEdit="false"
+    :errors="errors"
+  />
 </template>

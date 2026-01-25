@@ -31,6 +31,8 @@ class Mahasiswa
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "apikey: $apiKey",
 
@@ -39,7 +41,10 @@ class Mahasiswa
         curl_close($ch);
 
         $response = json_decode($response);
-        return $response->data;
+        if (is_object($response) && isset($response->data)) {
+            return $response->data;
+        }
+        return [];
     }
 
     public static function find($id)
@@ -53,6 +58,8 @@ class Mahasiswa
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "apikey: $apiKey",
 
@@ -81,6 +88,8 @@ class Mahasiswa
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "apikey: $apiKey",
 

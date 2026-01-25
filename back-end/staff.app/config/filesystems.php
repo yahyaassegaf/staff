@@ -47,14 +47,22 @@ return [
             'report' => false,
         ],
 
+        // 'google' => [
+        //     'driver' => 'google',
+        //     'clientId' => env('GOOGLE_DRIVE_CLIENT_ID'),
+        //     'clientSecret' => env('GOOGLE_DRIVE_CLIENT_SECRET'),
+        //     'accessToken' => env('GOOGLE_DRIVE_ACCESS_TOKEN'), // optional
+        //     'refreshToken' => env('GOOGLE_DRIVE_REFRESH_TOKEN'),
+        //     'folder' => env('GOOGLE_DRIVE_FOLDER'),
+        // ],
         'google' => [
             'driver' => 'google',
             'clientId' => env('GOOGLE_DRIVE_CLIENT_ID'),
             'clientSecret' => env('GOOGLE_DRIVE_CLIENT_SECRET'),
-            'accessToken' => env('GOOGLE_DRIVE_ACCESS_TOKEN'), // optional
             'refreshToken' => env('GOOGLE_DRIVE_REFRESH_TOKEN'),
             'folder' => env('GOOGLE_DRIVE_FOLDER'),
         ],
+
 
         's3' => [
             'driver' => 's3',
@@ -83,8 +91,8 @@ return [
     */
 
     'links' => [
-        // public_path('storage') => storage_path('app/public'),
-        base_path('../public_html/storage') => storage_path('app/public'),
+        public_path('storage') => storage_path('app/public'),
+        // base_path('../public_html/storage') => storage_path('app/public'),
 
     ],
 

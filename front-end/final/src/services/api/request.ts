@@ -15,9 +15,12 @@ export async function apiGet(
             success : true,
             data : response.data
         } 
-  } catch (error) {
+  } catch (error: any) {
     console.error("GET Error:", error);
-    throw error; // 🔥 biar catch di pemanggil
+    if (error.response?.status === 401) {
+        return { success: false, error: 'Unauthorized' };
+    }
+    return { success: false, error };
   }
 }
 export async function apiPdf(
@@ -48,8 +51,11 @@ export async function apiPost(url: string, params?:Object) {
             success : true,
             data : response.data
         }
-    } catch (error) {
-         console.error("GET Error:", error);
+    } catch (error: any) {
+        console.error("POST Error:", error);
+        if (error.response?.status === 401) {
+            return { success: false, error: 'Unauthorized' };
+        }
         return { success: false, error };
     }
 }

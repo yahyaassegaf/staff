@@ -24,6 +24,7 @@ return new class extends Migration
             $table->string('kelas_pondok', 255);
             $table->date('tanggal');
             $table->integer('user_id');
+            $table->enum('jenis_kelamin',['L','P'])->nullable();
             $table->string('local_path')->nullable();
             $table->string('drive_link')->nullable();
             $table->string('drive_file_id')->nullable();

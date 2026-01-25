@@ -16,12 +16,13 @@ return new class extends Migration
             $table->string('nomor');
             $table->string('nama');
             $table->string('nim');
+            $table->string('prodi_mhs')->nullable();
             $table->string('semester');
             $table->date('dari_tanggal');
             $table->date('tanggal');
             $table->integer('prodi_id');
             $table->integer('user_id');
-            $table->string('jenis_kelamin');
+            $table->enum('jenis_kelamin', ['L', 'P'])->nullable();
             $table->string('drive_file_id')->nullable();
             $table->enum('status', ['pending', 'uploaded', 'failed'])->default('pending');
             $table->timestamps();

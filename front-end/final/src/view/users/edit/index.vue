@@ -1,11 +1,10 @@
 <script lang="ts">
-import { defineComponent } from "vue";
-import { onMounted, ref } from "vue";
+import { defineComponent, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import UsersComponent from "../../../components/users/index.vue";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
-import { apiGet, apiPost, apiPut } from "../../../services/api/request";
+import { apiGet, apiPut } from "../../../services/api/request";
 import router from "../../../router";
 
 export default defineComponent({
@@ -14,28 +13,18 @@ export default defineComponent({
   },
   setup() {
     const route = useRoute();
-    const items = ref([]);
     const loading = ref(false);
+    const errors = ref<any>({});
     const userData = ref({
       id: "",
       name: "",
       email: "",
       handphone: "",
       level_id: "",
+      prodi_id: "",
+      jenis_kelamin: "",
       password: "",
     });
-
-    async function getLevel() {
-      try {
-        loading.value = true;
-        const response = await apiGet("/get-level");
-        items.value = response.data.data;
-      } catch (error) {
-        console.log(error);
-      } finally {
-        loading.value = false;
-      }
-    }
 
     async function getUser() {
       try {
@@ -50,6 +39,8 @@ export default defineComponent({
             email: user.email,
             handphone: user.phone,
             level_id: user.level_id,
+            prodi_id: user.prodi_id,
+            jenis_kelamin: user.jenis_kelamin,
             password: "",
           };
         }
@@ -66,11 +57,14 @@ export default defineComponent({
     }
 
     async function submit(form: any) {
+      errors.value = {};
       const formData = new FormData();
       formData.append("id", form.id);
       formData.append("name", form.name);
       formData.append("email", form.email);
       formData.append("level_id", form.level_id);
+      formData.append("prodi_id", form.prodi_id);
+      formData.append("jenis_kelamin", form.jenis_kelamin);
       formData.append("handphone", form.handphone);
 
       if (form.password) {
@@ -94,30 +88,33 @@ export default defineComponent({
         });
         router.push({ name: "users" });
       } else {
-        toast.error("User gagal diupdate", {
-          theme: "auto",
-          icon: true,
-          hideProgressBar: true,
-          autoClose: true,
-          position: "top-right",
-        });
+        if ((response.error as any)?.response?.status === 422) {
+          errors.value = (response.error as any).response.data.errors;
+          toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+        } else {
+          toast.error("User gagal diupdate", {
+            theme: "auto",
+            icon: true,
+            hideProgressBar: true,
+            autoClose: true,
+            position: "top-right",
+          });
+        }
       }
     }
 
     onMounted(() => {
-      getLevel();
       getUser();
     });
 
     return {
-      getLevel,
       getUser,
-      items,
       userData,
       selectedFile,
       handleFile,
       submit,
       loading,
+      errors,
     };
   },
 });
@@ -126,8 +123,8 @@ export default defineComponent({
   <UsersComponent
     @submit="submit"
     @file-change="handleFile"
-    :levels="items"
     :modelValue="userData"
     :isEdit="true"
+    :errors="errors"
   />
 </template>

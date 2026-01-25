@@ -21,17 +21,19 @@ export default defineComponent({
     const searchValue = ref("");
     const total = ref(0);
     const headers = [
+      { text: "No", value: "no", sortable: false },
       { text: "NIm", value: "nim", sortable: true },
       { text: "Nama Lengkap", value: "nama_lengkap", sortable: true },
       { text: "Nama Prodi", value: "nama_prodi", sortable: true },
       { text: "Prodi", value: "alias_prodi", sortable: true },
       { text: "Kelas Pondok", value: "kelas_pondok", sortable: true },
+      { text: "URL", value: "drive_link", sortable: false },
       { text: "Action", value: "action", sortable: false },
     ];
 
     const serverOptions = ref<ServerOptions>({
       page: 1,
-      rowsPerPage: 5,
+      rowsPerPage: 10,
       sortBy: "id",
       sortType: "desc",
     });
@@ -45,7 +47,9 @@ export default defineComponent({
       try {
         const response = await apiGet(`/get-prodi`);
         if (response.success) {
-          const data = response.data?.data;
+          const data = response.data?.data
+            ? response.data?.data
+            : response.data;
           listProdi.value = Array.isArray(data) ? data : [data];
         }
       } catch (error) {
@@ -65,9 +69,16 @@ export default defineComponent({
           prodi_id: prodiFilter.value,
         });
 
-        items.value = Array.isArray(response.data.data.data)
+        const rows = Array.isArray(response.data.data.data)
           ? response.data.data.data
           : [];
+
+        const startNo =
+          (serverOptions.value.page - 1) * serverOptions.value.rowsPerPage;
+        items.value = rows.map((row: any, idx: number) => ({
+          ...row,
+          no: startNo + idx + 1,
+        }));
 
         total.value = response.data.data.total;
       } catch (error) {
@@ -179,72 +190,129 @@ export default defineComponent({
 </script>
 
 <template>
-  <h3>Daftar Fakultas</h3>
-  <SimpleCardComponent>
-    <template #showheader>
-      <div class="d-flex justify-content-between align-items-center w-100">
-        <button class="btn btn-primary btn-sm" @click="goAdd">
-          Tambah Data
-        </button>
-        <select
-          class="form-select form-select-sm"
-          style="width: 200px"
-          v-model="prodiFilter"
-        >
-          <option value="">Semua Prodi</option>
-          <option v-for="item in listProdi" :key="item.id" :value="item.id">
-            {{ item.nama }}
-          </option>
-        </select>
-      </div>
-    </template>
-    <div class="row mb-3">
-      <div class="col-md-3 ms-auto">
-        <input
-          type="text"
-          class="form-control form-control-sm"
-          v-model="searchValue"
-          placeholder="Cari fakultas..."
-        />
+  <div class="container-fluid">
+    <div
+      class="d-md-flex align-items-center justify-content-between my-4 page-header-breadcrumb"
+    >
+      <h1 class="page-title fw-semibold fs-18 mb-0">
+        Surat Keterangan Lulus Mata Kuliah
+      </h1>
+      <div class="ms-md-1 ms-0">
+        <nav>
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+              <a href="javascript:void(0);">Kegiatan</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">SKLMK</li>
+          </ol>
+        </nav>
       </div>
     </div>
-    <EasyDataTable
-      class="table text-nowrap"
-      :search-value="searchValue"
-      :headers="headers"
-      :items="items"
-      border-cell
-      v-model:server-options="serverOptions"
-      :loading="loading"
-      :server-items-length="total"
-      :rowsItems="[5, 10, 25, 50, 100]"
-    >
-      <template #loading>
-        <div class="text-center">
-          <div class="spinner-border" role="status">
-            <span class="visually-hidden">Loading...</span>
+
+    <SimpleCardComponent>
+      <template #showheader>
+        <div class="row g-2 align-items-center w-100 m-0">
+          <div class="col-12 col-md-auto">
+            <button
+              class="btn btn-primary btn-wave shadow-sm w-100"
+              @click="goAdd"
+            >
+              <i class="ri-add-line align-middle me-1"></i> Tambah Data
+            </button>
+          </div>
+          <div class="col-12 col-md-auto ms-auto">
+            <select
+              class="form-select form-select-sm"
+              style="min-width: 200px"
+              v-model="prodiFilter"
+            >
+              <option value="">Semua Prodi Unit</option>
+              <option v-for="item in listProdi" :key="item.id" :value="item.id">
+                {{ item.nama }}
+              </option>
+            </select>
           </div>
         </div>
       </template>
-      <template #item="{ item, column }">
-        <!-- kolom Action -->
-        <template v-if="column === 'action'">
-          <button class="btn btn-sm btn-primary" @click="edit(item)">
-            Edit
-          </button>
-          <button class="btn btn-sm btn-danger ms-1" @click="remove(item)">
-            Delete
-          </button>
-          <button class="btn btn-sm btn-info ms-1" @click="download(item)">
-            Delete
-          </button>
+
+      <div class="row mb-3">
+        <div class="col-md-3 ms-auto">
+          <div class="input-group">
+            <input
+              type="text"
+              class="form-control form-control-sm"
+              v-model="searchValue"
+              placeholder="Cari (Nama/NIM/Prodi)..."
+            />
+            <button class="btn btn-primary btn-sm" type="button">
+              <i class="ri-search-line"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <EasyDataTable
+        class="table text-nowrap"
+        :headers="headers"
+        :items="items"
+        border-cell
+        v-model:server-options="serverOptions"
+        :loading="loading"
+        :server-items-length="total"
+        :rows-items="[10, 25, 50, 100]"
+        buttons-pagination
+      >
+        <template #loading>
+          <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+          </div>
         </template>
 
-        <!-- kolom lain -->
-        <template v-else>
-          {{ item[column] }}
+        <template #item-drive_link="item">
+          <template v-if="item.drive_link">
+            <a
+              :href="item.drive_link"
+              target="_blank"
+              class="btn btn-sm btn-success-light"
+            >
+              <i class="ri-link"></i> Lihat
+            </a>
+          </template>
+          <template v-else>
+            <span class="badge bg-warning-transparent"
+              >proses upload google drive</span
+            >
+          </template>
         </template>
-      </template>
-    </EasyDataTable>
-  </SimpleCardComponent>
+
+        <template #item-action="item">
+          <div class="btn-list">
+            <button
+              class="btn btn-sm btn-icon btn-info-light btn-wave"
+              title="Download PDF"
+              @click="download(item)"
+            >
+              <i class="ri-download-2-line"></i>
+            </button>
+            <button
+              class="btn btn-sm btn-icon btn-primary-light btn-wave"
+              title="Edit"
+              @click="edit(item)"
+            >
+              <i class="ri-edit-line"></i>
+            </button>
+            <button
+              class="btn btn-sm btn-icon btn-danger-light btn-wave"
+              title="Hapus"
+              @click="remove(item)"
+            >
+              <i class="ri-delete-bin-line"></i>
+            </button>
+          </div>
+        </template>
+      </EasyDataTable>
+    </SimpleCardComponent>
+  </div>
 </template>

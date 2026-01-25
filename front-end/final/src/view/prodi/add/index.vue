@@ -13,10 +13,12 @@ export default defineComponent({
   },
   setup() {
     const loading = ref(false);
+    const errors = ref<any>({});
 
     async function submit(form: any) {
       try {
         loading.value = true;
+        errors.value = {};
         const response = await apiPost("/prodi", form);
         if (response.success == true) {
           toast.success("Prodi berhasil ditambahkan", {
@@ -28,13 +30,18 @@ export default defineComponent({
           });
           router.push({ name: "prodi" });
         } else {
-          toast.error("Prodi gagal ditambahkan", {
-            theme: "auto",
-            icon: true,
-            hideProgressBar: true,
-            autoClose: true,
-            position: "top-right",
-          });
+          if ((response.error as any)?.response?.status === 422) {
+            errors.value = (response.error as any).response.data.errors;
+            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+          } else {
+            toast.error("Prodi gagal ditambahkan", {
+              theme: "auto",
+              icon: true,
+              hideProgressBar: true,
+              autoClose: true,
+              position: "top-right",
+            });
+          }
         }
       } catch (error) {
         console.log(error);
@@ -53,10 +60,11 @@ export default defineComponent({
     return {
       submit,
       loading,
+      errors,
     };
   },
 });
 </script>
 <template>
-  <ProdiComponent @submit="submit" :isEdit="false" />
+  <ProdiComponent @submit="submit" :isEdit="false" :errors="errors" />
 </template>

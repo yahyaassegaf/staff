@@ -14,11 +14,12 @@ export default defineComponent({
   setup() {
     const route = useRoute();
     const loading = ref(false);
+    const errors = ref<any>({});
     const suratData = ref({
       id: "",
       nomor: "",
       prodi_id: "",
-      dekan: "",
+      th_akademik_id: null as null | number,
       nama: "",
       tanggal_lahir: "",
       nim: "",
@@ -40,7 +41,9 @@ export default defineComponent({
             id: data.id,
             nomor: data.nomor || "",
             prodi_id: data.prodi_id || "",
-            dekan: data.dekan || "",
+            th_akademik_id: data.th_akademik_id
+              ? Number(data.th_akademik_id)
+              : null,
             nama: data.nama || "",
             tanggal_lahir: data.tanggal_lahir
               ? data.tanggal_lahir.slice(0, 10)
@@ -63,16 +66,34 @@ export default defineComponent({
 
     async function submit(form: any) {
       try {
+        errors.value = {};
         loading.value = true;
         const response = await apiPut(
           `/surat-keterangan-transfer/${form.id}`,
           form
         );
-        if (response.success || response.data.status) {
-          toast.success("Surat berhasil diupdate");
+        if (response.success == true) {
+          toast.success("Surat berhasil diupdate", {
+            theme: "auto",
+            icon: true,
+            hideProgressBar: true,
+            autoClose: true,
+            position: "top-right",
+          });
           router.push({ path: "/skt" });
         } else {
-          toast.error("Surat gagal diupdate");
+          if ((response.error as any)?.response?.status === 422) {
+            errors.value = (response.error as any).response.data.errors;
+            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+          } else {
+            toast.error("Surat gagal diupdate", {
+              theme: "auto",
+              icon: true,
+              hideProgressBar: true,
+              autoClose: true,
+              position: "top-right",
+            });
+          }
         }
       } catch (error) {
         console.log(error);
@@ -90,6 +111,7 @@ export default defineComponent({
       suratData,
       submit,
       loading,
+      errors,
     };
   },
 });
@@ -101,5 +123,6 @@ export default defineComponent({
     @submit="submit"
     :modelValue="suratData"
     :isEdit="true"
+    :errors="errors"
   />
 </template>

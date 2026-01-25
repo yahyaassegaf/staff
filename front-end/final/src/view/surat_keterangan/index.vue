@@ -18,13 +18,14 @@ export default defineComponent({
     const searchValue = ref("");
     const total = ref(0);
     const headers = [
+      { text: "No", value: "no", sortable: false },
       { text: "Nomor Surat", value: "nomor", sortable: true },
       { text: "NIM", value: "nim", sortable: true },
       { text: "Nama Mahasiswa", value: "nama_mahasiswa", sortable: true },
       { text: "Prodi", value: "prodi", sortable: true },
       { text: "Periode", value: "periode_bulan", sortable: true },
-      { text: "Staff", value: "nama_staff", sortable: true },
       { text: "Tanggal", value: "tanggal", sortable: true },
+      { text: "URL", value: "drive_link", sortable: false },
       { text: "Action", value: "action", sortable: false },
     ];
 
@@ -64,7 +65,13 @@ export default defineComponent({
         });
 
         if (response.success) {
-          items.value = response.data.data.data || [];
+          const rows = response.data.data.data || [];
+          const startNo =
+            (serverOptions.value.page - 1) * serverOptions.value.rowsPerPage;
+          items.value = rows.map((row: any, idx: number) => ({
+            ...row,
+            no: startNo + idx + 1,
+          }));
           total.value = response.data.data.total || 0;
         }
       } catch (error) {
@@ -177,14 +184,19 @@ export default defineComponent({
 
     <SimpleCardComponent>
       <template #showheader>
-        <div class="d-flex justify-content-between align-items-center w-100">
-          <button class="btn btn-primary btn-wave shadow-sm" @click="goAdd">
-            <i class="ri-add-line align-middle me-1"></i> Tambah Data
-          </button>
-          <div class="d-flex gap-2">
+        <div class="row g-2 align-items-center w-100 m-0">
+          <div class="col-12 col-md-auto">
+            <button
+              class="btn btn-primary btn-wave shadow-sm w-100"
+              @click="goAdd"
+            >
+              <i class="ri-add-line align-middle me-1"></i> Tambah Data
+            </button>
+          </div>
+          <div class="col-12 col-md-auto ms-auto">
             <select
               class="form-select form-select-sm"
-              style="width: 200px"
+              style="min-width: 200px"
               v-model="prodiFilter"
             >
               <option value="">Semua Prodi Unit</option>
@@ -231,22 +243,42 @@ export default defineComponent({
           </div>
         </template>
 
+        <template #item-drive_link="item">
+          <template v-if="item.drive_link">
+            <a
+              :href="item.drive_link"
+              target="_blank"
+              class="btn btn-sm btn-success-light"
+            >
+              <i class="ri-link"></i> Lihat
+            </a>
+          </template>
+          <template v-else>
+            <span class="badge bg-warning-transparent"
+              >proses upload google drive</span
+            >
+          </template>
+        </template>
+
         <template #item-action="item">
           <div class="btn-list">
             <button
               class="btn btn-sm btn-icon btn-info-light btn-wave"
+              title="Download PDF"
               @click="download(item)"
             >
               <i class="ri-download-2-line"></i>
             </button>
             <button
               class="btn btn-sm btn-icon btn-primary-light btn-wave"
+              title="Edit"
               @click="edit(item)"
             >
               <i class="ri-edit-line"></i>
             </button>
             <button
               class="btn btn-sm btn-icon btn-danger-light btn-wave"
+              title="Hapus"
               @click="remove(item)"
             >
               <i class="ri-delete-bin-line"></i>

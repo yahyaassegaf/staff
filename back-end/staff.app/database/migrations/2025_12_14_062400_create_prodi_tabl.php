@@ -26,7 +26,7 @@ return new class extends Migration
             $table->string('color', 15)->nullable();
             $table->integer('max_sks_skripsi')->nullable();
             $table->unsignedBigInteger('user_id')->nullable();
-            $table->string('ttd')->nullable();
+            $table->integer('tanda_tangan_id')->nullable();
             $table->timestamps();
             $table->string('token', 50)->nullable();
         });

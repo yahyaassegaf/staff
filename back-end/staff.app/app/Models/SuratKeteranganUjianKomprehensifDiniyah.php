@@ -15,4 +15,9 @@ class SuratKeteranganUjianKomprehensifDiniyah extends Model
     {
         return $this->belongsTo(Prodi::class, 'prodi_id');
     }
+
+    public function tandaTangan(): BelongsTo
+    {
+        return $this->belongsTo(TandaTangan::class, 'tanda_tangan_id');
+    }
 }

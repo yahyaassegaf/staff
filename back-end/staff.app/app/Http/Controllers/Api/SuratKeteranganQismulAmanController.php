@@ -14,6 +14,8 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class SuratKeteranganQismulAmanController extends Controller
 {
@@ -65,6 +67,13 @@ class SuratKeteranganQismulAmanController extends Controller
             });
         }
 
+        $auth = Auth::user()->jenis_kelamin;
+        if ($auth == 'L') {
+            $data->where('surat_keterangan_qismul_aman.jenis_kelamin', 'L');
+        } else {
+            $data->where('surat_keterangan_qismul_aman.jenis_kelamin', 'P');
+        }
+
         $data->orderBy(
             $request->input('sortBy', 'id'),
             $request->input('sortType', 'desc')
@@ -85,7 +94,7 @@ class SuratKeteranganQismulAmanController extends Controller
     {
         Log::info($request->all());
         try {
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'prodi_id' => 'nullable|exists:prodi,id',
                 'ketua' => 'nullable|string|max:255',
                 'nama_mhs' => 'required|string|max:255',
@@ -99,9 +108,17 @@ class SuratKeteranganQismulAmanController extends Controller
                 'tanggal_berlaku_dari' => 'required|date',
                 'tanggal_berlaku_sampai' => 'required|date',
                 'tanggal' => 'required|date',
-                'drive_file_id' => 'nullable|string',
-                'status' => 'nullable|in:pending,uploaded,failed',
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
 
             $login = Auth::user()->prodi ? Auth::user()->prodi->alias : 'UMUM';
             $no = NoSurat::orderByDesc('id')->value('nomor') ?? 0;
@@ -113,22 +130,21 @@ class SuratKeteranganQismulAmanController extends Controller
 
             $skqa = new SuratKeteranganQismulAman();
             $skqa->nomor_surat = $noSurat;
-            $skqa->ketua = $request->ketua;
-            $skqa->nama_lengkap = $request->nama_mhs;
-            $skqa->tempat_lahir = $request->tempat_lahir;
-            $skqa->tanggal_lahir = $request->tanggal_lahir;
-            $skqa->nim = $request->nim;
-            $skqa->prodi_id = $request->prodi_id;
-            $skqa->jenis_kelamin = $request->jenis_kelamin;
-            $skqa->prodi_mhs = $request->prodi_mhs;
-            $skqa->alamat_rumah = $request->alamat_rumah;
-            $skqa->kelas_pondok = $request->kelas_pondok;
-            $skqa->tanggal_berlaku_dari = $request->tanggal_berlaku_dari;
-            $skqa->tanggal_berlaku_sampai = $request->tanggal_berlaku_sampai;
-            $skqa->tanggal = $request->tanggal;
+            $skqa->ketua = $validate['ketua'] ?? null;
+            $skqa->nama_lengkap = $validate['nama_mhs'];
+            $skqa->tempat_lahir = $validate['tempat_lahir'];
+            $skqa->tanggal_lahir = $validate['tanggal_lahir'];
+            $skqa->nim = $validate['nim'];
+            $skqa->prodi_id = $validate['prodi_id'] ?? null;
+            $skqa->jenis_kelamin = Auth::user()->jenis_kelamin;
+            $skqa->prodi_mhs = $validate['prodi_mhs'];
+            $skqa->alamat_rumah = $validate['alamat_rumah'];
+            $skqa->kelas_pondok = $validate['kelas_pondok'];
+            $skqa->tanggal_berlaku_dari = $validate['tanggal_berlaku_dari'];
+            $skqa->tanggal_berlaku_sampai = $validate['tanggal_berlaku_sampai'];
+            $skqa->tanggal = $validate['tanggal'];
             $skqa->user_id = Auth::user()->id;
-            $skqa->drive_file_id = $request->drive_file_id;
-            $skqa->status = $request->status ?? 'pending';
+            $skqa->status = $validate['status'] ?? 'pending';
             $skqa->save();
 
             $Nomor              = new NoSurat();
@@ -186,7 +202,7 @@ class SuratKeteranganQismulAmanController extends Controller
     {
         Log::info($request->all());
         try {
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'prodi_id' => 'nullable|exists:prodi,id',
                 'ketua' => 'nullable|string|max:255',
                 'nama_mhs' => 'required|string|max:255',
@@ -200,9 +216,17 @@ class SuratKeteranganQismulAmanController extends Controller
                 'tanggal_berlaku_dari' => 'required|date',
                 'tanggal_berlaku_sampai' => 'required|date',
                 'tanggal' => 'required|date',
-                'drive_file_id' => 'nullable|string',
-                'status' => 'nullable|in:pending,uploaded,failed',
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
 
             $skqa = SuratKeteranganQismulAman::find($id);
             if (!$skqa) {
@@ -212,22 +236,21 @@ class SuratKeteranganQismulAmanController extends Controller
                 ]);
             }
 
-            $skqa->prodi_id = $request->prodi_id;
-            $skqa->ketua = $request->ketua;
-            $skqa->nama_lengkap = $request->nama_mhs;
-            $skqa->tempat_lahir = $request->tempat_lahir;
-            $skqa->tanggal_lahir = $request->tanggal_lahir;
-            $skqa->nim = $request->nim;
-            $skqa->jenis_kelamin = $request->jenis_kelamin;
-            $skqa->prodi_mhs = $request->prodi_mhs;
-            $skqa->alamat_rumah = $request->alamat_rumah;
-            $skqa->kelas_pondok = $request->kelas_pondok;
-            $skqa->tanggal_berlaku_dari = $request->tanggal_berlaku_dari;
-            $skqa->tanggal_berlaku_sampai = $request->tanggal_berlaku_sampai;
-            $skqa->tanggal = $request->tanggal;
-            $skqa->drive_file_id = $request->drive_file_id;
-            $skqa->status = $request->status ?? $skqa->status;
-
+            $skqa->prodi_id = $validate['prodi_id'] ?? $skqa->prodi_id;
+            $skqa->ketua = $validate['ketua'] ?? null;
+            $skqa->nama_lengkap = $validate['nama_mhs'];
+            $skqa->tempat_lahir = $validate['tempat_lahir'];
+            $skqa->tanggal_lahir = $validate['tanggal_lahir'];
+            $skqa->nim = $validate['nim'];
+            $skqa->jenis_kelamin = Auth::user()->jenis_kelamin;
+            $skqa->prodi_mhs = $validate['prodi_mhs'];
+            $skqa->alamat_rumah = $validate['alamat_rumah'];
+            $skqa->kelas_pondok = $validate['kelas_pondok'];
+            $skqa->tanggal_berlaku_dari = $validate['tanggal_berlaku_dari'];
+            $skqa->tanggal_berlaku_sampai = $validate['tanggal_berlaku_sampai'];
+            $skqa->tanggal = $validate['tanggal'];
+            // $skqa->drive_file_id = $validate['drive_file_id'] ?? $skqa->drive_file_id;
+            // $skqa->status = $validate['status'] ?? $skqa->status;
             $skqa->save();
 
             return response()->json([
@@ -273,10 +296,12 @@ class SuratKeteranganQismulAmanController extends Controller
     {
         try {
             $data = SuratKeteranganQismulAman::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_qismul_aman.prodi_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
                 ->select(
                     'surat_keterangan_qismul_aman.*',
                     'prodi.nama as nama_prodi',
-                    'prodi.alias as alias_prodi'
+                    'prodi.alias as alias_prodi',
+                    'tanda_tangan.gambar as ttd',
                 )
                 ->where('surat_keterangan_qismul_aman.id', $id)
                 ->first();
@@ -287,7 +312,9 @@ class SuratKeteranganQismulAmanController extends Controller
                     'message' => 'Data tidak ditemukan'
                 ], 404);
             }
+            $tddPath = base_path('../public_html/' . $data->ttd);
 
+            $tddBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tddPath));
             $kopPath = base_path('../public_html/img/kop.jpg');
             $kopBase64 = '';
             if (file_exists($kopPath)) {
@@ -309,6 +336,7 @@ class SuratKeteranganQismulAmanController extends Controller
                 'tanggal_berlaku_sampai' => Carbon::parse($data->tanggal_berlaku_sampai)->translatedFormat('d F Y'),
                 'tanggal_surat' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
                 'kopBase64' => $kopBase64,
+                'ttd' => $tddBase64,
             ];
 
             $pdf = Pdf::loadView('pdf.surat_qismul_aman', $pdfData)
@@ -327,7 +355,12 @@ class SuratKeteranganQismulAmanController extends Controller
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Keterangan Qismul Aman';
-            UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganQismulAman::class);
+
+            $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
+
+            if (!Storage::disk('google')->exists($googlePath)) {
+                UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganQismulAman::class);
+            }
 
             return response($pdf->output(), 200, [
                 'Content-Type' => 'application/pdf',

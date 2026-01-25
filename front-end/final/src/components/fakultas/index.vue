@@ -1,32 +1,103 @@
 <script lang="ts" setup>
-import { reactive, watch } from "vue";
+import { reactive, watch, ref, onMounted } from "vue";
+import Multiselect from "vue-multiselect";
+import "vue-multiselect/dist/vue-multiselect.min.css";
+import { apiGet } from "../../services/api/request";
 
 const props = defineProps({
   modelValue: Object,
   isEdit: Boolean,
+  errors: {
+    type: Object,
+    default: () => ({}),
+  },
 });
 
 const defaultForm = {
   id: "",
-  kode: "",
-  alias: "",
-  nama: "",
-  nama_fakultas: "",
   kode_fakultas: "",
+  nama_fakultas: "",
   dekan: "",
-  jenjang: "S1",
-  nidn_kepala: "",
-  nama_kepala: "",
+  nidn_dekan: "",
+  tanda_tangan_id: null as null | number,
+  prodi: [],
 };
 
 const form = reactive({ ...defaultForm });
+const listProdi = ref<any[]>([]);
+const listTandaTangan = ref<any[]>([]);
+const isLoadingProdi = ref(false);
+
+async function getProdi() {
+  isLoadingProdi.value = true;
+  try {
+    const response = await apiGet("/get-all-prodi");
+    if (response.success) {
+      const data = response.data?.data;
+      // Ensure listProdi is always an array
+      listProdi.value = Array.isArray(data) ? data : data ? [data] : [];
+    }
+  } catch (error) {
+    console.log(error);
+  } finally {
+    isLoadingProdi.value = false;
+  }
+}
+
+async function getTandaTangan() {
+  try {
+    const response = await apiGet("/tanda-tangan");
+    if (response.success) {
+      const data =
+        response.data?.data?.data || response.data?.data || response.data;
+      listTandaTangan.value = Array.isArray(data) ? data : [data];
+    }
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+onMounted(() => {
+  getProdi();
+  getTandaTangan();
+});
+
+const isLoadingData = ref(false);
 
 watch(
   () => props.modelValue,
-  (val) => {
-    console.log(val);
+  async (val) => {
     if (props.isEdit && val) {
+      if (!val.nama_fakultas) {
+        isLoadingData.value = true;
+        return;
+      }
+
+      isLoadingData.value = true;
+
+      // Pastikan listTandaTangan sudah terisi sebelum set form
+      if (listTandaTangan.value.length === 0) {
+        await getTandaTangan();
+      }
+
+      // Simulasi loading untuk efek skeleton
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Simpan tanda_tangan_id sebelum Object.assign
+      const savedTandaTanganId = val.tanda_tangan_id
+        ? Number(val.tanda_tangan_id)
+        : null;
+
+      // Reset form then assign
+      Object.assign(form, defaultForm);
       Object.assign(form, val);
+      // Ensure form.prodi is an array for Multiselect
+      if (!form.prodi) form.prodi = [];
+
+      // Set tanda_tangan_id dengan nilai yang sudah disimpan
+      form.tanda_tangan_id = savedTandaTanganId;
+
+      isLoadingData.value = false;
     }
   },
   { immediate: true }
@@ -56,107 +127,115 @@ function submitForm() {
                   >Nama Fakultas :</label
                 >
                 <input type="hidden" v-if="isEdit" v-model="form.id" />
+                <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
+                  v-else
                   type="text"
                   v-model="form.nama_fakultas"
                   class="form-control"
+                  :class="{ 'is-invalid': errors?.nama_fakultas }"
                   id="input-nama"
                   placeholder="Isikan nama fakultas"
                 />
+                <div v-if="errors?.nama_fakultas" class="invalid-feedback">
+                  {{ errors.nama_fakultas[0] }}
+                </div>
               </div>
               <div class="col-xl-12">
                 <label for="input-kode" class="form-label">Kode :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
+                  v-else
                   type="text"
                   v-model="form.kode_fakultas"
                   class="form-control"
+                  :class="{ 'is-invalid': errors?.kode_fakultas }"
                   id="input-kode"
                   placeholder="Isikan kode"
                 />
+                <div v-if="errors?.kode_fakultas" class="invalid-feedback">
+                  {{ errors.kode_fakultas[0] }}
+                </div>
               </div>
               <div class="col-xl-12">
                 <label for="input-nama-kepala" class="form-label"
                   >Dekan :</label
                 >
+                <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
+                  v-else
                   type="text"
                   v-model="form.dekan"
                   class="form-control"
+                  :class="{ 'is-invalid': errors?.dekan }"
                   id="input-nama-kepala"
-                  placeholder="Isikan nama kepala prodi"
+                  placeholder="Isikan nama dekan"
                 />
+                <div v-if="errors?.dekan" class="invalid-feedback">
+                  {{ errors.dekan[0] }}
+                </div>
               </div>
-            </div>
-            <div class="row gy-3">
+
               <div class="col-xl-12">
-                <label for="input-nama" class="form-label">Nama Prodi :</label>
-                <input type="hidden" v-if="isEdit" v-model="form.id" />
+                <label for="input-nidn-dekan" class="form-label"
+                  >NIDN Dekan :</label
+                >
+                <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
+                  v-else
                   type="text"
-                  v-model="form.nama"
+                  v-model="form.nidn_dekan"
                   class="form-control"
-                  id="input-nama"
-                  placeholder="Isikan nama prodi"
+                  :class="{ 'is-invalid': errors?.nidn_dekan }"
+                  id="input-nidn-dekan"
+                  placeholder="Isikan NIDN dekan"
                 />
+                <div v-if="errors?.nidn_dekan" class="invalid-feedback">
+                  {{ errors.nidn_dekan[0] }}
+                </div>
               </div>
-              <div class="col-xl-6">
-                <label for="input-kode" class="form-label">Kode :</label>
-                <input
-                  type="text"
-                  v-model="form.kode"
-                  class="form-control"
-                  id="input-kode"
-                  placeholder="Isikan kode"
-                />
-              </div>
-              <div class="col-xl-6">
-                <label for="input-alias" class="form-label">Alias :</label>
-                <input
-                  type="text"
-                  v-model="form.alias"
-                  class="form-control"
-                  id="input-alias"
-                  maxlength="5"
-                  placeholder="Isikan alias"
-                />
-              </div>
-              <div class="col-xl-6">
-                <label for="input-jenjang" class="form-label">Jenjang :</label>
+
+              <div class="col-xl-12">
+                <label class="form-label">Tanda Tangan (Dekan) :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
                 <select
+                  v-else
+                  v-model="form.tanda_tangan_id"
                   class="form-select"
-                  v-model="form.jenjang"
-                  id="input-jenjang"
-                  aria-label="Pilih jenjang"
+                  :class="{ 'is-invalid': errors?.tanda_tangan_id }"
                 >
-                  <option value="S1">S1</option>
-                  <option value="S2">S2</option>
-                  <option value="S3">S3</option>
+                  <option :value="null">-- Pilih Tanda Tangan --</option>
+                  <option
+                    v-for="ttd in listTandaTangan"
+                    :key="ttd.id"
+                    :value="Number(ttd.id)"
+                  >
+                    {{ ttd.nama }}
+                  </option>
                 </select>
+                <div v-if="errors?.tanda_tangan_id" class="invalid-feedback">
+                  {{ errors.tanda_tangan_id[0] }}
+                </div>
               </div>
-              <div class="col-xl-6">
-                <label for="input-nidn-kepala" class="form-label"
-                  >NIDN Kepala :</label
-                >
-                <input
-                  type="text"
-                  v-model="form.nidn_kepala"
-                  class="form-control"
-                  id="input-nidn-kepala"
-                  maxlength="15"
-                  placeholder="Isikan NIDN kepala prodi"
-                />
-              </div>
+
               <div class="col-xl-12">
-                <label for="input-nama-kepala" class="form-label"
-                  >Kepala Prodi :</label
-                >
-                <input
-                  type="text"
-                  v-model="form.nama_kepala"
-                  class="form-control"
-                  id="input-nama-kepala"
-                  placeholder="Isikan nama kepala prodi"
-                />
+                <label class="form-label">Program Studi :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
+                <Multiselect
+                  v-else
+                  v-model="form.prodi"
+                  :options="listProdi"
+                  :multiple="true"
+                  :close-on-select="false"
+                  :clear-on-select="false"
+                  placeholder="Pilih Program Studi"
+                  label="nama"
+                  track-by="id"
+                  :class="{ 'is-invalid': errors?.prodi }"
+                ></Multiselect>
+                <div v-if="errors?.prodi" class="text-danger small mt-1">
+                  {{ errors.prodi[0] }}
+                </div>
               </div>
             </div>
           </div>
@@ -171,4 +250,21 @@ function submitForm() {
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.skeleton-input {
+  height: 38px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: 5px;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+</style>

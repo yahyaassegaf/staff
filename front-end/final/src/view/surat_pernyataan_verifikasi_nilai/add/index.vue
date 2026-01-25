@@ -11,16 +11,35 @@ export default defineComponent({
   },
   setup() {
     const loading = ref(false);
+    const errors = ref<any>({});
     async function submit(params: any) {
       try {
+        errors.value = {};
         loading.value = true;
         const response = await apiPost("/spvn", params);
 
-        if (response.success || response.data.status) {
-          toast.success("Surat Berhasil Ditambahkan");
+        if (response.success == true) {
+          toast.success("Surat Berhasil Ditambahkan", {
+            theme: "auto",
+            icon: true,
+            hideProgressBar: true,
+            autoClose: true,
+            position: "top-right",
+          });
           router.push({ path: "/spvn" });
         } else {
-          toast.error("Surat gagal Ditambahkan");
+          if ((response.error as any)?.response?.status === 422) {
+            errors.value = (response.error as any).response.data.errors;
+            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+          } else {
+            toast.error("Surat gagal Ditambahkan", {
+              theme: "auto",
+              icon: true,
+              hideProgressBar: true,
+              autoClose: true,
+              position: "top-right",
+            });
+          }
         }
       } catch (error) {
         console.log(error);
@@ -33,11 +52,12 @@ export default defineComponent({
     return {
       loading,
       submit,
+      errors,
     };
   },
 });
 </script>
 
 <template>
-  <FormComponent @submit="submit" :isEdit="false" />
+  <FormComponent @submit="submit" :isEdit="false" :errors="errors" />
 </template>

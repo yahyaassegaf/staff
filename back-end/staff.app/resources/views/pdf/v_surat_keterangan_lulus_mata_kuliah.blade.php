@@ -8,7 +8,7 @@
     <style>
         /* WAJIB untuk DomPDF */
         @page {
-            margin: 2cm 2cm 2cm 2cm;
+            margin: 1cm 2cm 1cm 2cm;
         }
 
         body {
@@ -43,10 +43,9 @@
         }
 
         .paragraf {
-            /* text-align: justify; */
-            margin-left: -1px;
-            margin-bottom: 5px;
+            text-align: justify;
             text-indent: 1.25cm;
+            margin-bottom: 10px;
         }
 
         table.data {
@@ -73,14 +72,16 @@
         }
 
         .nama-ttd {
-            margin-top: 60px;
+            margin-top: 10px;
             font-weight: bold;
             text-decoration: underline;
         }
 
         .kop img {
+            margin-top: 5px;
             width: 100%;
-            height: auto;
+            max-height: 155px;
+            object-fit: contain;
             display: block;
         }
 
@@ -90,7 +91,7 @@
         }
 
         .kop {
-            margin-top: -1.5cm;
+            margin-top: -2.1cm;
             /* naik ke atas */
             margin-left: -1.5cm;
             /* tembus margin kiri */
@@ -177,23 +178,40 @@
         Demikian surat keterangan ini kami buat dengan sebenar-benarnya sebagai persyaratan agar
         mahasiswa tersebut dapat mengikuti ujian skripsi.
     </div>
-
+    <!-- AREA TTD & STEMPEL -->
     <!-- TANDA TANGAN -->
-    <table class="ttd">
+    <table class="ttd" width="100%" cellpadding="0" cellspacing="0" style="margin-top:50px;">
         <tr>
             <td width="60%"></td>
-            <td class="text-right">
-                Bangil, {{ $tanggal_surat }}<br>
-                Kaprodi {{ $alias_prodi }}
 
-                <div class="nama-ttd">
+            <!-- BLOK KANAN -->
+            <td width="40%" style="text-align:center;">
+                Bangil, {{ $tanggal_surat }}<br>
+                Kepala Prodi {{ $alias_prodi }}<br>
+
+                <!-- AREA TTD (OVERLAY AMAN) -->
+                <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="
+            height:70px;
+            text-align:center;
+            vertical-align:middle;
+            background-image: url('{{ $stempel }}');
+            background-repeat: no-repeat;
+            background-position: 20% 60%;
+            background-size: 90px 90px;
+        ">
+                            <img src="{{ $ttd }}" style="width:250px;">
+                        </td>
+                    </tr>
+                </table>
+                <div class="nama-ttd" style="margin-top:4px;">
                     {{ $nama_kepala_prodi }}
                 </div>
-                NIY : {{ $nidn_kepala_prodi }}
+                NIDN : {{ $nidn_kepala_prodi }}
             </td>
         </tr>
     </table>
-
 </body>
 
 </html>

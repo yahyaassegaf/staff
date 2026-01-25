@@ -8,12 +8,15 @@ use App\Models\LogSurat;
 use App\Models\NoSurat;
 use App\Models\Prodi;
 use App\Models\SuratKeteranganUjianKomprehensifDiniyah;
+use App\Models\TandaTangan;
 use App\Services\SuratService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
 {
@@ -34,6 +37,13 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
                     ->orWhere('prodi.nama', 'like', "%{$search}%")
                     ->orWhere('kelas_pondok', 'like', "%{$search}%");
             });
+        }
+
+        $auth = Auth::user()->jenis_kelamin;
+        if ($auth == 'L') {
+            $data->where('surat_keterangan_ujian_komprehensif_diniyah.jenis_kelamin', 'L');
+        } else {
+            $data->where('surat_keterangan_ujian_komprehensif_diniyah.jenis_kelamin', 'P');
         }
 
         if ($request->filled('prodi_id')) {
@@ -65,7 +75,7 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
     {
         Log::info($request->all());
         try {
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'prodi_id'      => 'required',
                 'nama_mhs'      => 'required|string|max:255',
                 'tempat_lahir'  => 'required|string|max:100',
@@ -75,9 +85,19 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
                 'alamat_rumah'  => 'required|string',
                 'kelas_pondok'  => 'required|string|max:255',
                 'tanggal'       => 'required|date',
-                'koor_kompre'   => 'nullable|string',
+                'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
                 'ttd'           => 'nullable|string',
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
 
             $login = Auth::user()->prodi->alias;
             $no = NoSurat::orderByDesc('id')->value('nomor') ?? 0;
@@ -86,7 +106,7 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
             // Format nomor surat: 001/SK.UKD/K.FTI/2025
             // K + Alias Prodi (KFTI)
             $tahun = date('Y');
-            $unit = 'K.' . strtoupper($login);
+            $unit = 'WR1';
             // Assuming strict format is needed, adapting from existing service pattern would be best, 
             // but for now constructing manually as per common pattern or using the provided number directly if handled by service.
             // Logic in reference uses SuratService::NoSuratKeteranganLulusMataKuliah($no_surat, $unit);
@@ -96,21 +116,31 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
             // I will use a generic format or custom if Service not updated.
             // Let's assume standard format: NO/SK.UKD/UNIT/YEAR
 
-            $noSurat = SuratService::NoSuratKeteranganLulusMataKuliah($no_surat, $unit);
+            $noSurat = SuratService::NoSuratKomprehensif($no_surat, $unit);
 
             $data = new SuratKeteranganUjianKomprehensifDiniyah();
             $data->nomor_surat = $noSurat;
-            $data->prodi_id = $request->prodi_id;
-            $data->nama_lengkap = $request->nama_mhs;
-            $data->tempat_lahir = $request->tempat_lahir;
-            $data->tanggal_lahir = $request->tanggal_lahir;
-            $data->nim = $request->nim;
-            $data->prodi_mhs = $request->prodi_mhs;
-            $data->alamat_rumah = $request->alamat_rumah;
-            $data->kelas_pondok = $request->kelas_pondok;
-            $data->tanggal = $request->tanggal;
-            $data->koor_komprehensif = $request->koordinator_kompre;
-            $data->ttd = $request->ttd;
+            $data->prodi_id = $validate['prodi_id'];
+            $data->nama_lengkap = $validate['nama_mhs'];
+            $data->tempat_lahir = $validate['tempat_lahir'];
+            $data->tanggal_lahir = $validate['tanggal_lahir'];
+            $data->nim = $validate['nim'];
+            $data->prodi_mhs = $validate['prodi_mhs'];
+            $data->alamat_rumah = $validate['alamat_rumah'];
+            $data->kelas_pondok = $validate['kelas_pondok'];
+            $data->tanggal = $validate['tanggal'];
+            $data->tanda_tangan_id = $validate['tanda_tangan_id'] ?? null;
+            // Set koor_komprehensif from tanda_tangan nama if provided
+            if (!empty($validate['tanda_tangan_id'])) {
+                $tandaTangan = TandaTangan::find($validate['tanda_tangan_id']);
+                $data->koor_komprehensif = $tandaTangan?->nama;
+                $data->ttd = $tandaTangan?->ttd;
+            } else {
+                $data->ttd = $validate['ttd'] ?? null;
+            }
+            $data->user_id = Auth::user()->id;
+            $data->jenis_kelamin = Auth::user()->jenis_kelamin;
+            $data->status = 'pending';
             $data->save();
 
             $Nomor = new NoSurat();
@@ -166,9 +196,9 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
     {
         Log::info($request->all());
         try {
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'prodi_id' => 'sometimes|exists:prodi,id',
-                'nama_lengkap' => 'sometimes|string|max:255',
+                'nama_mhs' => 'sometimes|string|max:255',
                 'tempat_lahir' => 'sometimes|string|max:100',
                 'tanggal_lahir' => 'sometimes|date',
                 'nim' => 'sometimes|string|max:255',
@@ -176,9 +206,19 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
                 'alamat_rumah' => 'sometimes|string',
                 'kelas_pondok' => 'sometimes|string|max:255',
                 'tanggal' => 'sometimes|date',
-                'koor_komprehensif' => 'nullable|string',
+                'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
                 'ttd' => 'nullable|string',
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
 
             $data = SuratKeteranganUjianKomprehensifDiniyah::find($id);
             if (!$data) {
@@ -188,7 +228,43 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
                 ]);
             }
 
-            $data->update($validate);
+            if (array_key_exists('prodi_id', $validate)) {
+                $data->prodi_id = $validate['prodi_id'];
+            }
+            if (array_key_exists('nama_mhs', $validate)) {
+                $data->nama_lengkap = $validate['nama_mhs'];
+            }
+            if (array_key_exists('tempat_lahir', $validate)) {
+                $data->tempat_lahir = $validate['tempat_lahir'];
+            }
+            if (array_key_exists('tanggal_lahir', $validate)) {
+                $data->tanggal_lahir = $validate['tanggal_lahir'];
+            }
+            if (array_key_exists('nim', $validate)) {
+                $data->nim = $validate['nim'];
+            }
+            if (array_key_exists('prodi_mhs', $validate)) {
+                $data->prodi_mhs = $validate['prodi_mhs'];
+            }
+            if (array_key_exists('alamat_rumah', $validate)) {
+                $data->alamat_rumah = $validate['alamat_rumah'];
+            }
+            if (array_key_exists('kelas_pondok', $validate)) {
+                $data->kelas_pondok = $validate['kelas_pondok'];
+            }
+            if (array_key_exists('tanggal', $validate)) {
+                $data->tanggal = $validate['tanggal'];
+            }
+            if (array_key_exists('tanda_tangan_id', $validate)) {
+                $data->tanda_tangan_id = $validate['tanda_tangan_id'];
+                // Update koor_komprehensif and ttd from tanda_tangan
+                if (!empty($validate['tanda_tangan_id'])) {
+                    $tandaTangan = TandaTangan::find($validate['tanda_tangan_id']);
+                    $data->koor_komprehensif = $tandaTangan?->nama;
+                    $data->ttd = $tandaTangan?->ttd;
+                }
+            }
+            $data->save();
 
             return response()->json([
                 'status' => true,
@@ -234,13 +310,16 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
         Log::info('masuk.....');
         Log::info($id);
         try {
-            $data = SuratKeteranganUjianKomprehensifDiniyah::join('prodi', 'prodi.id', '=', 'surat_keterangan_ujian_komprehensif_diniyah.prodi_id')
-                ->join('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
-                ->join('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+            $data = SuratKeteranganUjianKomprehensifDiniyah::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_ujian_komprehensif_diniyah.prodi_id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_keterangan_ujian_komprehensif_diniyah.tanda_tangan_id')
                 ->select(
                     'surat_keterangan_ujian_komprehensif_diniyah.*',
                     'prodi.nama as nama_prodi',
-                    'fakultas.nama as fakultas'
+                    'fakultas.nama as fakultas',
+                    'tanda_tangan.nama as nama_ttd',
+                    'tanda_tangan.gambar as ttd'
                 )
                 ->where('surat_keterangan_ujian_komprehensif_diniyah.id', $id)
                 ->first();
@@ -254,6 +333,12 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
             Log::info($data);
             $kopPath = base_path('../public_html/img/kop.jpg');
             $kopBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath));
+            $tddPath = base_path('../public_html/' . $data->ttd);
+
+            $tddBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tddPath));
+            $stempelPath = base_path('../public_html/img/stempel.png');
+
+            $stempelBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($stempelPath));
             $pdfData = [
                 'nomor_surat' => $data->nomor_surat,
                 'nama' => $data->nama_lengkap,
@@ -265,9 +350,11 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
                 'alamat' => $data->alamat_rumah,
                 'kelas' => $data->kelas_pondok,
                 'tanggal_surat' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
-                'nama_penandatangan' => $data->koor_komprehensif, // Assuming ttd field contains the name
+                'nama_penandatangan' => $data->nama_ttd, // Assuming ttd field contains the name
                 'jabatan_penandatangan' => 'Ketua / Koordinator Komprehensip',
-                'kopBase64' => $kopBase64, // Static title based on blade template
+                'kopBase64' => $kopBase64,
+                'ttd' => $tddBase64,
+                'stempel' => $stempelBase64
             ];
 
             // Load view pdf.komprehensif created by user
@@ -289,7 +376,12 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Keterangan Ujian Komprehensif Diniyah';
-            UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganUjianKomprehensifDiniyah::class);
+
+            $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
+
+            if (!Storage::disk('google')->exists($googlePath)) {
+                UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganUjianKomprehensifDiniyah::class);
+            }
 
             return response($pdf->output(), 200, [
                 'Content-Type' => 'application/pdf',

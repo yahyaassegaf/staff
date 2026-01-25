@@ -14,6 +14,8 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class SuratKeteranganLulusMataKuliahController extends Controller
 {
@@ -51,6 +53,13 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             $data->where('prodi_id', $login->id);
         }
 
+        $auth = Auth::user()->jenis_kelamin;
+        if ($auth == 'L') {
+            $data->where('surat_keterangan_lulus_mata_kuliah.jenis_kelamin', 'L');
+        } else {
+            $data->where('surat_keterangan_lulus_mata_kuliah.jenis_kelamin', 'P');
+        }
+
         if ($request->filled('search')) {
             $search = $request->search;
             $data->where(function ($q) use ($search) {
@@ -82,7 +91,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
     {
         Log::info($request->all());
         try {
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required',
                 'nama_mhs' => 'required|string|max:255',
                 'tempat_lahir' => 'required|string|max:100',
@@ -92,9 +101,17 @@ class SuratKeteranganLulusMataKuliahController extends Controller
                 'alamat_rumah' => 'required|string',
                 'kelas_pondok' => 'required|string|max:255',
                 'tanggal' => 'nullable|date',
-                'drive_file_id' => 'nullable|string',
-                'status' => 'nullable|in:pending,uploaded,failed',
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
             // Generate nomor surat
             // $tahun = date('Y');
             // $count = SuratKeteranganLulusMataKuliah::whereYear('created_at', $tahun)->count() + 1;
@@ -112,29 +129,29 @@ class SuratKeteranganLulusMataKuliahController extends Controller
 
             $noSurat = SuratService::NoSuratKeteranganLulusMataKuliah($no_surat, $unit);
 
-            $sklmk = new SuratKeteranganLulusMataKuliah();
-            $sklmk->nomor_surat = $noSurat;
-            $sklmk->prodi_id = $request->prodi_id;
-            $sklmk->nama_lengkap = $request->nama_mhs;
-            $sklmk->tempat_lahir = $request->tempat_lahir;
-            $sklmk->tanggal_lahir = $request->tanggal_lahir;
-            $sklmk->nim = $request->nim;
-            $sklmk->prodi_mahasiswa = $request->prodi_mhs;
-            $sklmk->alamat_rumah = $request->alamat_rumah;
-            $sklmk->kelas_pondok = $request->kelas_pondok;
-            $sklmk->tanggal = $request->tanggal;
-            $sklmk->user_id = Auth::user()->id;
-            $sklmk->drive_file_id = $request->drive_file_id;
-            $sklmk->status = $request->status ?? 'pending';
+            $sklmk                  = new SuratKeteranganLulusMataKuliah();
+            $sklmk->nomor_surat     = $noSurat;
+            $sklmk->prodi_id        = $validate['prodi_id'];
+            $sklmk->nama_lengkap    = $validate['nama_mhs'];
+            $sklmk->tempat_lahir    = $validate['tempat_lahir'];
+            $sklmk->tanggal_lahir   = $validate['tanggal_lahir'];
+            $sklmk->nim             = $validate['nim'];
+            $sklmk->prodi_mahasiswa = $validate['prodi_mhs'];
+            $sklmk->alamat_rumah    = $validate['alamat_rumah'];
+            $sklmk->kelas_pondok    = $validate['kelas_pondok'];
+            $sklmk->tanggal         = $validate['tanggal'] ?? date('Y-m-d');
+            $sklmk->user_id         = Auth::user()->id;
+            $sklmk->jenis_kelamin   = Auth::user()->jenis_kelamin;
+            $sklmk->status          = $validate['status'] ?? 'pending';
             $sklmk->save();
 
-            $Nomor              = new NoSurat();
-            $Nomor->nomor       = $no_surat;
-            $Nomor->user_id     = Auth::user()->id;
+            $Nomor                  = new NoSurat();
+            $Nomor->nomor           = $no_surat;
+            $Nomor->user_id         = Auth::user()->id;
             $Nomor->save();
 
-            $log                = new LogSurat();
-            $log->nomor         = $no_surat;
+            $log                    = new LogSurat();
+            $log->nomor             = $no_surat;
             $log->nomor_surat   = $noSurat;
             $log->nama_surat = 'Surat Keterangan Lulus Mata Kuliah';
             $log->user_id = Auth::user()->id;
@@ -185,7 +202,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
     {
         Log::info($request->all());
         try {
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'prodi_id' => 'sometimes|exists:prodi,id',
                 'nama_mhs' => 'required|string|max:255',
                 'tempat_lahir' => 'required|string|max:100',
@@ -199,6 +216,16 @@ class SuratKeteranganLulusMataKuliahController extends Controller
                 'status' => 'nullable|in:pending,uploaded,failed',
             ]);
 
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
+
             $sklmk = SuratKeteranganLulusMataKuliah::find($id);
             if (!$sklmk) {
                 return response()->json([
@@ -207,40 +234,18 @@ class SuratKeteranganLulusMataKuliahController extends Controller
                 ]);
             }
 
-            if (array_key_exists('prodi_id', $validate)) {
-                $sklmk->prodi_id = $validate['prodi_id'];
-            }
-            if (array_key_exists('nama_mhs', $validate)) {
-                $sklmk->nama_lengkap = $validate['nama_mhs'];
-            }
-            if (array_key_exists('tempat_lahir', $validate)) {
-                $sklmk->tempat_lahir = $validate['tempat_lahir'];
-            }
-            if (array_key_exists('tanggal_lahir', $validate)) {
-                $sklmk->tanggal_lahir = $validate['tanggal_lahir'];
-            }
-            if (array_key_exists('nim', $validate)) {
-                $sklmk->nim = $validate['nim'];
-            }
-            if (array_key_exists('prodi_mhs', $validate)) {
-                $sklmk->prodi_mahasiswa = $validate['prodi_mhs'];
-            }
-            if (array_key_exists('alamat_rumah', $validate)) {
-                $sklmk->alamat_rumah = $validate['alamat_rumah'];
-            }
-            if (array_key_exists('kelas_pondok', $validate)) {
-                $sklmk->kelas_pondok = $validate['kelas_pondok'];
-            }
-            if (array_key_exists('tanggal', $validate)) {
-                $sklmk->tanggal = $validate['tanggal'];
-            }
-            if (array_key_exists('drive_file_id', $validate)) {
-                $sklmk->drive_file_id = $validate['drive_file_id'];
-            }
-            if (array_key_exists('status', $validate)) {
-                $sklmk->status = $validate['status'];
-            }
-
+            $sklmk->prodi_id = $validate['prodi_id'] ?? $sklmk->prodi_id;
+            $sklmk->nama_lengkap = $validate['nama_mhs'];
+            $sklmk->tempat_lahir = $validate['tempat_lahir'];
+            $sklmk->tanggal_lahir = $validate['tanggal_lahir'];
+            $sklmk->nim = $validate['nim'];
+            $sklmk->prodi_mahasiswa = $validate['prodi_mhs'];
+            $sklmk->alamat_rumah = $validate['alamat_rumah'];
+            $sklmk->kelas_pondok = $validate['kelas_pondok'];
+            $sklmk->tanggal = $validate['tanggal'];
+            $sklmk->jenis_kelamin = Auth::user()->jenis_kelamin;
+            $sklmk->drive_file_id = $validate['drive_file_id'] ?? $sklmk->drive_file_id;
+            $sklmk->status = $validate['status'] ?? $sklmk->status;
             $sklmk->save();
 
             return response()->json([
@@ -287,29 +292,39 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             $data = SuratKeteranganLulusMataKuliah::join('prodi', 'prodi.id', '=', 'surat_keterangan_lulus_mata_kuliah.prodi_id')
                 ->join('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
                 ->join('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->join('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
                 ->select(
                     'surat_keterangan_lulus_mata_kuliah.*',
                     'prodi.nama as nama_prodi',
                     'fakultas.nama as fakultas',
                     'prodi.alias as alias_prodi',
                     'prodi.nidn_kepala as nidn_kepala_prodi',
-                    'prodi.nama_kepala as nama_kepala_prodi'
+                    'prodi.nama_kepala as nama_kepala_prodi',
+                    'tanda_tangan.gambar as ttd',
                 )
                 ->where('surat_keterangan_lulus_mata_kuliah.id', $id)
                 ->first();
             Log::info($data);
             if (!$data) {
-                Log::info('data kosong');
                 return response()->json([
                     'status' => false,
                     'message' => 'Data tidak ditemukan'
                 ], 404);
             }
-            Log::info('data ada');
+
+
             $kopPath = base_path('../public_html/img/kop.jpg');
-            Log::info($kopPath);
+
             $kopBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath));
-            Log::info($kopBase64);
+
+            $stempelPath = base_path('../public_html/img/stempel.png');
+
+            $stempelBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($stempelPath));
+
+            $tddPath = base_path('../public_html/' . $data->ttd);
+
+            $tddBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tddPath));
+
             $pdfData = [
                 'nomor_surat' => $data->nomor_surat,
                 'nama' => $data->nama_lengkap,
@@ -323,20 +338,20 @@ class SuratKeteranganLulusMataKuliahController extends Controller
                 'alias_prodi' => $data->alias_prodi,
                 'nama_kepala_prodi' => $data->nama_kepala_prodi,
                 'nidn_kepala_prodi' => $data->nidn_kepala_prodi,
-                'tanggal_surat' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
-                'nama_penandatangan' => $data->koor_komprehensif, // Assuming ttd field contains the name
-                'jabatan_penandatangan' => 'Ketua / Koordinator Komprehensip',
+                'tanggal_surat' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'), // Assuming ttd field contains the name
+                'stempel' => $stempelBase64,
+                'ttd' => $tddBase64,
                 'kopBase64' => $kopBase64, // Static title based on blade template
             ];
-            Log::info($pdfData);
+
             // Load view pdf.komprehensif created by user
             $pdf = Pdf::loadView('pdf.v_surat_keterangan_lulus_mata_kuliah', $pdfData)
                 ->setPaper('a4', 'portrait');
-            Log::info('pdf');
-            $fileName = 'surat_keterangan_lulus_mata_kuliah_' . $data->nim . '_' . $data->alias_prodi . '.pdf';
-            Log::info($fileName);
+
+            $fileName = 'surat_keterangan_lulus_mata_kuliah_' . $data->nim . '_' . $data->prodi_mahasiswa . '.pdf';
+
             $directory = public_path('pdf/');
-            Log::info($directory);
+
             if (!file_exists($directory)) {
                 mkdir($directory, 0755, true);
             }
@@ -348,7 +363,12 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Keterangan Lulus Mata Kuliah';
-            UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganLulusMataKuliah::class);
+
+            $googlePath = $data->prodi_mahasiswa . '/' . $nameTable . '/' . $fileName;
+
+            if (!Storage::disk('google')->exists($googlePath)) {
+                UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi_mahasiswa, SuratKeteranganLulusMataKuliah::class);
+            }
 
             return response($pdf->output(), 200, [
                 'Content-Type' => 'application/pdf',

@@ -26,7 +26,7 @@ return new class extends Migration
             $table->date('tanggal');
             $table->integer('user_id');
             $table->integer('prodi_id');
-            $table->string('jenis_kelamin');
+             $table->enum('jenis_kelamin',['L','P'])->nullable();
             $table->string('drive_file_id')->nullable();
             $table->string('local_path')->nullable();
             $table->string('drive_link')->nullable();

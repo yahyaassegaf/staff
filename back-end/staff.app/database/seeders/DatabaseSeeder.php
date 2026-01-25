@@ -2,10 +2,12 @@
 
 namespace Database\Seeders;
 
+use App\Models\FakultasProdi;
 use App\Models\Level;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
@@ -18,6 +20,9 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // User::factory(10)->create();
+        $this->call([
+            TandaTanganSeeder::class,
+        ]);
         $this->call([
             ProdiSeeder::class,
         ]);
@@ -35,6 +40,7 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('123456'),
             'level_id' => 1,
             'prodi_id' => 10,
+            'jenis_kelamin' => 'L',
             'email'    => 'prodipba@example.com',
         ]);
         User::factory()->create([
@@ -42,6 +48,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'prodihki',
             'password' => Hash::make('123456'),
             'level_id' => 1,
+            'jenis_kelamin' => 'L',
             'email'    => 'prodihki@example.com',
         ]);
         User::factory()->create([
@@ -49,6 +56,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'prodimhu',
             'password' => Hash::make('123456'),
             'level_id' => 1,
+            'jenis_kelamin' => 'L',
             'email'    => 'prodimhu@example.com',
         ]);
         User::factory()->create([
@@ -56,6 +64,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'prodiesy',
             'password' => Hash::make('123456'),
             'level_id' => 1,
+            'jenis_kelamin' => 'L',
             'email'    => 'prodiesy@example.com',
         ]);
         User::factory()->create([
@@ -63,6 +72,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'prodimpi',
             'password' => Hash::make('123456'),
             'level_id' => 1,
+            'jenis_kelamin' => 'L',
             'email'    => 'prodimpi@example.com',
         ]);
         User::factory()->create([
@@ -70,6 +80,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'prodikpi',
             'password' => Hash::make('123456'),
             'level_id' => 1,
+            'jenis_kelamin' => 'L',
             'email' => 'prodikpi@example.com',
         ]);
         User::factory()->create([
@@ -77,6 +88,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'prodispa',
             'password' => Hash::make('123456'),
             'level_id' => 1,
+            'jenis_kelamin' => 'L',
             'email' => 'prodispa@example.com',
         ]);
         User::factory()->create([
@@ -84,6 +96,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'prodikpk',
             'password' => Hash::make('123456'),
             'level_id' => 1,
+            'jenis_kelamin' => 'L',
             'email' => 'prodikpk@example.com',
         ]);
         User::factory()->create([
@@ -91,6 +104,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'prodimtk',
             'password' => Hash::make('123456'),
             'level_id' => 1,
+            'jenis_kelamin' => 'L',
             'email' => 'prodimtk@example.com',
         ]);
         User::factory()->create([
@@ -98,6 +112,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'prodipai',
             'password' => Hash::make('123456'),
             'level_id' => 1,
+            'jenis_kelamin' => 'L',
             'email' => 'prodipai@example.com',
         ]);
         User::factory()->create([
@@ -105,6 +120,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'prodibki',
             'password' => Hash::make('123456'),
             'level_id' => 1,
+            'jenis_kelamin' => 'L',
             'email' => 'prodispi@example.com',
         ]);
         User::factory()->create([
@@ -112,6 +128,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'prodiipa',
             'password' => Hash::make('123456'),
             'level_id' => 1,
+            'jenis_kelamin' => 'L',
             'email' => 'prodiipa@example.com',
         ]);
         User::factory()->create([
@@ -119,6 +136,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'prodiips',
             'password' => Hash::make('123456'),
             'level_id' => 1,
+            'jenis_kelamin' => 'L',
             'email' => 'prodiips@example.com',
         ]);
     }

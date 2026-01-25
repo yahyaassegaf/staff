@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { reactive, ref, watch, onMounted } from "vue";
+import { reactive, ref, watch, onMounted, nextTick } from "vue";
 import Multiselect from "vue-multiselect";
 import "vue-multiselect/dist/vue-multiselect.min.css";
 import { apiGet } from "../../services/api/request";
@@ -8,13 +8,17 @@ import { debounce } from "vuetify/lib/util/helpers.mjs";
 const props = defineProps({
   modelValue: Object,
   isEdit: Boolean,
+  errors: {
+    type: Object,
+    default: () => ({}),
+  },
 });
 
 const defaultForm = {
   id: "",
   nomor: "",
   prodi_id: 0,
-  dekan: "",
+  th_akademik_id: null as null | number,
   nama: "",
   tanggal_lahir: "",
   nim: "",
@@ -25,7 +29,7 @@ const defaultForm = {
   jenis_kelamin: "",
 };
 
-const isFromSystem = ref(true);
+const disableListMhsWatcher = ref(false);
 
 const readonlyField = ref({
   nama: false,
@@ -36,12 +40,17 @@ const form = reactive({ ...defaultForm });
 
 const options = ref<any[]>([]);
 const loading = ref(false);
+const isLoadingData = ref(false);
 const listMhs = ref<any>(null);
 
-watch(listMhs, (val) => {
+watch(listMhs, async (val) => {
   if (!val) return;
 
-  if (isFromSystem.value) return;
+  if (disableListMhsWatcher.value) return;
+
+  isLoadingData.value = true;
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
   form.nama = val.nama;
   form.nim = val.nim;
 
@@ -56,9 +65,11 @@ watch(listMhs, (val) => {
   if (val.jenis_kelamin) {
     form.jenis_kelamin = val.jenis_kelamin;
   }
+  isLoadingData.value = false;
 });
 
 const listProdi = ref<any[]>([]);
+const listThAkademik = ref<any[]>([]);
 
 async function getProdi() {
   try {
@@ -75,8 +86,21 @@ async function getProdi() {
   }
 }
 
+async function getThAkademik() {
+  try {
+    const response = await apiGet(`/get-th-akademik`);
+    if (response.success) {
+      const data = response.data?.data;
+      listThAkademik.value = Array.isArray(data) ? data : [data];
+    }
+  } catch (error) {
+    console.log(error);
+  }
+}
+
 onMounted(() => {
   getProdi();
+  getThAkademik();
 });
 
 function customName(params: any) {
@@ -85,17 +109,31 @@ function customName(params: any) {
 
 watch(
   () => props.modelValue,
-  (val) => {
-    if (!props.isEdit || !val) return;
+  async (val) => {
+    if (!props.isEdit) return;
 
-    Object.assign(form, defaultForm);
-    isFromSystem.value = true;
+    if (!val || !val.nim) {
+      isLoadingData.value = true;
+      return;
+    }
+
+    disableListMhsWatcher.value = true;
+    isLoadingData.value = true;
+
+    // Pastikan listThAkademik sudah terisi sebelum set form
+    if (listThAkademik.value.length === 0) {
+      await getThAkademik();
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const restVal = val;
+    Object.assign(form, restVal);
 
     form.id = val.id ?? "";
     form.nomor = val.nomor ?? "";
     form.prodi_id = val.prodi_id ?? 0;
-    form.dekan = val.dekan ?? "";
-    form.nama = val.nama ?? "";
+    form.nama = val.nama || val.nama_mhs || "";
     form.tanggal_lahir = val.tanggal_lahir
       ? val.tanggal_lahir.slice(0, 10)
       : "";
@@ -114,24 +152,46 @@ watch(
       };
       options.value = [listMhs.value];
     }
+
+    // Set th_akademik_id jika ada
+    form.th_akademik_id = val.th_akademik_id
+      ? Number(val.th_akademik_id)
+      : null;
+
+    isLoadingData.value = false;
+
+    await nextTick();
+    disableListMhsWatcher.value = false;
   },
   { immediate: true }
 );
 
 const getMhs = debounce(async (params: string) => {
   const keyword = params.trim();
+  if (!keyword && !props.isEdit) {
+    options.value = [];
+    return;
+  }
+
   try {
     loading.value = true;
-    const response = await apiGet(`/get-mhs/${keyword}`);
+    const response = await apiGet(`/get-mhs`, { search: keyword });
     if (response.success) {
-      options.value = response.data ? response.data : response.data.data;
+      const result = response.data;
+      if (result && result.data && Array.isArray(result.data)) {
+        options.value = result.data;
+      } else if (Array.isArray(result)) {
+        options.value = result;
+      } else {
+        options.value = [];
+      }
     }
   } catch (error) {
     console.log(error);
   } finally {
     loading.value = false;
   }
-}, 200);
+}, 300);
 
 const emit = defineEmits(["submit"]);
 
@@ -154,7 +214,11 @@ function submitForm() {
             <div class="row gy-3">
               <div class="col-xl-6">
                 <label class="form-label">Program Studi Unit:</label>
-                <select class="form-select" v-model="form.prodi_id">
+                <select
+                  class="form-select"
+                  :class="{ 'is-invalid': errors?.prodi_id }"
+                  v-model="form.prodi_id"
+                >
                   <option
                     v-for="prodi in listProdi"
                     :key="prodi.id"
@@ -163,6 +227,9 @@ function submitForm() {
                     {{ prodi.nama }}
                   </option>
                 </select>
+                <div v-if="errors?.prodi_id" class="invalid-feedback">
+                  {{ errors.prodi_id[0] }}
+                </div>
               </div>
 
               <div class="col-xl-6">
@@ -173,108 +240,139 @@ function submitForm() {
                   v-model="listMhs"
                   :internal-search="false"
                   @search-change="getMhs"
-                  @select="isFromSystem = false"
                   label="nama"
                   track-by="id"
                   :searchable="true"
                   :loading="loading"
                   :custom-label="customName"
+                  :class="{ 'border-danger': errors?.nim || errors?.nama }"
                 ></Multiselect>
-              </div>
-
-              <hr />
-              <div class="card-title mb-0">Informasi Surat</div>
-
-              <div class="col-xl-6">
-                <label class="form-label">Dekan / Institusi :</label>
-                <input
-                  type="text"
-                  v-model="form.dekan"
-                  class="form-control"
-                  placeholder="Isikan Nama Dekan / Institusi"
-                />
-              </div>
-
-              <div class="col-xl-6">
-                <label class="form-label">Semester :</label>
-                <input
-                  type="text"
-                  v-model="form.semester"
-                  class="form-control"
-                  placeholder="Contoh: II (Dua)"
-                />
-              </div>
-
-              <div class="col-xl-6">
-                <label class="form-label">Tahun Akademik :</label>
-                <input
-                  type="text"
-                  v-model="form.tahun_akademik"
-                  class="form-control"
-                  placeholder="Contoh: 2023/2024"
-                />
-              </div>
-
-              <div class="col-xl-6">
-                <label class="form-label">Tanggal Surat :</label>
-                <input
-                  type="date"
-                  v-model="form.tanggal"
-                  class="form-control"
-                />
+                <div v-if="errors?.nim" class="text-danger small">
+                  {{ errors.nim[0] }}
+                </div>
               </div>
 
               <hr />
               <div class="card-title mb-0">Informasi Mahasiswa</div>
 
-              <div class="col-xl-4">
+              <div class="col-xl-6">
                 <label class="form-label">Nama Mahasiswa :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
+                  v-else
                   type="text"
                   v-model="form.nama"
                   class="form-control"
+                  :class="{ 'is-invalid': errors?.nama }"
                   :readonly="readonlyField.nama"
                   placeholder="Isikan Nama Mahasiswa"
                 />
-              </div>
-
-              <div class="col-xl-4">
-                <label class="form-label">NIM :</label>
-                <input
-                  type="text"
-                  v-model="form.nim"
-                  class="form-control"
-                  placeholder="Isikan NIM"
-                />
-              </div>
-
-              <div class="col-xl-4">
-                <label class="form-label">Jenis Kelamin :</label>
-                <select class="form-select" v-model="form.jenis_kelamin">
-                  <option value="">Pilih Jenis Kelamin</option>
-                  <option value="Laki-laki">Laki-laki</option>
-                  <option value="Perempuan">Perempuan</option>
-                </select>
+                <div v-if="errors?.nama" class="invalid-feedback">
+                  {{ errors.nama[0] }}
+                </div>
               </div>
 
               <div class="col-xl-6">
-                <label class="form-label">Tanggal Lahir :</label>
+                <label class="form-label">NIM :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
+                  v-else
+                  type="text"
+                  v-model="form.nim"
+                  class="form-control"
+                  :class="{ 'is-invalid': errors?.nim }"
+                  placeholder="Isikan NIM"
+                />
+                <div v-if="errors?.nim" class="invalid-feedback">
+                  {{ errors.nim[0] }}
+                </div>
+              </div>
+              <div class="col-xl-6">
+                <label class="form-label">Tanggal Lahir :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
+                <input
+                  v-else
                   type="date"
                   v-model="form.tanggal_lahir"
                   class="form-control"
+                  :class="{ 'is-invalid': errors?.tanggal_lahir }"
                 />
+                <div v-if="errors?.tanggal_lahir" class="invalid-feedback">
+                  {{ errors.tanggal_lahir[0] }}
+                </div>
               </div>
 
               <div class="col-xl-6">
                 <label class="form-label">Jurusan / Program Studi :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
+                  v-else
                   type="text"
                   v-model="form.jurusan_prodi"
                   class="form-control"
+                  :class="{ 'is-invalid': errors?.jurusan_prodi }"
                   :readonly="readonlyField.jurusan_prodi"
                   placeholder="Isikan Jurusan / Program Studi"
                 />
+                <div v-if="errors?.jurusan_prodi" class="invalid-feedback">
+                  {{ errors.jurusan_prodi[0] }}
+                </div>
+              </div>
+              <hr />
+              <div class="card-title mb-0">Informasi Surat</div>
+
+              <div class="col-xl-6">
+                <label class="form-label">Semester :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
+                <input
+                  v-else
+                  type="text"
+                  v-model="form.semester"
+                  class="form-control"
+                  :class="{ 'is-invalid': errors?.semester }"
+                  placeholder="Contoh: II (Dua)"
+                />
+                <div v-if="errors?.semester" class="invalid-feedback">
+                  {{ errors.semester[0] }}
+                </div>
+              </div>
+
+              <div class="col-xl-6">
+                <label class="form-label">Tahun Akademik :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
+                <select
+                  v-else
+                  v-model="form.th_akademik_id"
+                  class="form-select"
+                  :class="{ 'is-invalid': errors?.th_akademik_id }"
+                >
+                  <option :value="null">-- Pilih Tahun Akademik --</option>
+                  <option
+                    v-for="thAkademik in listThAkademik"
+                    :key="thAkademik.id"
+                    :value="Number(thAkademik.id)"
+                  >
+                    {{ thAkademik.nama }} - {{ thAkademik.semester }}
+                  </option>
+                </select>
+                <div v-if="errors?.th_akademik_id" class="invalid-feedback">
+                  {{ errors.th_akademik_id[0] }}
+                </div>
+              </div>
+
+              <div class="col-xl-12">
+                <label class="form-label">Tanggal Surat :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
+                <input
+                  v-else
+                  type="date"
+                  v-model="form.tanggal"
+                  class="form-control"
+                  :class="{ 'is-invalid': errors?.tanggal }"
+                />
+                <div v-if="errors?.tanggal" class="invalid-feedback">
+                  {{ errors.tanggal[0] }}
+                </div>
               </div>
             </div>
           </div>
@@ -288,3 +386,22 @@ function submitForm() {
     </form>
   </div>
 </template>
+
+<style scoped>
+.skeleton-input {
+  height: 38px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: 5px;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+</style>

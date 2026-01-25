@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Level;
+use App\Models\Prodi;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use phpDocumentor\Reflection\Types\Void_;
 
 class LoginController extends Controller
@@ -16,12 +18,24 @@ class LoginController extends Controller
     {
         Log::info($request->all());
 
-        $validate = $request->validate([
+        $validator = Validator::make($request->all(), [
             'username' => 'required',
             'password' => 'required'
         ]);
 
-        $user = User::where('username', $request->username)->first();
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validasi gagal',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $validate = $validator->validated();
+
+        $user = User::join('level', 'level.id', '=', 'users.level_id')->where('username', $validate['username'])
+            ->select('users.*', 'level.nama as level')
+            ->first();
 
         Log::info($user);
 
@@ -32,7 +46,7 @@ class LoginController extends Controller
             ], 401);
         }
 
-        if (!$user && !Hash::check($request->password, $user->password)) {
+        if (!Hash::check($validate['password'], $user->password)) {
             return response()->json([
                 'status' => false,
                 'message' => 'Username atau password salah'
@@ -59,6 +73,60 @@ class LoginController extends Controller
             'user' => $user,
             'message' => 'Profile berhasil diambil'
         ]);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        Log::info($request->all());
+        try {
+
+            $user = $request->user();
+
+            $validator = Validator::make($request->all(), [
+                'name'      => 'required',
+                'username'  => 'required|unique:users,username,' . $user->id,
+                'handphone' => 'required',
+                'email'     => 'required|email|unique:users,email,' . $user->id,
+
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
+
+            $user->name     = $validate['name'];
+            $user->username = $validate['username'];
+            $user->phone    = $validate['handphone'];
+            $user->email    = $validate['email'];
+
+            if ($request->filled('password')) {
+                $user->password = Hash::make($request->password);
+            }
+
+            if ($request->hasFile('foto')) {
+                $path = $request->file('foto')->store('img', 'public');
+                $user->img = $path;
+            }
+
+            $user->save();
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Profile berhasil diupdate'
+            ]);
+        } catch (\Throwable $th) {
+            Log::info($th);
+            return response()->json([
+                'status'  => false,
+                'message' => 'Profile gagal diupdate: ' . $th->getMessage()
+            ]);
+        }
     }
 
     public function logout(Request $request)
@@ -139,21 +207,40 @@ class LoginController extends Controller
         Log::info($request->all());
         try {
 
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'name'      => 'required',
                 'handphone' => 'required',
                 'email'     => 'required',
                 'level_id'  => 'required',
                 'prodi_id'  => 'required',
+
             ]);
 
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
+
             $user           = User::find($id);
-            $user->name     = $request->name;
-            $user->username = $request->name;
-            $user->prodi_id = $request->prodi_id;
-            $user->phone    = $request->handphone;
-            $user->email    = $request->email;
-            $user->level_id = $request->level_id;
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Data tidak ditemukan'
+                ], 404);
+            }
+
+            $user->name = $validate['name'];
+            $user->username = $validate['name'];
+            $user->prodi_id = $validate['prodi_id'];
+            $user->phone = $validate['handphone'];
+            $user->email = $validate['email'];
+            $user->level_id = $validate['level_id'];
+            $user->jenis_kelamin = $request->jenis_kelamin;
 
             if ($request->filled('password')) {
                 $user->password = Hash::make($request->password);
@@ -200,7 +287,7 @@ class LoginController extends Controller
     {
         Log::info($request->all());
         try {
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'name'      => 'required',
                 'handphone' => 'required',
                 'email'     => 'required',
@@ -208,22 +295,34 @@ class LoginController extends Controller
                 'prodi_id'  => 'required',
                 'foto'      => 'required',
                 'level_id'  => 'required',
+
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
 
             if ($request->hasFile('foto')) {
                 $path = $request->file('foto')->store('img', 'public');
             }
 
 
-            $user           = new User();
-            $user->name     = $request->name;
-            $user->username = $request->name;
-            $user->phone    = $request->handphone;
-            $user->email    = $request->email;
-            $user->prodi_id = $request->prodi_id;
-            $user->img      = $path;
-            $user->password = Hash::make($request->password);
-            $user->level_id = $request->level_id;
+            $user = new User();
+            $user->name = $validate['name'];
+            $user->username = $validate['name'];
+            $user->phone = $validate['handphone'];
+            $user->email = $validate['email'];
+            $user->prodi_id = $validate['prodi_id'];
+            $user->img = $path;
+            $user->password = Hash::make($validate['password']);
+            $user->level_id = $validate['level_id'];
+            $user->jenis_kelamin = $request->jenis_kelamin;
             $user->save();
 
             return response()->json([
@@ -238,12 +337,33 @@ class LoginController extends Controller
             ]);
         }
     }
-    public function getProdi() {
+    public function getProdi()
+    {
         $data = Prodi::all();
         return response()->json([
             'status' => true,
             'data' => $data,
             'message' => 'Data berhasil diambil'
         ]);
+    }
+
+    public function getTandaTangan()
+    {
+        try {
+            $data = \App\Models\TandaTangan::all();
+            return response()->json([
+                'status' => true,
+                'data' => $data,
+                'message' => 'Data berhasil diambil'
+            ]);
+        } catch (\Throwable $th) {
+            Log::info($th->getMessage());
+            return response()->json(
+                [
+                    'status' => false,
+                    'message' => 'Data gagal diambil'
+                ]
+            );
+        }
     }
 }

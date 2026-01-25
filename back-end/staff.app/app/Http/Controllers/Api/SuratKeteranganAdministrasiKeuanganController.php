@@ -8,12 +8,15 @@ use App\Models\LogSurat;
 use App\Models\NoSurat;
 use App\Models\Prodi;
 use App\Models\SuratKeteranganAdministrasiKeuangan;
+use App\Models\TandaTangan;
 use App\Services\SuratService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class SuratKeteranganAdministrasiKeuanganController extends Controller
 {
@@ -45,6 +48,13 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
             $data->where('prodi_id', $login->id);
         }
 
+        $auth = Auth::user()->jenis_kelamin;
+        if ($auth == 'L') {
+            $data->where('surat_keterangan_administrasi_keuangan.jenis_kelamin', 'L');
+        } else {
+            $data->where('surat_keterangan_administrasi_keuangan.jenis_kelamin', 'P');
+        }
+
         $data->orderBy(
             $request->input('sortBy', 'id'),
             $request->input('sortType', 'asc')
@@ -65,8 +75,7 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
     {
         Log::info($request->all());
         try {
-
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'prodi_id'      => 'nullable',
                 'nama_mhs'      => 'required|string|max:255',
                 'tempat_lahir'  => 'required|string|max:100',
@@ -76,29 +85,47 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
                 'alamat_rumah'  => 'required|string',
                 'kelas_pondok'  => 'required|string|max:255',
                 'tanggal'       => 'required|date',
-                'kepala_biro'   => 'nullable|string',
+                'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
             ]);
 
-            $loginArgs = Auth::user()->prodi ? Auth::user()->prodi->alias : 'UNIV';
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
+
+            $loginArgs = $validate['prodi_mhs'];
             $no = NoSurat::orderByDesc('id')->value('nomor') ?? 0;
+            Log::info($no);
             $no_surat = str_pad($no + 1, 3, '0', STR_PAD_LEFT);
+            Log::info($no_surat);
 
-            $unit = 'K.' . strtoupper($loginArgs);
+            $unit = 'BAK';
 
-            $noSurat = SuratService::NoSuratKeteranganLulusMataKuliah($no_surat, $unit);
+            $noSurat = SuratService::NoSuratKeteranganAdministrasiKeuangan($no_surat, $unit);
 
             $data = new SuratKeteranganAdministrasiKeuangan();
             $data->nomor_surat  = $noSurat;
-            $data->prodi_id     = $request->prodi_id;
-            $data->nama_lengkap = $request->nama_mhs;
-            $data->tempat_lahir = $request->tempat_lahir;
-            $data->tanggal_lahir = $request->tanggal_lahir;
-            $data->nim          = $request->nim;
-            $data->prodi_mhs    = $request->prodi_mhs;
-            $data->alamat_rumah = $request->alamat_rumah;
-            $data->kelas_pondok = $request->kelas_pondok;
-            $data->tanggal      = $request->tanggal;
-            $data->kepala_biro  = $request->kepala_biro;
+            $data->prodi_id     = $validate['prodi_id'];
+            $data->nama_lengkap = $validate['nama_mhs'];
+            $data->tempat_lahir = $validate['tempat_lahir'];
+            $data->tanggal_lahir = $validate['tanggal_lahir'];
+            $data->nim          = $validate['nim'];
+            $data->prodi_mhs    = $validate['prodi_mhs'];
+            $data->alamat_rumah = $validate['alamat_rumah'];
+            $data->kelas_pondok = $validate['kelas_pondok'];
+            $data->tanggal      = $validate['tanggal'];
+            $data->tanda_tangan_id = $validate['tanda_tangan_id'] ?? null;
+            // Set kepala_biro from tanda_tangan nama if provided
+            if (!empty($validate['tanda_tangan_id'])) {
+                $tandaTangan = TandaTangan::find($validate['tanda_tangan_id']);
+                $data->kepala_biro = $tandaTangan?->nama;
+            }
+            $data->jenis_kelamin = Auth::user()->jenis_kelamin;
             $data->user_id      = Auth::user()->id;
             $data->save();
 
@@ -155,18 +182,28 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
     {
         Log::info($request->all());
         try {
-            $validate = $request->validate([
-                'prodi_id' => 'sometimes|exists:prodi,id',
-                'nama_lengkap' => 'sometimes|string|max:255',
-                'tempat_lahir' => 'sometimes|string|max:100',
-                'tanggal_lahir' => 'sometimes|date',
-                'nim' => 'sometimes|string|max:255',
-                'prodi_mhs' => 'sometimes|string|max:255',
-                'alamat_rumah' => 'sometimes|string',
-                'kelas_pondok' => 'sometimes|string|max:255',
-                'tanggal' => 'sometimes|date',
-                'kepala_biro' => 'nullable|string',
+            $validator = Validator::make($request->all(), [
+                'prodi_id'      => 'required|exists:prodi,id',
+                'nama_mhs'      => 'required|string|max:255',
+                'tempat_lahir'  => 'required|string|max:100',
+                'tanggal_lahir' => 'required|date',
+                'nim'           => 'required|string|max:255',
+                'prodi_mhs'     => 'required|string|max:255',
+                'alamat_rumah'  => 'required|string',
+                'kelas_pondok'  => 'required|string|max:255',
+                'tanggal'       => 'required|date',
+                'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
 
             $data = SuratKeteranganAdministrasiKeuangan::find($id);
             if (!$data) {
@@ -176,14 +213,33 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
                 ]);
             }
 
-            $data->update($validate);
+
+            $data->prodi_id = $validate['prodi_id'];
+            $data->nama_lengkap = $validate['nama_mhs'];
+            $data->tempat_lahir = $validate['tempat_lahir'];
+            $data->tanggal_lahir = $validate['tanggal_lahir'];
+            $data->nim = $validate['nim'];
+            $data->prodi_mhs = $validate['prodi_mhs'];
+            $data->alamat_rumah = $validate['alamat_rumah'];
+            $data->kelas_pondok = $validate['kelas_pondok'];
+            $data->tanggal = $validate['tanggal'];
+            if (array_key_exists('tanda_tangan_id', $validate)) {
+                $data->tanda_tangan_id = $validate['tanda_tangan_id'];
+                if (!empty($validate['tanda_tangan_id'])) {
+                    $tandaTangan = TandaTangan::find($validate['tanda_tangan_id']);
+                    $data->kepala_biro = $tandaTangan?->nama;
+                }
+            }
+            $data->jenis_kelamin = Auth::user()->jenis_kelamin;
+            $data->user_id      = Auth::user()->id;
+            $data->save();
 
             return response()->json([
                 'status' => true,
                 'message' => 'Data berhasil diupdate'
             ]);
         } catch (\Throwable $th) {
-            Log::info($th);
+            Log::info($th->getMessage());
             return response()->json([
                 'status' => false,
                 'message' => 'Data gagal diupdate'
@@ -225,11 +281,14 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
             $data = SuratKeteranganAdministrasiKeuangan::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_administrasi_keuangan.prodi_id')
                 ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
                 ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_keterangan_administrasi_keuangan.tanda_tangan_id')
                 ->select(
                     'surat_keterangan_administrasi_keuangan.*',
                     'prodi.nama as nama_prodi',
                     'prodi.alias as alias_prodi',
-                    'fakultas.nama as fakultas'
+                    'fakultas.nama as fakultas',
+                    'tanda_tangan.nama as nama_ttd',
+                    'tanda_tangan.gambar as ttd',
                 )
                 ->where('surat_keterangan_administrasi_keuangan.id', $id)
                 ->first();
@@ -244,6 +303,11 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
             $kopPath = base_path('../public_html/img/kop.jpg');
             $kopBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath));
 
+            // Get ttd from tanda_tangan table
+            $tddPath = base_path('../public_html/' . $data->ttd);
+            $stempelPath = base_path('../public_html/img/stempel.png');
+            $stempelBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($stempelPath));
+            $tddBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tddPath));
             $pdfData = [
                 'nomor_surat' => $data->nomor_surat,
                 'nama' => $data->nama_lengkap,
@@ -251,18 +315,20 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
                 'tanggal_lahir' => Carbon::parse($data->tanggal_lahir)->translatedFormat('d F Y'),
                 'nim' => $data->nim,
                 'fakultas' => $data->fakultas ?? '-',
-                'prodi' => $data->nama_prodi ?? '-',
+                'prodi' => $data->prodi_mhs ?? '-',
                 'alamat' => $data->alamat_rumah,
                 'kelas' => $data->kelas_pondok,
                 'tanggal_surat' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
-                'nama_penandatangan' => $data->kepala_biro,
+                'nama_penandatangan' => $data->nama_ttd ?? $data->kepala_biro,
                 'jabatan_penandatangan' => 'Kepala Biro',
                 'kopBase64' => $kopBase64,
+                'ttd' => $tddBase64,
+                'stempel' => $stempelBase64,
             ];
 
             $pdf = Pdf::loadView('pdf.administrasi_keuangan', $pdfData)
                 ->setPaper('a4', 'portrait');
-            Log::info('pdf');
+            // Log::info('pdf');
             $fileName = 'surat_keterangan_administrasi_keuangan_' . $data->nim . '.pdf';
 
             $directory = base_path('../public_html/pdf/');
@@ -277,7 +343,12 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Keterangan Administrasi Keuangan';
-            UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganAdministrasiKeuangan::class);
+
+            $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
+
+            if (!Storage::disk('google')->exists($googlePath)) {
+                UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganAdministrasiKeuangan::class);
+            }
 
             return response($pdf->output(), 200, [
                 'Content-Type' => 'application/pdf',

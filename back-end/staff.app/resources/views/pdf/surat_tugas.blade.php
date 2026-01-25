@@ -21,12 +21,15 @@
 
         /* ===== KOP SURAT ===== */
         .kop {
-            width: 100%;
+            margin-top: -0.1cm;
+            margin-left: -1cm;
+            margin-right: -1cm;
         }
 
         .kop img {
             width: 100%;
-            height: auto;
+            max-height: 155px;
+            object-fit: contain;
             display: block;
         }
 
@@ -64,7 +67,7 @@
         }
 
         .margin-bottom-20 {
-            margin-bottom: 20px;
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -84,7 +87,7 @@
         <div class="text-center text-bold text-underline">
             SURAT TUGAS
         </div>
-        <div class="text-center margin-bottom-20">
+        <div class="text-center margin-bottom-10">
             Nomor: {{ $nomor }}
         </div>
 
@@ -147,16 +150,32 @@
             Demikian surat tugas ini kami sampaikan agar dapat dilaksanakan dengan penuh tanggung jawab.
         </p>
 
-        <br><br>
-
         <!-- TANDA TANGAN -->
-        <table>
+        <table class="ttd" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">
             <tr>
-                <td width="55%"></td>
-                <td class="text-center">
+                <td width="60%"></td>
+                <td width="40%" class="text-center">
                     Bangil, {{ $tanggal }}<br>
-                    Kepala Prodi<br><br><br><br><br>
-                    <strong>{{ $nama_kepala }}</strong><br>
+                    Kepala Prodi
+
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                            <td style="
+                                text-align:center;
+                                vertical-align:middle;
+                                background-image: url('{{ $stempel }}');
+                                background-repeat: no-repeat;
+                                background-position: 20% 60%;
+                                background-size: 130px 130px;
+                            ">
+                                <img src="{{ $ttd }}" style="width:300px;">
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div class="nama-ttd">
+                        <strong>{{ $nama_kepala }}</strong>
+                    </div>
                     NIY: {{ $nidn_kepala }}
                 </td>
             </tr>

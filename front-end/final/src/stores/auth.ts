@@ -28,7 +28,25 @@ export const useAuthStore = defineStore('auth', {
       // const user = users.find(
       //   (u: User) => u.username === username && u.password === password
       // );
-      const auth = await apiPost('/login', { username, password });
+      
+      let auth: { success: boolean; data?: any } = { success: false };
+      let retryCount = 0;
+      const maxRetries = 2;
+      
+      while (retryCount <= maxRetries) {
+        try {
+          auth = await apiPost('/login', { username, password });
+          break;
+        } catch (error: any) {
+          console.warn(`Login attempt ${retryCount + 1} failed:`, error.message);
+          if (retryCount === maxRetries) {
+            auth = { success: false };
+            break;
+          }
+          retryCount++;
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
 
       if (auth.success) {
 
@@ -49,6 +67,21 @@ export const useAuthStore = defineStore('auth', {
     logUserOut() {
       localStorage.removeItem('token');
       this.authenticated = false;
+    },
+
+    async logoutUser() {
+      try {
+        await apiPost('/logout');
+        localStorage.clear();
+        sessionStorage.clear();
+        this.authenticated = false;
+      } catch (error) {
+        console.error('Logout API error:', error);
+        // Force logout even if API fails
+        localStorage.clear();
+        sessionStorage.clear();
+        this.authenticated = false;
+      }
     },
 
     // generateToken(user: User): string {

@@ -14,4 +14,9 @@ class Prodi extends Model
     {
         return $this->hasOne(User::class);
     }
+
+    public function tandaTangan()
+    {
+        return $this->belongsTo(TandaTangan::class, 'tanda_tangan_id');
+    }
 }

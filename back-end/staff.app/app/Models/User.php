@@ -19,9 +19,15 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
+        'username',
         'name',
         'email',
+        'level_id',
+        'phone',
+        'img',
+        'prodi_id',
         'password',
+        'jenis_kelamin',
     ];
 
     /**
@@ -50,5 +56,10 @@ class User extends Authenticatable
     public function prodi()
     {
         return $this->belongsTo(Prodi::class);
+    }
+
+    public function level()
+    {
+        return $this->belongsTo(Level::class, 'level_id');
     }
 }

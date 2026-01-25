@@ -4,7 +4,7 @@ export const switcherStore = defineStore('switcher', {
     state: () => ({
         colortheme: 'light',            // light, dark
         direction: 'ltr',               // ltr, rtl
-        navigationStyles: 'vertical',   // vertical, horizontal
+        navigationStyles: 'horizontal',   // vertical, horizontal (forced to horizontal)
         menuStyles: '',                 // menu-click, menu-hover, icon-click, icon-hover
         layoutStyles: 'double-menu',   // double-menu, detached, icon-overlay, icontext-menu, closed-menu, default-menu
         pageStyles: 'flat',          // regular, classic, modern,flat
@@ -458,8 +458,8 @@ export const switcherStore = defineStore('switcher', {
             // reseting to ltr
             this.directionFn('ltr');
 
-            // reseting to vertical
-            this.navigationStylesFn('vertical');
+            // reseting to horizontal (always horizontal)
+            this.navigationStylesFn('horizontal');
 
             // reseting the layout styles
             this.layoutStylesFn('double-menu')
@@ -479,7 +479,8 @@ export const switcherStore = defineStore('switcher', {
         retrieveFromLocalStorage() {
             this.direction = localStorage.getItem('vyzordirection') || this.direction;
             this.directionFn(this.direction);
-            this.navigationStyles = localStorage.getItem('vyzornavstyles') || this.navigationStyles;
+            // Force navigation to always be horizontal
+            this.navigationStyles = 'horizontal';
             this.navigationStylesFn(this.navigationStyles);
             this.pageStyles = localStorage.getItem('vyzorpageStyle') || this.pageStyles;
             this.pageStylesFn(this.pageStyles);

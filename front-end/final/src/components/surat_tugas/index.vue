@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { reactive, ref, watch, onMounted } from "vue";
+import { reactive, ref, watch, onMounted, nextTick } from "vue";
 import Multiselect from "vue-multiselect";
 import "vue-multiselect/dist/vue-multiselect.min.css";
 import { apiGet } from "../../services/api/request";
@@ -8,6 +8,10 @@ import { debounce } from "vuetify/lib/util/helpers.mjs";
 const props = defineProps({
   modelValue: Object,
   isEdit: Boolean,
+  errors: {
+    type: Object,
+    default: () => ({}),
+  },
 });
 
 const defaultForm = {
@@ -27,7 +31,7 @@ const defaultForm = {
   jenis_kelamin: "",
 };
 
-const isFromSystem = ref(true);
+const disableListMhsWatcher = ref(false);
 
 const readonlyField = ref({
   nama_mhs: false,
@@ -38,12 +42,17 @@ const form = reactive({ ...defaultForm });
 
 const options = ref<any[]>([]);
 const loading = ref(false);
+const isLoadingData = ref(false);
 const listMhs = ref<any>(null);
 
-watch(listMhs, (val) => {
+watch(listMhs, async (val) => {
   if (!val) return;
 
-  if (isFromSystem.value) return;
+  if (disableListMhsWatcher.value) return;
+
+  isLoadingData.value = true;
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
   form.nama_mhs = val.nama;
   form.nim_nik = val.nim;
 
@@ -58,6 +67,7 @@ watch(listMhs, (val) => {
   if (val.jenis_kelamin) {
     form.jenis_kelamin = val.jenis_kelamin;
   }
+  isLoadingData.value = false;
 });
 
 const listProdi = ref<any[]>([]);
@@ -87,11 +97,19 @@ function customName(params: any) {
 
 watch(
   () => props.modelValue,
-  (val) => {
-    if (!props.isEdit || !val) return;
+  async (val) => {
+    if (!props.isEdit) return;
 
-    Object.assign(form, defaultForm);
-    isFromSystem.value = true;
+    if (!val || !(val.nim_nik || val.nim)) {
+      isLoadingData.value = true;
+      return;
+    }
+
+    disableListMhsWatcher.value = true;
+    isLoadingData.value = true;
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    Object.assign(form, val);
 
     form.id = val.id ?? "";
     form.nomor = val.nomor ?? "";
@@ -100,8 +118,8 @@ watch(
     form.alamat_dosen = val.alamat_dosen ?? "";
     form.tugas_dosen = val.tugas_dosen ?? "";
     form.tugasnya = val.tugasnya ?? "";
-    form.nama_mhs = val.nama_mhs ?? "";
-    form.nim_nik = val.nim_nik ?? "";
+    form.nama_mhs = val.nama_mhs || val.nama_lengkap || "";
+    form.nim_nik = val.nim_nik ?? val.nim ?? "";
     form.fakultas_prodi = val.fakultas_prodi ?? "";
     form.judul_skripsi = val.judul_skripsi ?? "";
     form.masa_penugasan = val.masa_penugasan ?? "";
@@ -116,24 +134,40 @@ watch(
       };
       options.value = [listMhs.value];
     }
+    isLoadingData.value = false;
+
+    await nextTick();
+    disableListMhsWatcher.value = false;
   },
   { immediate: true }
 );
 
 const getMhs = debounce(async (params: string) => {
   const keyword = params.trim();
+  if (!keyword && !props.isEdit) {
+    options.value = [];
+    return;
+  }
+
   try {
     loading.value = true;
-    const response = await apiGet(`/get-mhs/${keyword}`);
+    const response = await apiGet(`/get-mhs`, { search: keyword });
     if (response.success) {
-      options.value = response.data ? response.data : response.data.data;
+      const result = response.data;
+      if (result && result.data && Array.isArray(result.data)) {
+        options.value = result.data;
+      } else if (Array.isArray(result)) {
+        options.value = result;
+      } else {
+        options.value = [];
+      }
     }
   } catch (error) {
     console.log(error);
   } finally {
     loading.value = false;
   }
-}, 200);
+}, 300);
 
 const emit = defineEmits(["submit"]);
 
@@ -156,7 +190,11 @@ function submitForm() {
             <div class="row gy-3">
               <div class="col-xl-6">
                 <label class="form-label">Program Studi Unit:</label>
-                <select class="form-select" v-model="form.prodi_id">
+                <select
+                  class="form-select"
+                  :class="{ 'is-invalid': errors?.prodi_id }"
+                  v-model="form.prodi_id"
+                >
                   <option
                     v-for="prodi in listProdi"
                     :key="prodi.id"
@@ -165,6 +203,9 @@ function submitForm() {
                     {{ prodi.nama }}
                   </option>
                 </select>
+                <div v-if="errors?.prodi_id" class="invalid-feedback">
+                  {{ errors.prodi_id[0] }}
+                </div>
               </div>
 
               <div class="col-xl-6">
@@ -175,13 +216,18 @@ function submitForm() {
                   v-model="listMhs"
                   :internal-search="false"
                   @search-change="getMhs"
-                  @select="isFromSystem = false"
                   label="nama"
                   track-by="id"
                   :searchable="true"
                   :loading="loading"
                   :custom-label="customName"
+                  :class="{
+                    'border-danger': errors?.nim_nik || errors?.nama_mhs,
+                  }"
                 ></Multiselect>
+                <div v-if="errors?.nim_nik" class="text-danger small">
+                  {{ errors.nim_nik[0] }}
+                </div>
               </div>
 
               <hr />
@@ -189,115 +235,173 @@ function submitForm() {
 
               <div class="col-xl-4">
                 <label class="form-label">Nama Dosen :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
+                  v-else
                   type="text"
                   v-model="form.nama_dosen"
                   class="form-control"
+                  :class="{ 'is-invalid': errors?.nama_dosen }"
                   placeholder="Isikan Nama Dosen"
                 />
+                <div v-if="errors?.nama_dosen" class="invalid-feedback">
+                  {{ errors.nama_dosen[0] }}
+                </div>
               </div>
 
               <div class="col-xl-4">
                 <label class="form-label">Alamat Dosen :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
+                  v-else
                   type="text"
                   v-model="form.alamat_dosen"
                   class="form-control"
+                  :class="{ 'is-invalid': errors?.alamat_dosen }"
                   placeholder="Isikan Alamat Dosen"
                 />
+                <div v-if="errors?.alamat_dosen" class="invalid-feedback">
+                  {{ errors.alamat_dosen[0] }}
+                </div>
               </div>
 
               <div class="col-xl-4">
                 <label class="form-label">Tugas Dosen :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
+                  v-else
                   type="text"
                   v-model="form.tugas_dosen"
                   class="form-control"
+                  :class="{ 'is-invalid': errors?.tugas_dosen }"
                   placeholder="Isikan Tugas Dosen (Contoh: Dosen Pembimbing)"
                 />
+                <div v-if="errors?.tugas_dosen" class="invalid-feedback">
+                  {{ errors.tugas_dosen[0] }}
+                </div>
               </div>
 
               <div class="col-xl-12">
                 <label class="form-label">Deskripsi Tugas (Tugasnya) :</label>
+                <div
+                  v-if="isLoadingData"
+                  class="skeleton-input"
+                  style="height: 62px"
+                ></div>
                 <textarea
+                  v-else
                   v-model="form.tugasnya"
                   class="form-control"
+                  :class="{ 'is-invalid': errors?.tugasnya }"
                   rows="3"
                   placeholder="Isikan Detail Tugas yang Dilakukan"
                 ></textarea>
+                <div v-if="errors?.tugasnya" class="invalid-feedback">
+                  {{ errors.tugasnya[0] }}
+                </div>
               </div>
 
               <hr />
               <div class="card-title mb-0">Informasi Mahasiswa & Penugasan</div>
 
-              <div class="col-xl-4">
+              <div class="col-xl-6">
                 <label class="form-label">Nama Mahasiswa :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
+                  v-else
                   type="text"
                   v-model="form.nama_mhs"
                   class="form-control"
+                  :class="{ 'is-invalid': errors?.nama_mhs }"
                   :readonly="readonlyField.nama_mhs"
                   placeholder="Isikan Nama Mahasiswa"
                 />
-              </div>
-
-              <div class="col-xl-4">
-                <label class="form-label">NIM / NIK :</label>
-                <input
-                  type="text"
-                  v-model="form.nim_nik"
-                  class="form-control"
-                  placeholder="Isikan NIM atau NIK"
-                />
-              </div>
-
-              <div class="col-xl-4">
-                <label class="form-label">Jenis Kelamin Mahasiswa :</label>
-                <select class="form-select" v-model="form.jenis_kelamin">
-                  <option value="">Pilih Jenis Kelamin</option>
-                  <option value="Laki-laki">Laki-laki</option>
-                  <option value="Perempuan">Perempuan</option>
-                </select>
+                <div v-if="errors?.nama_mhs" class="invalid-feedback">
+                  {{ errors.nama_mhs[0] }}
+                </div>
               </div>
 
               <div class="col-xl-6">
-                <label class="form-label">Fakultas / Prodi :</label>
+                <label class="form-label">NIM / NIK :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
+                  v-else
+                  type="text"
+                  v-model="form.nim_nik"
+                  class="form-control"
+                  :class="{ 'is-invalid': errors?.nim_nik }"
+                  placeholder="Isikan NIM atau NIK"
+                />
+                <div v-if="errors?.nim_nik" class="invalid-feedback">
+                  {{ errors.nim_nik[0] }}
+                </div>
+              </div>
+              <div class="col-xl-6">
+                <label class="form-label">Fakultas / Prodi :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
+                <input
+                  v-else
                   type="text"
                   v-model="form.fakultas_prodi"
                   class="form-control"
+                  :class="{ 'is-invalid': errors?.fakultas_prodi }"
                   :readonly="readonlyField.fakultas_prodi"
                   placeholder="Isikan Fakultas atau Program Studi"
                 />
+                <div v-if="errors?.fakultas_prodi" class="invalid-feedback">
+                  {{ errors.fakultas_prodi[0] }}
+                </div>
               </div>
 
               <div class="col-xl-6">
                 <label class="form-label">Masa Penugasan :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
-                  type="text"
+                  v-else
+                  type="date"
                   v-model="form.masa_penugasan"
                   class="form-control"
+                  :class="{ 'is-invalid': errors?.masa_penugasan }"
                   placeholder="Contoh: Semester Ganjil 2023/2024"
                 />
+                <div v-if="errors?.masa_penugasan" class="invalid-feedback">
+                  {{ errors.masa_penugasan[0] }}
+                </div>
               </div>
 
-              <div class="col-xl-6">
+              <div class="col-xl-12">
                 <label class="form-label">Tanggal Surat :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
+                  v-else
                   type="date"
                   v-model="form.tanggal"
                   class="form-control"
+                  :class="{ 'is-invalid': errors?.tanggal }"
                 />
+                <div v-if="errors?.tanggal" class="invalid-feedback">
+                  {{ errors.tanggal[0] }}
+                </div>
               </div>
 
               <div class="col-xl-12">
                 <label class="form-label">Judul Skripsi :</label>
+                <div
+                  v-if="isLoadingData"
+                  class="skeleton-input"
+                  style="height: 62px"
+                ></div>
                 <textarea
+                  v-else
                   v-model="form.judul_skripsi"
                   class="form-control"
+                  :class="{ 'is-invalid': errors?.judul_skripsi }"
                   rows="3"
                   placeholder="Isikan Judul Skripsi Mahasiswa"
                 ></textarea>
+                <div v-if="errors?.judul_skripsi" class="invalid-feedback">
+                  {{ errors.judul_skripsi[0] }}
+                </div>
               </div>
             </div>
           </div>
@@ -311,3 +415,22 @@ function submitForm() {
     </form>
   </div>
 </template>
+
+<style scoped>
+.skeleton-input {
+  height: 38px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: 5px;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+</style>

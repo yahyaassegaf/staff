@@ -49,6 +49,13 @@ import Vue3Tour from 'vue3-tour'
 import 'vue3-tour/dist/vue3-tour.css'
 import { vMaska } from 'maska/vue';
 
+// Summernote dependencies
+import './jquery-setup';
+import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+import 'summernote/dist/summernote-bs5.css';
+import 'summernote/dist/summernote-bs5.js';
+
+
 // Create Vue app
 const app = createApp(App);
 

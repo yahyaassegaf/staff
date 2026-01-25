@@ -12,4 +12,9 @@ class SuratPernyataanVerifikasiNilai extends Model
     protected $table = 'surat_pernyataan_verifikasi_nilai';
 
     protected $guarded = [];
+
+    public function tandaTangan()
+    {
+        return $this->belongsTo(TandaTangan::class, 'tanda_tangan_id');
+    }
 }

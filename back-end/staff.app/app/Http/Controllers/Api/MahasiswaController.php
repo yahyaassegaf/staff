@@ -48,20 +48,23 @@ class MahasiswaController extends Controller
      * @param  string  $search
      * @return \Illuminate\Http\Response
      */
-    public function search($search)
+    public function search(Request $request, $search = null)
     {
-        $search = trim($search);
+        // Ambil keyword dari segment URL atau query parameter 'search'
+        $keyword = $search ?? $request->query('search');
+        $keyword = trim($keyword ?? '');
+
         $where = null;
-        if (Auth::user()->prodi) {
+        // Hanya filter prodi jika user memiliki prodi_id
+        if (Auth::user() && Auth::user()->prodi_id) {
             $where = [
                 ['mst_mhs.prodi_id', '=', Auth::user()->prodi_id]
             ];
         }
-        // $where = [
-        //     ['mst_mhs.prodi_id', '=', 6]
-        // ];
-        Log::info($where);
-        $data = Mahasiswa::all(null, 30, $search, 'mst_mhs.nim', 'asc', $where);
+
+        Log::info("Mahasiswa Search - Keyword: '{$keyword}', User Prodi: " . (Auth::user()->prodi_id ?? 'None'));
+
+        $data = Mahasiswa::all(null, 30, $keyword, 'mst_mhs.nim', 'asc', $where);
         return response()->json($data);
     }
 

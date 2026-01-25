@@ -19,17 +19,17 @@ export default defineComponent({
     const searchValue = ref("");
     const total = ref(0);
     const headers = [
+      { text: "No", value: "no", sortable: false },
+      { text: "Kode", value: "kode_fakultas", sortable: true },
       { text: "Nama Fakultas", value: "nama_fakultas", sortable: true },
       { text: "Dekan", value: "dekan_fakultas", sortable: true },
-      { text: "Nama Prodi", value: "nama_prodi", sortable: true },
-      { text: "Alias Prodi", value: "alias_prodi", sortable: true },
-      { text: "Kprodi", value: "nama_kepala_prodi", sortable: true },
+      { text: "Program Studi", value: "nama_prodi", sortable: true },
       { text: "Action", value: "action", sortable: false },
     ];
 
     const serverOptions = ref<ServerOptions>({
       page: 1,
-      rowsPerPage: 5,
+      rowsPerPage: 10,
       sortBy: "id",
       sortType: "desc",
     });
@@ -47,9 +47,16 @@ export default defineComponent({
           search: searchValue.value,
         });
 
-        items.value = Array.isArray(response.data.data.data)
+        const rows = Array.isArray(response.data.data.data)
           ? response.data.data.data
           : [];
+
+        const startNo =
+          (serverOptions.value.page - 1) * serverOptions.value.rowsPerPage;
+        items.value = rows.map((row: any, idx: number) => ({
+          ...row,
+          no: startNo + idx + 1,
+        }));
 
         total.value = response.data.data.total;
       } catch (error) {
@@ -130,53 +137,94 @@ export default defineComponent({
 </script>
 
 <template>
-  <h3>Daftar Fakultas</h3>
-  <SimpleCardComponent>
-    <template #showheader>
-      <button class="btn btn-primary btn-sm" @click="goAdd">Tambah Data</button>
-    </template>
-    <label class="mb-3">
-      <input
-        type="text"
-        class="form-control form-control-sm"
-        v-model="searchValue"
-        placeholder="Cari fakultas..."
-      />
-    </label>
-    <EasyDataTable
-      class="table text-nowrap"
-      :search-value="searchValue"
-      :headers="headers"
-      :items="items"
-      border-cell
-      v-model:server-options="serverOptions"
-      :loading="loading"
-      :server-items-length="total"
-      :rowsItems="[5, 10, 25, 50, 100]"
+  <div class="container-fluid">
+    <div
+      class="d-md-flex align-items-center justify-content-between my-4 page-header-breadcrumb"
     >
-      <template #loading>
-        <div class="text-center">
-          <div class="spinner-border" role="status">
-            <span class="visually-hidden">Loading...</span>
+      <h1 class="page-title fw-semibold fs-18 mb-0">Fakultas</h1>
+      <div class="ms-md-1 ms-0">
+        <nav>
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+              <a href="javascript:void(0);">Master</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">Fakultas</li>
+          </ol>
+        </nav>
+      </div>
+    </div>
+
+    <SimpleCardComponent>
+      <template #showheader>
+        <button class="btn btn-primary btn-wave shadow-sm" @click="goAdd">
+          <i class="ri-add-line align-middle me-1"></i> Tambah Data
+        </button>
+      </template>
+
+      <div class="row mb-3">
+        <div class="col-md-3 ms-auto">
+          <div class="input-group">
+            <input
+              type="text"
+              class="form-control form-control-sm"
+              v-model="searchValue"
+              placeholder="Cari fakultas..."
+            />
+            <button class="btn btn-primary btn-sm" type="button">
+              <i class="ri-search-line"></i>
+            </button>
           </div>
         </div>
-      </template>
-      <template #item="{ item, column }">
-        <!-- kolom Action -->
-        <template v-if="column === 'action'">
-          <button class="btn btn-sm btn-primary" @click="edit(item)">
-            Edit
-          </button>
-          <button class="btn btn-sm btn-danger ms-1" @click="remove(item)">
-            Delete
-          </button>
-        </template>
+      </div>
 
-        <!-- kolom lain -->
-        <template v-else>
-          {{ item[column] }}
+      <EasyDataTable
+        class="table text-nowrap"
+        :headers="headers"
+        :items="items"
+        border-cell
+        v-model:server-options="serverOptions"
+        :loading="loading"
+        :server-items-length="total"
+        :rows-items="[10, 25, 50, 100]"
+        buttons-pagination
+      >
+        <template #loading>
+          <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+          </div>
         </template>
-      </template>
-    </EasyDataTable>
-  </SimpleCardComponent>
+        <template #item-action="item">
+          <div class="btn-list">
+            <button
+              class="btn btn-sm btn-icon btn-primary-light btn-wave"
+              title="Edit"
+              @click="edit(item)"
+            >
+              <i class="ri-edit-line"></i>
+            </button>
+            <button
+              class="btn btn-sm btn-icon btn-danger-light btn-wave"
+              title="Hapus"
+              @click="remove(item)"
+            >
+              <i class="ri-delete-bin-line"></i>
+            </button>
+          </div>
+        </template>
+      </EasyDataTable>
+    </SimpleCardComponent>
+  </div>
 </template>
+
+<style scoped>
+.btn-icon {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>

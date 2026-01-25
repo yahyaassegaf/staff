@@ -14,6 +14,7 @@ export default defineComponent({
   setup() {
     const route = useRoute();
     const loading = ref(false);
+    const errors = ref<any>({});
     const fakultasData = ref({
       id: "",
       kode: "",
@@ -22,9 +23,12 @@ export default defineComponent({
       nama_fakultas: "",
       kode_fakultas: "",
       dekan: "",
+      nidn_dekan: "",
+      tanda_tangan_id: null as null | number,
       jenjang: "S1",
       nidn_kepala: "",
       nama_kepala: "",
+      prodi: [],
     });
 
     async function getFakultas() {
@@ -42,9 +46,14 @@ export default defineComponent({
             nama_fakultas: fakultas.nama_fakultas || "",
             kode_fakultas: fakultas.kode_fakultas || "",
             dekan: fakultas.dekan || "",
+            nidn_dekan: fakultas.nidn_dekan || "",
+            tanda_tangan_id: fakultas.tanda_tangan_id
+              ? Number(fakultas.tanda_tangan_id)
+              : null,
             jenjang: fakultas.jenjang || "S1",
             nidn_kepala: fakultas.nidn_kepala || "",
             nama_kepala: fakultas.nama_kepala || "",
+            prodi: fakultas.prodi || [],
           };
         }
       } catch (error) {
@@ -57,6 +66,7 @@ export default defineComponent({
     async function submit(form: any) {
       try {
         loading.value = true;
+        errors.value = {};
         const response = await apiPut(`/fakultas/${form.id}`, form);
         if (response.success == true) {
           toast.success("Fakultas berhasil diupdate", {
@@ -68,13 +78,18 @@ export default defineComponent({
           });
           router.push({ name: "fakultas" });
         } else {
-          toast.error("Fakultas gagal diupdate", {
-            theme: "auto",
-            icon: true,
-            hideProgressBar: true,
-            autoClose: true,
-            position: "top-right",
-          });
+          if ((response.error as any)?.response?.status === 422) {
+            errors.value = (response.error as any).response.data.errors;
+            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+          } else {
+            toast.error("Fakultas gagal diupdate", {
+              theme: "auto",
+              icon: true,
+              hideProgressBar: true,
+              autoClose: true,
+              position: "top-right",
+            });
+          }
         }
       } catch (error) {
         console.log(error);
@@ -99,11 +114,17 @@ export default defineComponent({
       submit,
       fakultasData,
       loading,
+      errors,
     };
   },
 });
 </script>
 
 <template>
-  <FakultasComponent @submit="submit" :modelValue="fakultasData" :isEdit="true" />
+  <FakultasComponent
+    @submit="submit"
+    :modelValue="fakultasData"
+    :isEdit="true"
+    :errors="errors"
+  />
 </template>

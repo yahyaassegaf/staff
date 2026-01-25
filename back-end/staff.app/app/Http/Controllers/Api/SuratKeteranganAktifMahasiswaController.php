@@ -8,12 +8,15 @@ use App\Models\LogSurat;
 use App\Models\NoSurat;
 use App\Models\Prodi;
 use App\Models\SuratKeteranganAktifMahasiswa;
+use App\Models\ThAkademik;
 use App\Services\SuratService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class SuratKeteranganAktifMahasiswaController extends Controller
 {
@@ -46,6 +49,13 @@ class SuratKeteranganAktifMahasiswaController extends Controller
             });
         }
 
+        $auth = Auth::user()->jenis_kelamin;
+        if ($auth == 'L') {
+            $data->where('surat_keterangan_aktif_mahasiswa.jenis_kelamin', 'L');
+        } else {
+            $data->where('surat_keterangan_aktif_mahasiswa.jenis_kelamin', 'P');
+        }
+
         $data->orderBy(
             $request->input('sortBy', 'id'),
             $request->input('sortType', 'desc')
@@ -66,8 +76,9 @@ class SuratKeteranganAktifMahasiswaController extends Controller
     {
         Log::info($request->all());
         try {
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required|exists:prodi,id',
+                'th_akademik_id' => 'nullable|exists:th_akademik,id',
                 'nama_mhs' => 'required|string|max:255',
                 'nim' => 'required|string|max:255',
                 'nik' => 'nullable|string|max:255',
@@ -75,45 +86,62 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 'tanggal_lahir' => 'required|date',
                 'prodi_mhs' => 'required|string|max:255',
                 'semester' => 'required|string|max:50',
-                'tahun_akademik' => 'required|string|max:100',
+                'tahun_akademik' => 'nullable|string|max:100',
                 'nama_ortu' => 'required|string|max:255',
                 'nik_ortu' => 'nullable|string|max:255',
                 'nip_ortu' => 'nullable|string|max:255',
                 'alamat_ortu' => 'required|string',
                 'hp_ortu' => 'nullable|string|max:50',
                 'tanggal' => 'required|date',
-                'drive_file_id' => 'nullable|string',
-                'status' => 'nullable|in:pending,uploaded,failed',
             ]);
 
-            $login = Auth::user()->prodi ? Auth::user()->prodi->alias : 'UMUM';
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
+
+            // $login = Auth::user()->prodi ? Auth::user()->prodi->alias : 'UMUM';
+            $login = $request->prodi_mhs;
             $no = NoSurat::orderByDesc('id')->value('nomor') ?? 0;
             $no_surat = str_pad($no + 1, 3, '0', STR_PAD_LEFT);
 
+            // $unit = 'K.' . strtoupper($login);
             $unit = 'K.' . strtoupper($login);
 
             $noSurat = SuratService::NoSuratKeteranganAktifMahasiswa($no_surat, $unit);
 
             $skam = new SuratKeteranganAktifMahasiswa();
             $skam->nomor_surat = $noSurat;
-            $skam->prodi_id = $request->prodi_id;
-            $skam->nama_lengkap = $request->nama_mhs;
-            $skam->nim = $request->nim;
-            $skam->nik = $request->nik;
-            $skam->tempat_lahir = $request->tempat_lahir;
-            $skam->tanggal_lahir = $request->tanggal_lahir;
-            $skam->prodi_mhs = $request->prodi_mhs;
-            $skam->semester = $request->semester;
-            $skam->tahun_akademik = $request->tahun_akademik;
-            $skam->nama_ortu = $request->nama_ortu;
-            $skam->nik_ortu = $request->nik_ortu;
-            $skam->nip_ortu = $request->nip_ortu;
-            $skam->alamat_ortu = $request->alamat_ortu;
-            $skam->hp_ortu = $request->hp_ortu;
-            $skam->tanggal = $request->tanggal;
+            $skam->prodi_id = $validate['prodi_id'];
+            $skam->th_akademik_id = $validate['th_akademik_id'] ?? null;
+            $skam->nama_lengkap = $validate['nama_mhs'];
+            $skam->nim = $validate['nim'];
+            $skam->nik = $validate['nik'] ?? null;
+            $skam->tempat_lahir = $validate['tempat_lahir'];
+            $skam->tanggal_lahir = $validate['tanggal_lahir'];
+            $skam->prodi_mhs = $validate['prodi_mhs'];
+            $skam->semester = $validate['semester'];
+            // Set tahun_akademik from th_akademik if provided
+            if (!empty($validate['th_akademik_id'])) {
+                $thAkademik = ThAkademik::find($validate['th_akademik_id']);
+                $skam->tahun_akademik = $thAkademik ? $thAkademik->nama . ' ' . $thAkademik->semester : $validate['tahun_akademik'];
+            } else {
+                $skam->tahun_akademik = $validate['tahun_akademik'] ?? '';
+            }
+            $skam->nama_ortu = $validate['nama_ortu'];
+            $skam->nik_ortu = $validate['nik_ortu'] ?? null;
+            $skam->nip_ortu = $validate['nip_ortu'] ?? null;
+            $skam->alamat_ortu = $validate['alamat_ortu'];
+            $skam->hp_ortu = $validate['hp_ortu'] ?? null;
+            $skam->tanggal = $validate['tanggal'];
             $skam->user_id = Auth::user()->id;
-            $skam->drive_file_id = $request->drive_file_id;
-            $skam->status = $request->status ?? 'pending';
+            $skam->jenis_kelamin = Auth::user()->jenis_kelamin;
+            $skam->status = 'pending';
             $skam->save();
 
             $Nomor              = new NoSurat();
@@ -171,8 +199,9 @@ class SuratKeteranganAktifMahasiswaController extends Controller
     {
         Log::info($request->all());
         try {
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required|exists:prodi,id',
+                'th_akademik_id' => 'nullable|exists:th_akademik,id',
                 'nama_mhs' => 'required|string|max:255',
                 'nim' => 'required|string|max:255',
                 'nik' => 'nullable|string|max:255',
@@ -180,43 +209,63 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 'tanggal_lahir' => 'required|date',
                 'prodi_mhs' => 'required|string|max:255',
                 'semester' => 'required|string|max:50',
-                'tahun_akademik' => 'required|string|max:100',
+                'tahun_akademik' => 'nullable|string|max:100',
                 'nama_ortu' => 'required|string|max:255',
                 'nik_ortu' => 'nullable|string|max:255',
                 'nip_ortu' => 'nullable|string|max:255',
                 'alamat_ortu' => 'required|string',
                 'hp_ortu' => 'nullable|string|max:50',
                 'tanggal' => 'required|date',
-                'drive_file_id' => 'nullable|string',
-                'status' => 'nullable|in:pending,uploaded,failed',
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
 
             $skam = SuratKeteranganAktifMahasiswa::find($id);
             if (!$skam) {
                 return response()->json([
                     'status' => false,
                     'message' => 'Data tidak ditemukan'
-                ]);
+                ], 404);
             }
 
-            $skam->prodi_id = $request->prodi_id;
-            $skam->nama_lengkap = $request->nama_mhs;
-            $skam->nim = $request->nim;
-            $skam->nik = $request->nik;
-            $skam->tempat_lahir = $request->tempat_lahir;
-            $skam->tanggal_lahir = $request->tanggal_lahir;
-            $skam->prodi_mhs = $request->prodi_mhs;
-            $skam->semester = $request->semester;
-            $skam->tahun_akademik = $request->tahun_akademik;
-            $skam->nama_ortu = $request->nama_ortu;
-            $skam->nik_ortu = $request->nik_ortu;
-            $skam->nip_ortu = $request->nip_ortu;
-            $skam->alamat_ortu = $request->alamat_ortu;
-            $skam->hp_ortu = $request->hp_ortu;
-            $skam->tanggal = $request->tanggal;
-            $skam->drive_file_id = $request->drive_file_id;
-            $skam->status = $request->status ?? $skam->status;
+            // Determine tahun_akademik from th_akademik if provided
+            $tahunAkademik = $validate['tahun_akademik'] ?? $skam->tahun_akademik;
+            if (!empty($request->th_akademik_id)) {
+                $thAkademik = ThAkademik::find($request->th_akademik_id);
+                $tahunAkademik = $thAkademik ? $thAkademik->nama . ' ' . $thAkademik->semester : $tahunAkademik;
+            }
 
+            // Map frontend fields (if different) to database fields
+            $dataToUpdate = [
+                'prodi_id'       => $validate['prodi_id'],
+                'th_akademik_id' => $request->th_akademik_id ?? $skam->th_akademik_id,
+                'nama_lengkap'   => $validate['nama_mhs'],
+                'nim'            => $validate['nim'],
+                'nik'            => $validate['nik'] ?? null,
+                'tempat_lahir'   => $validate['tempat_lahir'],
+                'tanggal_lahir'  => $validate['tanggal_lahir'],
+                'prodi_mhs'      => $validate['prodi_mhs'],
+                'semester'       => $validate['semester'],
+                'tahun_akademik' => $tahunAkademik,
+                'nama_ortu'      => $validate['nama_ortu'],
+                'nik_ortu'       => $validate['nik_ortu'] ?? null,
+                'nip_ortu'       => $validate['nip_ortu'] ?? null,
+                'alamat_ortu'    => $validate['alamat_ortu'],
+                'hp_ortu'        => $validate['hp_ortu'] ?? null,
+                'tanggal'        => $validate['tanggal'],
+                'jenis_kelamin'  => Auth::user()->jenis_kelamin,
+                'user_id'        => Auth::user()->id,
+            ];
+
+            $skam->fill($dataToUpdate);
             $skam->save();
 
             return response()->json([
@@ -262,15 +311,22 @@ class SuratKeteranganAktifMahasiswaController extends Controller
     {
         try {
             $data = SuratKeteranganAktifMahasiswa::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_aktif_mahasiswa.prodi_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
+                ->leftJoin('th_akademik', 'th_akademik.id', '=', 'surat_keterangan_aktif_mahasiswa.th_akademik_id')
                 ->select(
                     'surat_keterangan_aktif_mahasiswa.*',
                     'prodi.nama as nama_prodi',
                     'prodi.alias as alias_prodi',
                     'prodi.nama_kepala as nama_kepala_prodi',
-                    'prodi.nidn_kepala as nidn_kepala_prodi'
+                    'prodi.nidn_kepala as nidn_kepala_prodi',
+                    'tanda_tangan.gambar as ttd',
+                    'th_akademik.nama as th_akademik_nama',
+                    'th_akademik.semester as th_akademik_semester',
                 )
                 ->where('surat_keterangan_aktif_mahasiswa.id', $id)
                 ->first();
+
+            Log::info($data);
 
             if (!$data) {
                 return response()->json([
@@ -279,8 +335,21 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 ], 404);
             }
 
+            $stempelPath = base_path('../public_html/img/stempel.png');
+
+            $stempelBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($stempelPath));
+
+            $tddPath = base_path('../public_html/' . $data->ttd);
+            $tddBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tddPath));
+
             $kopPath = base_path('../public_html/img/kop.jpg');
             $kopBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath));
+
+            // Build tahun_akademik from th_akademik or fallback to stored value
+            $tahunAkademik = $data->tahun_akademik;
+            if ($data->th_akademik_nama) {
+                $tahunAkademik = $data->th_akademik_nama . ' ' . $data->th_akademik_semester;
+            }
 
             $pdfData = [
                 'nomor_surat' => $data->nomor_surat,
@@ -291,7 +360,7 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 'tanggal_lahir' => Carbon::parse($data->tanggal_lahir)->translatedFormat('d F Y'),
                 'prodi_mhs' => $data->prodi_mhs,
                 'semester' => $data->semester,
-                'tahun_akademik' => $data->tahun_akademik,
+                'tahun_akademik' => $tahunAkademik,
                 'nama_ortu' => $data->nama_ortu,
                 'nik_ortu' => $data->nik_ortu,
                 'nip_ortu' => $data->nip_ortu,
@@ -302,6 +371,8 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 'nama_kepala_prodi' => $data->nama_kepala_prodi,
                 'nidn_kepala_prodi' => $data->nidn_kepala_prodi,
                 'kopBase64' => $kopBase64,
+                'stempel' => $stempelBase64,
+                'ttd' => $tddBase64,
             ];
 
             $pdf = Pdf::loadView('pdf.surat_aktif', $pdfData)
@@ -320,7 +391,12 @@ class SuratKeteranganAktifMahasiswaController extends Controller
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Keterangan Aktif Mahasiswa';
-            UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganAktifMahasiswa::class);
+
+            $googlePath = $data->prodi_mhs . '/' . $nameTable . '/' . $fileName;
+
+            if (!Storage::disk('google')->exists($googlePath)) {
+                UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi_mhs, SuratKeteranganAktifMahasiswa::class);
+            }
 
             return response($pdf->output(), 200, [
                 'Content-Type' => 'application/pdf',

@@ -18,15 +18,17 @@
 
         /* KOP SURAT */
         .kop {
-            margin-top: -2.5cm;
-            margin-left: -2cm;
-            margin-right: -2cm;
+            margin-top: -2.1cm;
+            margin-left: -1.5cm;
+            margin-right: -1.5cm;
             margin-bottom: 15px;
         }
 
         .kop img {
+            margin-top: 5px;
             width: 100%;
-            height: auto;
+            max-height: 155px;
+            object-fit: contain;
             display: block;
         }
 
@@ -49,7 +51,7 @@
 
         .nomor {
             margin-top: 5px;
-            margin-bottom: 25px;
+            margin-bottom: 10px;
         }
 
         .paragraf {
@@ -164,14 +166,30 @@
     </div>
 
     <!-- TANDA TANGAN -->
-    <table class="ttd">
+    <table class="ttd" width="100%" cellpadding="0" cellspacing="0" style="margin-top:50px;">
         <tr>
             <td width="60%"></td>
-            <td class="text-right">
+            <td width="40%" class="text-center">
                 Bangil, {{ $tanggal_surat }}<br>
-                Ketua / Koordinator Komprehensif
+                Ketua / Koordinator Komprehensif<br>
 
-                <div class="nama-ttd">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="
+                            height:70px;
+                            text-align:center;
+                            vertical-align:middle;
+                            background-image: url('{{ $stempel }}');
+                            background-repeat: no-repeat;
+                            background-position: 20% 10%;
+                            background-size: 90px 90px;
+                        ">
+                            <img src="{{ $ttd }}" style="width:180px;">
+                        </td>
+                    </tr>
+                </table>
+
+                <div class="nama-ttd" style="margin-top:4px;">
                     {{ $nama_penandatangan }}
                 </div>
             </td>

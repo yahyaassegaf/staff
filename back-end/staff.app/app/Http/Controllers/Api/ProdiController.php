@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Prodi;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 
 class ProdiController extends Controller
 {
@@ -49,7 +51,7 @@ class ProdiController extends Controller
         Log::info($request->all());
 
         try {
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'kode'      => 'nullable|string|max:50',
                 'alias'     => 'nullable|string|max:5',
                 'nama'      => 'nullable|string|max:75',
@@ -57,17 +59,29 @@ class ProdiController extends Controller
                 'jenjang'   => 'nullable|string|in:S1,S2,S3',
                 'nidn_kepala' => 'nullable|string|max:15',
                 'nama_kepala' => 'nullable|string|max:60',
+                'tanda_tangan' => 'nullable|integer|exists:tanda_tangan,id',
             ]);
 
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
+
             $prodi = new Prodi();
-            $prodi->kode = $request->kode;
-            $prodi->alias = $request->alias;
-            $prodi->nama = $request->nama;
-            $prodi->aktif = $request->aktif ?? 'T';
-            $prodi->jenjang = $request->jenjang ?? 'S1';
-            $prodi->nidn_kepala = $request->nidn_kepala;
-            $prodi->nama_kepala = $request->nama_kepala;
-            $prodi->user_id = auth()->user()->id;
+            $prodi->kode = $validate['kode'] ?? null;
+            $prodi->alias = $validate['alias'] ?? null;
+            $prodi->nama = $validate['nama'] ?? null;
+            $prodi->aktif = $validate['aktif'] ?? 'T';
+            $prodi->jenjang = $validate['jenjang'] ?? 'S1';
+            $prodi->nidn_kepala = $validate['nidn_kepala'] ?? null;
+            $prodi->nama_kepala = $validate['nama_kepala'] ?? null;
+            $prodi->user_id = Auth::user()->id;
+            $prodi->tanda_tangan_id = $validate['tanda_tangan'] ?? null;
             $prodi->save();
 
             return response()->json([
@@ -88,8 +102,12 @@ class ProdiController extends Controller
      */
     public function show($id)
     {
-        $prodi = Prodi::find($id);
-
+        // Log::info($id);
+        $prodi = Prodi::leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
+        ->select('prodi.*', 'tanda_tangan.nama as tanda_tangan')
+        ->where('prodi.id', $id)
+        ->first();
+        // Log::info($prodi);
         if (!$prodi) {
             return response()->json([
                 'status' => false,
@@ -112,7 +130,7 @@ class ProdiController extends Controller
         Log::info($request->all());
 
         try {
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'kode'      => 'nullable|string|max:50',
                 'alias'     => 'nullable|string|max:5',
                 'nama'      => 'nullable|string|max:75',
@@ -120,7 +138,18 @@ class ProdiController extends Controller
                 'jenjang'   => 'nullable|string|in:S1,S2,S3',
                 'nidn_kepala' => 'nullable|string|max:15',
                 'nama_kepala' => 'nullable|string|max:60',
+                'tanda_tangan' => 'nullable|integer|exists:tanda_tangan,id',
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
 
             $prodi = Prodi::find($id);
 
@@ -130,15 +159,17 @@ class ProdiController extends Controller
                     'message' => 'Data tidak ditemukan'
                 ], 404);
             }
+            Log::info('validated', $validate);
 
-            $prodi->kode = $request->kode;
-            $prodi->alias = $request->alias;
-            $prodi->nama = $request->nama;
-            $prodi->aktif = $request->aktif ?? 'T';
-            $prodi->jenjang = $request->jenjang ?? 'S1';
-            $prodi->nidn_kepala = $request->nidn_kepala;
-            $prodi->nama_kepala = $request->nama_kepala;
-            $prodi->user_id = auth()->user()->id;
+            $prodi->kode = $validate['kode'] ?? null;
+            $prodi->alias = $validate['alias'] ?? null;
+            $prodi->nama = $validate['nama'] ?? null;
+            $prodi->aktif = $validate['aktif'] ?? 'T';
+            $prodi->jenjang = $validate['jenjang'] ?? 'S1';
+            $prodi->nidn_kepala = $validate['nidn_kepala'] ?? null;
+            $prodi->nama_kepala = $validate['nama_kepala'] ?? null;
+            $prodi->user_id = Auth::user()->id;
+            $prodi->tanda_tangan_id = $validate['tanda_tangan'] ?? null;
             $prodi->save();
 
             return response()->json([

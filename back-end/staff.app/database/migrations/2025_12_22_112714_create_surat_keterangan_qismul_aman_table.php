@@ -21,13 +21,13 @@ return new class extends Migration
             $table->string('nim');
             $table->integer('prodi_id')->nullable();
             $table->integer('user_id');
-            $table->string('jenis_kelamin');
             $table->string('prodi_mhs');
             $table->text('alamat_rumah');
             $table->string('kelas_pondok');
             $table->date('tanggal_berlaku_dari');
             $table->date('tanggal_berlaku_sampai');
             $table->date('tanggal');
+            $table->enum('jenis_kelamin',['L','P'])->nullable();
             $table->string('drive_file_id')->nullable();
             $table->string('local_path')->nullable();
             $table->string('drive_link')->nullable();

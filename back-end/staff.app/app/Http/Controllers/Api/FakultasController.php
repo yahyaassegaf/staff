@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use App\Models\FakultasProdi;
 use App\Models\Fakultas;
 use App\Models\Prodi;
@@ -13,26 +14,36 @@ class FakultasController extends Controller
 {
     public function index(Request $request)
     {
-          $data = FakultasProdi::join('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
-            ->join('prodi', 'prodi.id', '=', 'fakultas_prodi.prodi_id');
-            
-
-        $data->select('fakultas_prodi.id as id','fakultas_prodi.prodi_id',
-        'fakultas_prodi.fakultas_id','fakultas_prodi.id as id',
-        'fakultas.nama as nama_fakultas','fakultas.dekan as dekan_fakultas',
-        'prodi.nama_kepala as nama_kepala_prodi','prodi.nama as nama_prodi',
-        'prodi.alias as alias_prodi');
+        $data = Fakultas::query();
+        $data->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'fakultas.tanda_tangan_id');
+        $data->select(
+            'fakultas.id',
+            'fakultas.nama as nama_fakultas',
+            'fakultas.kode as kode_fakultas',
+            'fakultas.dekan as dekan_fakultas',
+            'fakultas.tanda_tangan_id',
+            'tanda_tangan.nama as nama_ttd'
+        );
 
         if ($request->filled('search')) {
-
             $search = $request->search;
-
             $data->where(function ($q) use ($search) {
-                $q->orWhere('dekan_fakultas', 'LIKE', "%{$search}%");
-                $q->orWhere('nama_kepala_prodi', 'LIKE', "%{$search}%");
-                $q->orWhere('nama_fakultas', 'LIKE', "%{$search}%");
-                $q->orWhere('nama_prodi', 'LIKE', "%{$search}%");
-                $q->orWhere('alias_prodi', 'LIKE', "%{$search}%");
+                $q->orWhere('dekan', 'LIKE', "%{$search}%");
+                $q->orWhere('nama', 'LIKE', "%{$search}%");
+                $q->orWhere('kode', 'LIKE', "%{$search}%");
+
+                // Search in related prodis via pivot exists subquery
+                $q->orWhereExists(function ($subq) use ($search) {
+                    $subq->select('fakultas_prodi.id')
+                        ->from('fakultas_prodi')
+                        ->join('prodi', 'prodi.id', '=', 'fakultas_prodi.prodi_id')
+                        ->whereColumn('fakultas_prodi.fakultas_id', 'fakultas.id')
+                        ->where(function ($q2) use ($search) {
+                            $q2->where('prodi.nama', 'LIKE', "%{$search}%")
+                                ->orWhere('prodi.alias', 'LIKE', "%{$search}%")
+                                ->orWhere('prodi.nama_kepala', 'LIKE', "%{$search}%");
+                        });
+                });
             });
         }
 
@@ -42,6 +53,17 @@ class FakultasController extends Controller
         );
 
         $data = $data->paginate($request->input('limit', 10));
+
+        // Append prodi list string to each result for display
+        $data->getCollection()->transform(function ($fakultas) {
+            $prodis = FakultasProdi::join('prodi', 'prodi.id', '=', 'fakultas_prodi.prodi_id')
+                ->where('fakultas_prodi.fakultas_id', $fakultas->id)
+                ->pluck('prodi.nama')
+                ->implode(', ');
+
+            $fakultas->nama_prodi = $prodis;
+            return $fakultas;
+        });
 
         return response()->json(
             [
@@ -54,114 +76,143 @@ class FakultasController extends Controller
 
     public function store(Request $request)
     {
-        Log::info($request->all());
-       try {
-            $validate = $request->validate([
-                'kode_fakultas'=>'required',
-                'nama_fakultas'=>'required',
-                'alias'        =>'required',
-                'kode'         =>'required',
-                'nama'         =>'required',
-                'dekan'        =>'required',
-                'jenjang'      =>'required',
-                'nidn_kepala'  =>'required',
-                'nama_kepala'  =>'required',
+        // Log::info($request->all());
+        try {
+            $validator = Validator::make($request->all(), [
+                'kode_fakultas' => 'required',
+                'nama_fakultas' => 'required',
+                'dekan'        => 'required',
+                'nidn_dekan'   => 'nullable|string|max:100',
+                'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
+                'prodi'        => 'required|array',
+                'prodi.*.id'   => 'required|exists:prodi,id',
             ]);
 
-            $fakultas           = new Fakultas();
-            $fakultas->nama     = $request->nama_fakultas;
-            $fakultas->kode     = $request->kode_fakultas;
-            $fakultas->dekan    = $request->dekan;
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
+
+            $fakultas        = new Fakultas();
+            $fakultas->nama  = $validate['nama_fakultas'];
+            $fakultas->kode  = $validate['kode_fakultas'];
+            $fakultas->dekan = $validate['dekan'];
+            $fakultas->nidn_dekan = $validate['nidn_dekan'] ?? null;
+            $fakultas->tanda_tangan_id = $validate['tanda_tangan_id'] ?? null;
             $fakultas->save();
 
-            $prodi              = new Prodi();
-            $prodi->kode        = $request->kode;
-            $prodi->nama        = $request->nama;
-            $prodi->alias       = $request->alias;
-            $prodi->jenjang     = $request->jenjang;
-            $prodi->nidn_kepala = $request->nidn_kepala;
-            $prodi->nama_kepala = $request->nama_kepala;
-            $prodi->save();
-            
-            $fakultasProdi              = new FakultasProdi();
-            $fakultasProdi->fakultas_id = $fakultas->id;
-            $fakultasProdi->prodi_id    = $prodi->id;
-            $fakultasProdi->save();
+            foreach ($request->prodi as $selectedProdi) {
+                $fakultasProdi              = new FakultasProdi();
+                $fakultasProdi->fakultas_id = $fakultas->id;
+                $fakultasProdi->prodi_id    = $selectedProdi['id'];
+                $fakultasProdi->save();
+            }
 
             return response()->json([
                 'status' => true,
                 'message' => 'Data berhasil ditambahkan'
             ]);
-       } catch (\Throwable $th) {
+        } catch (\Throwable $th) {
             Log::info($th);
             return response()->json([
                 'status' => false,
                 'message' => 'Data gagal ditambahkan'
             ]);
-       }
-        
+        }
     }
-        public function show($id)
+
+    public function show($id)
     {
-        // Log::info('id fakultas_prodi ',$id);
-        $user = FakultasProdi::join('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
-            ->join('prodi', 'prodi.id', '=', 'fakultas_prodi.prodi_id')
-            ->select('fakultas_prodi.*',
-            'prodi.nama as nama',
-            'prodi.alias as alias',
-            'prodi.kode as kode',
-            'prodi.jenjang as jenjang',
-            'prodi.nidn_kepala as nidn_kepala',
-            'prodi.nama_kepala as nama_kepala',
-            'fakultas.nama as nama_fakultas','fakultas.kode as kode_fakultas','fakultas.dekan as dekan',)
-            ->where('fakultas_prodi.id', $id)
-            ->first();
+        $fakultas = Fakultas::find($id);
+
+        if (!$fakultas) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Data tidak ditemukan'
+            ], 404);
+        }
+
+        $linkedProdis = FakultasProdi::join('prodi', 'prodi.id', '=', 'fakultas_prodi.prodi_id')
+            ->where('fakultas_prodi.fakultas_id', $fakultas->id)
+            ->select('prodi.*')
+            ->get();
+
+        $data = [
+            'id' => $fakultas->id,
+            'nama_fakultas' => $fakultas->nama,
+            'kode_fakultas' => $fakultas->kode,
+            'dekan' => $fakultas->dekan,
+            'nidn_dekan' => $fakultas->nidn_dekan,
+            'tanda_tangan_id' => $fakultas->tanda_tangan_id,
+            'prodi' => $linkedProdis
+        ];
+
         return response()->json([
             'status' => true,
-            'data' => $user,
+            'data' => $data,
             'message' => 'Data berhasil diambil'
         ]);
     }
+
     public function update(Request $request, $id)
     {
-        Log::info($request->all());
+        // Log::info($request->all());
         try {
-            $validate = $request->validate([
-                'kode_fakultas'=>'required',
-                'nama_fakultas'=>'required',
-                'alias'        =>'required',
-                'kode'         =>'required',
-                'nama'         =>'required',
-                'dekan'        =>'required',
-                'jenjang'      =>'required',
-                'nidn_kepala'  =>'required',
-                'nama_kepala'  =>'required',
+            $validator = Validator::make($request->all(), [
+                'kode_fakultas' => 'required',
+                'nama_fakultas' => 'required',
+                'dekan'        => 'required',
+                'nidn_dekan'   => 'nullable|string|max:100',
+                'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
+                'prodi'        => 'required|array',
             ]);
 
-            $fakultasProdi               = FakultasProdi::find($id);
-            
-            $fakultas                    = Fakultas::find($fakultasProdi->fakultas_id);
-            $fakultas->nama              = $request->nama_fakultas;
-            $fakultas->kode              = $request->kode_fakultas;
-            $fakultas->dekan             = $request->dekan;
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
+
+            $fakultas = Fakultas::find($id);
+
+            if (!$fakultas) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Data tidak ditemukan'
+                ], 404);
+            }
+
+            // Update Fakultas
+            $fakultas->nama  = $validate['nama_fakultas'];
+            $fakultas->kode  = $validate['kode_fakultas'];
+            $fakultas->dekan = $validate['dekan'];
+            $fakultas->nidn_dekan = $validate['nidn_dekan'] ?? $fakultas->nidn_dekan;
+            $fakultas->tanda_tangan_id = $validate['tanda_tangan_id'] ?? $fakultas->tanda_tangan_id;
             $fakultas->save();
 
-            $prodi                       = Prodi::find($fakultasProdi->prodi_id);
-            $prodi->nama                 = $request->nama;
-            $prodi->kode                 = $request->kode;
-            $prodi->alias                = $request->alias;
-            $prodi->jenjang              = $request->jenjang;
-            $prodi->nidn_kepala          = $request->nidn_kepala;
-            $prodi->nama_kepala          = $request->nama_kepala;
-            $prodi->save();
+            // Sync Prodis (Delete all, create new)
+            FakultasProdi::where('fakultas_id', $fakultas->id)->delete();
 
-            
+            foreach ($request->prodi as $selectedProdi) {
+                $newFp              = new FakultasProdi();
+                $newFp->fakultas_id = $fakultas->id;
+                $newFp->prodi_id    = $selectedProdi['id'];
+                $newFp->save();
+            }
 
             return response()->json([
                 'status' => true,
                 'message' => 'Data berhasil diupdate'
             ]);
-            
         } catch (\Throwable $th) {
             Log::info($th);
             return response()->json([
@@ -170,14 +221,16 @@ class FakultasController extends Controller
             ]);
         }
     }
-    public function destroy($id) {
+
+    public function destroy($id)
+    {
         try {
-            $fakultasProdi = FakultasProdi::find($id);
-            $fakultas = Fakultas::find($fakultasProdi->fakultas_id);
-            $prodi = Prodi::find($fakultasProdi->prodi_id);
-            $fakultas->delete();
-            $prodi->delete();
-            $fakultasProdi->delete();
+            $fakultas = Fakultas::find($id);
+            if ($fakultas) {
+                FakultasProdi::where('fakultas_id', $fakultas->id)->delete();
+                $fakultas->delete();
+            }
+
             return response()->json([
                 'status' => true,
                 'message' => 'Data berhasil dihapus'

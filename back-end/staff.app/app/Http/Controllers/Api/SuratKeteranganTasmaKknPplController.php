@@ -8,12 +8,15 @@ use App\Models\LogSurat;
 use App\Models\NoSurat;
 use App\Models\Prodi;
 use App\Models\SuratKeteranganTasmaKknPpl;
+use App\Models\TandaTangan;
 use App\Services\SuratService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class SuratKeteranganTasmaKknPplController extends Controller
 {
@@ -63,6 +66,13 @@ class SuratKeteranganTasmaKknPplController extends Controller
             });
         }
 
+        $auth = Auth::user()->jenis_kelamin;
+        if ($auth == 'L') {
+            $data->where('surat_keterangan_tasma_kkn_ppl.jenis_kelamin', 'L');
+        } else {
+            $data->where('surat_keterangan_tasma_kkn_ppl.jenis_kelamin', 'P');
+        }
+
         $data->orderBy(
             $request->input('sortBy', 'id'),
             $request->input('sortType', 'desc')
@@ -83,23 +93,31 @@ class SuratKeteranganTasmaKknPplController extends Controller
     {
         Log::info($request->all());
         try {
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'prodi_id' => 'nullable|exists:prodi,id',
-                'ketua' => 'nullable|string|max:255',
+                'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
                 'nama_mhs' => 'required|string|max:255',
                 'tempat_lahir' => 'required|string|max:100',
                 'tanggal_lahir' => 'required|date',
                 'nim' => 'required|string|max:255',
-                'jenis_kelamin' => 'required|string|max:50',
                 'prodi_mhs' => 'required|string|max:255',
                 'alamat_rumah' => 'required|string',
                 'kelas_pondok' => 'required|string|max:255',
                 'tanggal' => 'required|date',
-                'drive_file_id' => 'nullable|string',
-                'status' => 'nullable|in:pending,uploaded,failed',
             ]);
 
-            $login = Auth::user()->prodi ? Auth::user()->prodi->alias : 'UMUM';
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
+            Log::info($validate);
+
+            $login = $validate['prodi_mhs'];
             $no = NoSurat::orderByDesc('id')->value('nomor') ?? 0;
             $no_surat = str_pad($no + 1, 3, '0', STR_PAD_LEFT);
 
@@ -108,30 +126,34 @@ class SuratKeteranganTasmaKknPplController extends Controller
 
             $noSurat = SuratService::NoSuratKeteranganTasmaKknPpl($no_surat);
 
-            $sktkp = new SuratKeteranganTasmaKknPpl();
-            $sktkp->nomor_surat = $noSurat;
-            $sktkp->ketua = $request->ketua;
-            $sktkp->nama_lengkap = $request->nama_mhs;
-            $sktkp->tempat_lahir = $request->tempat_lahir;
-            $sktkp->tanggal_lahir = $request->tanggal_lahir;
-            $sktkp->nim = $request->nim;
-            $sktkp->prodi_id = $request->prodi_id;
-            $sktkp->jenis_kelamin = $request->jenis_kelamin;
-            $sktkp->prodi_mhs = $request->prodi_mhs;
-            $sktkp->alamat_rumah = $request->alamat_rumah;
-            $sktkp->kelas_pondok = $request->kelas_pondok;
-            $sktkp->tanggal = $request->tanggal;
-            $sktkp->user_id = Auth::user()->id;
-            $sktkp->drive_file_id = $request->drive_file_id;
-            $sktkp->status = $request->status ?? 'pending';
+            $sktkp                = new SuratKeteranganTasmaKknPpl();
+            $sktkp->nomor_surat   = $noSurat;
+            $sktkp->tanda_tangan_id = $validate['tanda_tangan_id'] ?? null;
+            // Set ketua from tanda_tangan nama if provided
+            if (!empty($validate['tanda_tangan_id'])) {
+                $tandaTangan = TandaTangan::find($validate['tanda_tangan_id']);
+                $sktkp->ketua = $tandaTangan?->nama;
+            }
+            $sktkp->nama_lengkap  = $validate['nama_mhs'];
+            $sktkp->tempat_lahir  = $validate['tempat_lahir'];
+            $sktkp->tanggal_lahir = $validate['tanggal_lahir'];
+            $sktkp->nim           = $validate['nim'];
+            $sktkp->prodi_id      = $validate['prodi_id'] ?? null;
+            $sktkp->jenis_kelamin = Auth::user()->jenis_kelamin;
+            $sktkp->prodi_mhs     = $validate['prodi_mhs'];
+            $sktkp->alamat_rumah  = $validate['alamat_rumah'];
+            $sktkp->kelas_pondok  = $validate['kelas_pondok'];
+            $sktkp->tanggal       = $validate['tanggal'];
+            $sktkp->user_id       = Auth::user()->id;
+            $sktkp->status        = 'pending';
             $sktkp->save();
 
-            $Nomor              = new NoSurat();
-            $Nomor->nomor       = $no_surat;
-            $Nomor->user_id     = Auth::user()->id;
+            $Nomor                = new NoSurat();
+            $Nomor->nomor         = $no_surat;
+            $Nomor->user_id       = Auth::user()->id;
             $Nomor->save();
 
-            $log                = new LogSurat();
+            $log                  = new LogSurat();
             $log->nomor         = $no_surat;
             $log->nomor_surat   = $noSurat;
             $log->nama_surat    = 'Surat Keterangan TASMA, KKN, PPL';
@@ -143,7 +165,7 @@ class SuratKeteranganTasmaKknPplController extends Controller
                 'message' => 'Data berhasil ditambahkan'
             ]);
         } catch (\Throwable $th) {
-            Log::error($th);
+            Log::error($th->getMessage());
             return response()->json([
                 'status' => false,
                 'message' => 'Data gagal ditambahkan'
@@ -181,21 +203,28 @@ class SuratKeteranganTasmaKknPplController extends Controller
     {
         Log::info($request->all());
         try {
-            $validate = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'prodi_id' => 'nullable|exists:prodi,id',
-                'ketua' => 'nullable|string|max:255',
+                'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
                 'nama_mhs' => 'required|string|max:255',
                 'tempat_lahir' => 'required|string|max:100',
                 'tanggal_lahir' => 'required|date',
                 'nim' => 'required|string|max:255',
-                'jenis_kelamin' => 'required|string|max:50',
                 'prodi_mhs' => 'required|string|max:255',
                 'alamat_rumah' => 'required|string',
                 'kelas_pondok' => 'required|string|max:255',
                 'tanggal' => 'required|date',
-                'drive_file_id' => 'nullable|string',
-                'status' => 'nullable|in:pending,uploaded,failed',
             ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validate = $validator->validated();
 
             $sktkp = SuratKeteranganTasmaKknPpl::find($id);
             if (!$sktkp) {
@@ -205,46 +234,23 @@ class SuratKeteranganTasmaKknPplController extends Controller
                 ]);
             }
 
-            if (array_key_exists('prodi_id', $validate)) {
-                $sktkp->prodi_id = $validate['prodi_id'];
+            $sktkp->prodi_id = $validate['prodi_id'] ?? $sktkp->prodi_id;
+            if (array_key_exists('tanda_tangan_id', $validate)) {
+                $sktkp->tanda_tangan_id = $validate['tanda_tangan_id'];
+                if (!empty($validate['tanda_tangan_id'])) {
+                    $tandaTangan = TandaTangan::find($validate['tanda_tangan_id']);
+                    $sktkp->ketua = $tandaTangan?->nama;
+                }
             }
-            if (array_key_exists('ketua', $validate)) {
-                $sktkp->ketua = $validate['ketua'];
-            }
-            if (array_key_exists('nama_mhs', $validate)) {
-                $sktkp->nama_lengkap = $validate['nama_mhs'];
-            }
-            if (array_key_exists('tempat_lahir', $validate)) {
-                $sktkp->tempat_lahir = $validate['tempat_lahir'];
-            }
-            if (array_key_exists('tanggal_lahir', $validate)) {
-                $sktkp->tanggal_lahir = $validate['tanggal_lahir'];
-            }
-            if (array_key_exists('nim', $validate)) {
-                $sktkp->nim = $validate['nim'];
-            }
-            if (array_key_exists('jenis_kelamin', $validate)) {
-                $sktkp->jenis_kelamin = $validate['jenis_kelamin'];
-            }
-            if (array_key_exists('prodi_mhs', $validate)) {
-                $sktkp->prodi_mhs = $validate['prodi_mhs'];
-            }
-            if (array_key_exists('alamat_rumah', $validate)) {
-                $sktkp->alamat_rumah = $validate['alamat_rumah'];
-            }
-            if (array_key_exists('kelas_pondok', $validate)) {
-                $sktkp->kelas_pondok = $validate['kelas_pondok'];
-            }
-            if (array_key_exists('tanggal', $validate)) {
-                $sktkp->tanggal = $validate['tanggal'];
-            }
-            if (array_key_exists('drive_file_id', $validate)) {
-                $sktkp->drive_file_id = $validate['drive_file_id'];
-            }
-            if (array_key_exists('status', $validate)) {
-                $sktkp->status = $validate['status'];
-            }
-
+            $sktkp->nama_lengkap = $validate['nama_mhs'];
+            $sktkp->tempat_lahir = $validate['tempat_lahir'];
+            $sktkp->tanggal_lahir = $validate['tanggal_lahir'];
+            $sktkp->nim = $validate['nim'];
+            $sktkp->jenis_kelamin = Auth::user()->jenis_kelamin;
+            $sktkp->prodi_mhs = $validate['prodi_mhs'];
+            $sktkp->alamat_rumah = $validate['alamat_rumah'];
+            $sktkp->kelas_pondok = $validate['kelas_pondok'];
+            $sktkp->tanggal = $validate['tanggal'];
             $sktkp->save();
 
             return response()->json([
@@ -292,11 +298,14 @@ class SuratKeteranganTasmaKknPplController extends Controller
             $data = SuratKeteranganTasmaKknPpl::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_tasma_kkn_ppl.prodi_id')
                 ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
                 ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_keterangan_tasma_kkn_ppl.tanda_tangan_id')
                 ->select(
                     'fakultas.nama as fakultas',
                     'surat_keterangan_tasma_kkn_ppl.*',
                     'prodi.nama as prodi',
                     'prodi.alias as alias_prodi',
+                    'tanda_tangan.nama as nama_ttd',
+                    'tanda_tangan.gambar as ttd',
                 )
                 ->where('surat_keterangan_tasma_kkn_ppl.id', $id)
                 ->first();
@@ -313,10 +322,16 @@ class SuratKeteranganTasmaKknPplController extends Controller
 
             $kopBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath));
 
+            $tddPath = base_path('../public_html/' . $data->ttd);
+
+            $tddBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tddPath));
+            $stempelPath = base_path('../public_html/img/stempel.png');
+
+            $stempelBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($stempelPath));
 
             $pdfData = [
                 'nomor_surat' => $data->nomor_surat,
-                'ketua' => $data->ketua,
+                'ketua' => $data->nama_ttd ?? $data->ketua,
                 'nama' => $data->nama_lengkap,
                 'tempat_lahir' => $data->tempat_lahir,
                 'tanggal_lahir' => Carbon::parse($data->tanggal_lahir)->translatedFormat('d F Y'),
@@ -329,6 +344,8 @@ class SuratKeteranganTasmaKknPplController extends Controller
                 'jenis_kelamin' => $data->jenis_kelamin,
                 'tanggal_surat' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
                 'kopBase64' => $kopBase64,
+                'ttd' => $tddBase64,
+                'stempel' => $stempelBase64,
             ];
 
             // Use the view found in user's open documents
@@ -348,7 +365,12 @@ class SuratKeteranganTasmaKknPplController extends Controller
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Keterangan TASMA, KKN, PPL';
-            UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi, SuratKeteranganTasmaKknPpl::class);
+
+            $googlePath = $data->prodi . '/' . $nameTable . '/' . $fileName;
+
+            if (!Storage::disk('google')->exists($googlePath)) {
+                UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi, SuratKeteranganTasmaKknPpl::class);
+            }
 
             return response($pdf->output(), 200, [
                 'Content-Type' => 'application/pdf',

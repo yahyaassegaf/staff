@@ -1,71 +1,141 @@
 <template>
-    <router-link to="#" class="side-menu__item" :class="`${menuData?.selected ? 'active' : ''}`"
-        @click="toggleSubmenu($event, menuData, undefined, level > 1)"
-        @mouseover="HoverToggleInnerMenuFn($event, menuData)">
-        <span v-if='menuData?.icon' v-html="menuData.icon">
-        </span>
-        <span class="side-menu__label" v-if="level == 1">{{ menuData.title }}
-            <span v-if="menuData.badge" :class="`badge ${menuData?.badgeColor} ms-1`">{{ menuData.badge
-                }}</span></span>
-        <span v-if="level > 1">{{ menuData.title }}
-            <span v-if="menuData.badgetxt" v-html="menuData.badgetxt"></span>
-        </span>
-        <i class="ri-arrow-right-s-line side-menu__angle"></i>
-    </router-link>
-    <ul class="slide-menu "
-        :class="`${menuData.active ? 'double-menu-active' : ''} child${level} ${menuData?.dirchange ? 'force-left' : ''}`"
-        :style="menuData.active ? 'display : block' : ''">
-        <li v-if="level <= 1" class="slide side-menu__label1">
-            <a href="javascript:void(0)">{{ menuData.title }}</a>
-        </li>
+  <router-link
+    to="#"
+    class="side-menu__item"
+    :class="`${menuData?.selected ? 'active' : ''}`"
+    @click="toggleSubmenu($event, menuData, undefined, level > 1)"
+    @mouseover="HoverToggleInnerMenuFn($event, menuData)"
+  >
+    <span v-if="menuData?.icon" v-html="menuData.icon"> </span>
+    <span class="side-menu__label" v-if="level == 1"
+      >{{ menuData.title }}
+      <span
+        v-if="menuData.badge"
+        :class="`badge ${menuData?.badgeColor} ms-1`"
+        >{{ menuData.badge }}</span
+      ></span
+    >
+    <span v-if="level > 1"
+      >{{ menuData.title }}
+      <span v-if="menuData.badgetxt" v-html="menuData.badgetxt"></span>
+    </span>
+    <i class="ri-arrow-right-s-line side-menu__angle"></i>
+  </router-link>
+  <ul
+    class="slide-menu"
+    :class="`${menuData.active ? 'double-menu-active' : ''} child${level} ${
+      menuData?.dirchange ? 'force-left' : ''
+    }`"
+    :style="menuData.active ? 'display : block' : ''"
+  >
+    <li v-if="level <= 1" class="slide side-menu__label1">
+      <a href="javascript:void(0)">{{ menuData.title }}</a>
+    </li>
 
-        <li v-for="(firstLevelMenuItem, subIndex) in menuData.children" :key="subIndex"
-            :class="`
-            ${firstLevelMenuItem.menuTitle ? 'slide__category' : ''} ${firstLevelMenuItem?.type == 'empty' ? 'slide' : ''} ${firstLevelMenuItem?.type == 'link' ? 'slide' : ''} ${firstLevelMenuItem?.type == 'sub' ? 'slide has-sub' : ''} ${firstLevelMenuItem?.active ? 'open' : ''} ${firstLevelMenuItem?.selected ? 'active' : ''}`">
-            <template v-if="firstLevelMenuItem?.type === 'link'">
-                <router-link :to="firstLevelMenuItem?.path" class="side-menu__item"
-                    :class="`${firstLevelMenuItem?.selected ? 'active' : ''}`">
-                    <span v-html="firstLevelMenuItem.icon"></span> {{ firstLevelMenuItem.title }}<span
-                        v-if="firstLevelMenuItem.badge" :class="`badge ${firstLevelMenuItem.badgeColor} ms-1`">{{
-                            firstLevelMenuItem.badge }}</span>
-                </router-link>
-            </template>
-            <template v-if="firstLevelMenuItem?.type === 'empty'">
-                <a to="javascript:;" class="side-menu__item">
-                    {{ firstLevelMenuItem.title }}<span v-if="firstLevelMenuItem.badge"
-                        :class="`badge ${firstLevelMenuItem.badgeColor} ms-1`">{{ firstLevelMenuItem.badge }}</span>
-                </a>
-            </template>
-            <template v-if="firstLevelMenuItem?.type === 'sub'">
-                <RecursiveMenu :menuData="firstLevelMenuItem" :toggleSubmenu="toggleSubmenu"
-                    :HoverToggleInnerMenuFn="HoverToggleInnerMenuFn" :level="level + 1" />
-            </template>
-        </li>
-    </ul>
+    <li
+      v-for="(firstLevelMenuItem, subIndex) in menuData.children"
+      :key="subIndex"
+      :class="`
+            ${firstLevelMenuItem.menuTitle ? 'slide__category' : ''} ${
+        firstLevelMenuItem?.type == 'empty' ? 'slide' : ''
+      } ${firstLevelMenuItem?.type == 'link' ? 'slide' : ''} ${
+        firstLevelMenuItem?.type == 'sub' ? 'slide has-sub' : ''
+      } ${firstLevelMenuItem?.active ? 'open' : ''} ${
+        firstLevelMenuItem?.selected ? 'active' : ''
+      }`"
+    >
+      <template v-if="firstLevelMenuItem?.type === 'link'">
+        <router-link
+          :to="firstLevelMenuItem?.path"
+          class="side-menu__item"
+          :class="`${firstLevelMenuItem?.selected ? 'active' : ''}`"
+          @click="handleLinkClick"
+        >
+          <span v-html="firstLevelMenuItem.icon"></span>
+          {{ firstLevelMenuItem.title
+          }}<span
+            v-if="firstLevelMenuItem.badge"
+            :class="`badge ${firstLevelMenuItem.badgeColor} ms-1`"
+            >{{ firstLevelMenuItem.badge }}</span
+          >
+        </router-link>
+      </template>
+      <template v-if="firstLevelMenuItem?.type === 'empty'">
+        <a to="javascript:;" class="side-menu__item">
+          {{ firstLevelMenuItem.title
+          }}<span
+            v-if="firstLevelMenuItem.badge"
+            :class="`badge ${firstLevelMenuItem.badgeColor} ms-1`"
+            >{{ firstLevelMenuItem.badge }}</span
+          >
+        </a>
+      </template>
+      <template v-if="firstLevelMenuItem?.type === 'sub'">
+        <RecursiveMenu
+          :menuData="firstLevelMenuItem"
+          :toggleSubmenu="toggleSubmenu"
+          :HoverToggleInnerMenuFn="HoverToggleInnerMenuFn"
+          :closeMenuOnNavigate="closeMenuOnNavigate"
+          :level="level + 1"
+        />
+      </template>
+    </li>
+  </ul>
 </template>
 
 <script setup>
-defineProps({
-    menuData: {
-        type: Object,
-        required: true,
-    },
-    toggleSubmenu: {
-        type: Function,
-        required: true,
-    },
-    HoverToggleInnerMenuFn: {
-        type: Function,
-        required: true,
-    },
-    level: {
-        type: Number,
-        required: true,
-    },
-})
+const props = defineProps({
+  menuData: {
+    type: Object,
+    required: true,
+  },
+  toggleSubmenu: {
+    type: Function,
+    required: true,
+  },
+  HoverToggleInnerMenuFn: {
+    type: Function,
+    required: true,
+  },
+  closeMenuOnNavigate: {
+    type: Function,
+    required: false,
+  },
+  level: {
+    type: Number,
+    required: true,
+  },
+});
+
+function handleLinkClick() {
+  // Delay closing to allow navigation to complete first
+  setTimeout(() => {
+    // Close all open dropdown menus
+    const openMenus = document.querySelectorAll(".slide.has-sub.open");
+    openMenus.forEach((menu) => {
+      menu.classList.remove("open");
+      const slideMenu = menu.querySelector(".slide-menu");
+      if (slideMenu) {
+        slideMenu.style.display = "none";
+      }
+    });
+
+    // Set menuData.active to false for parent
+    if (props.menuData) {
+      props.menuData.active = false;
+    }
+
+    // Close sidebar on mobile
+    if (window.innerWidth < 992) {
+      document.documentElement.setAttribute("data-toggled", "close");
+    }
+
+    // Also call the parent function if needed
+    if (props.closeMenuOnNavigate) {
+      props.closeMenuOnNavigate();
+    }
+  }, 100);
+}
 </script>
 
-<style lang="">
-
-</style>
-
+<style lang=""></style>
