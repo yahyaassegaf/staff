@@ -15,7 +15,8 @@ class GoogleDrive
     {
         try {
             $client = new \Google_Client();
-            $client->setAuthConfig(config('filesystems.disks.google.clientSecretJson'));
+            $client->setClientId(config('filesystems.disks.google.clientId'));
+            $client->setClientSecret(config('filesystems.disks.google.clientSecret'));
             $client->addScope(\Google_Service_Drive::DRIVE);
 
             // Set credentials menggunakan refresh token
