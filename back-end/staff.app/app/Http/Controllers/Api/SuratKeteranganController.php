@@ -141,6 +141,31 @@ class SuratKeteranganController extends Controller
         }
     }
 
+    public function destroy($id)
+    {
+        try {
+            $sk = SuratKeterangan::find($id);
+            if (!$sk) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Data tidak ditemukan'
+                ], 404);
+            }
+            $sk->delete();
+            return response()->json([
+                'status' => true,
+                'message' => 'Data berhasil dihapus'
+            ]);
+        } catch (\Throwable $th) {
+            Log::error($th);
+            return response()->json([
+                'status' => false,
+                'message' => 'Data gagal dihapus',
+                'error' => $th->getMessage()
+            ]);
+        }
+    }
+
     public function show($id)
     {
         $data = SuratKeterangan::join('prodi', 'prodi.id', '=', 'surat_keterangan.prodi_id')
@@ -158,6 +183,17 @@ class SuratKeteranganController extends Controller
                 'status' => false,
                 'message' => 'Data tidak ditemukan'
             ], 404);
+        }
+
+
+        $nomorStr = $data->nomor_surat ?? $data->nomor ?? null;
+        if ($nomorStr) {
+            $parts = explode('/', $nomorStr);
+            $firstPart = $parts[0];
+            if (strpos($firstPart, '-') !== false) {
+                $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+            }
+            $data->no_surat = trim($firstPart);
         }
 
         return response()->json([
@@ -199,6 +235,8 @@ class SuratKeteranganController extends Controller
                 ], 404);
             }
 
+            $oldDriveFileId = $sk->drive_file_id;
+
             $sk->fill([
                 'nama_mahasiswa'   => $validate['nama_mhs'],
                 'nim'              => $validate['nim'],
@@ -210,7 +248,91 @@ class SuratKeteranganController extends Controller
                 'prodi_id'         => $validate['prodi_id'],
                 'jenis_kelamin'    => Auth::user()->jenis_kelamin,
             ]);
+
+            // Delete old file from Google Drive if exists
+            if (!empty($oldDriveFileId)) {
+                \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
+            }
+
+            $sk->drive_file_id = null;
+            $sk->drive_link = null;
+            $sk->status = 'pending';
             $sk->save();
+
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratKeterangan::join('prodi', 'prodi.id', '=', 'surat_keterangan.prodi_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_keterangan.tanda_tangan_id')
+                ->select(
+                    'surat_keterangan.*',
+                    'prodi.nama as prodi_name',
+                    'prodi.alias as alias_prodi',
+                    'prodi.nama_kepala',
+                    'prodi.nidn_kepala',
+                    'tanda_tangan.gambar as ttd',
+                    'tanda_tangan.nama as nama_staff',
+                )
+                ->where('surat_keterangan.id', $sk->id)
+                ->first();
+
+            if ($data) {
+                $kunci_jabatan = 'staff_' . strtolower($data->alias_prodi);
+                $settingJabatan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', $kunci_jabatan)->first();
+
+                $nama_kepala = $data->nama_kepala;
+                $tddBase64 = '';
+
+                if ($settingJabatan && $settingJabatan->tandaTangan) {
+                    $nama_kepala = $settingJabatan->tandaTangan->nama;
+                    $tddPath = base_path('../public_html/' . $settingJabatan->tandaTangan->gambar);
+                    if (file_exists($tddPath)) {
+                        $tddBase64 = SuratService::getBase64Image($tddPath);
+                    }
+                } else {
+                    $tddPath = base_path('../public_html/' . $data->ttd);
+                    if (file_exists($tddPath) && !empty($data->ttd)) {
+                        $tddBase64 = SuratService::getBase64Image($tddPath);
+                    }
+                }
+
+                $kopPath = base_path('../public_html/img/kop.jpg');
+                $kopBase64 = SuratService::getBase64Image($kopPath);
+
+                $stempelPath = base_path('../public_html/img/stempel.png');
+                $stempelBase64 = SuratService::getBase64Image($stempelPath);
+
+                $pdfData = [
+                    'nomor' => $data->nomor,
+                    'nama_mahasiswa' => $data->nama_mahasiswa,
+                    'nim' => $data->nim,
+                    'prodi' => $data->prodi,
+                    'periode_bulan' => $data->periode_bulan,
+                    'nama_staff' => $data->nama_staff,
+                    'alasan' => $data->alasan,
+                    'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+                    'jenis_kelamin' => $data->jenis_kelamin,
+                    'nama_kepala' => $nama_kepala,
+                    'nidn_kepala' => $data->nidn_kepala,
+                    'kopBase64' => $kopBase64,
+                    'ttd' => $tddBase64,
+                    'stempel' => $stempelBase64
+                ];
+
+                $pdf = Pdf::loadView('pdf.surat_keterangan', $pdfData)->setPaper('a4', 'portrait');
+                $fileName = 'surat_keterangan_' . $data->nim . '.pdf';
+                $directory = base_path('../public_html/pdf/');
+
+                if (!file_exists($directory)) {
+                    mkdir($directory, 0755, true);
+                }
+
+                $path = $directory . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->prodi_name, SuratKeterangan::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -226,30 +348,6 @@ class SuratKeteranganController extends Controller
         }
     }
 
-    public function destroy($id)
-    {
-        try {
-            $sk = SuratKeterangan::find($id);
-            if (!$sk) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data tidak ditemukan'
-                ], 404);
-            }
-            $sk->delete();
-            return response()->json([
-                'status' => true,
-                'message' => 'Data berhasil dihapus'
-            ]);
-        } catch (\Throwable $th) {
-            Log::error($th);
-            return response()->json([
-                'status' => false,
-                'message' => 'Data gagal dihapus'
-            ]);
-        }
-    }
-
     public function downloadPdf($id)
     {
         try {
@@ -260,6 +358,7 @@ class SuratKeteranganController extends Controller
                 ->select(
                     'surat_keterangan.*',
                     'prodi.nama as prodi_name',
+                    'prodi.alias as alias_prodi',
                     'prodi.nama_kepala',
                     'prodi.nidn_kepala',
                     'fakultas.nama as fakultas_name',
@@ -272,14 +371,30 @@ class SuratKeteranganController extends Controller
             if (!$data) {
                 return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
             }
-            $tddPath = base_path('../public_html/' . $data->ttd);
+            $kunci_jabatan = 'staff_' . strtolower($data->alias_prodi);
+            $settingJabatan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', $kunci_jabatan)->first();
 
-            $tddBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tddPath));
+            $nama_kepala = $data->nama_kepala;
+            $tddBase64 = '';
+
+            if ($settingJabatan && $settingJabatan->tandaTangan) {
+                $nama_kepala = $settingJabatan->tandaTangan->nama;
+                $tddPath = base_path('../public_html/' . $settingJabatan->tandaTangan->gambar);
+                if (file_exists($tddPath)) {
+                    $tddBase64 = SuratService::getBase64Image($tddPath);
+                }
+            } else {
+                $tddPath = base_path('../public_html/' . $data->ttd);
+                if (file_exists($tddPath) && !empty($data->ttd)) {
+                    $tddBase64 = SuratService::getBase64Image($tddPath);
+                }
+            }
+
             $kopPath = base_path('../public_html/img/kop.jpg');
-            $kopBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath));
+            $kopBase64 = SuratService::getBase64Image($kopPath);
 
             $stempelPath = base_path('../public_html/img/stempel.png');
-            $stempelBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($stempelPath));
+            $stempelBase64 = SuratService::getBase64Image($stempelPath);
 
             $pdfData = [
                 'nomor' => $data->nomor,
@@ -289,9 +404,9 @@ class SuratKeteranganController extends Controller
                 'periode_bulan' => $data->periode_bulan,
                 'nama_staff' => $data->nama_staff,
                 'alasan' => $data->alasan,
-                'tanggal' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
+                'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
                 'jenis_kelamin' => $data->jenis_kelamin,
-                'nama_kepala' => $data->nama_kepala,
+                'nama_kepala' => $nama_kepala,
                 'nidn_kepala' => $data->nidn_kepala,
                 'kopBase64' => $kopBase64,
                 'ttd' => $tddBase64,

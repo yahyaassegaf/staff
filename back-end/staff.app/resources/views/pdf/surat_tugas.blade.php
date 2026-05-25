@@ -157,18 +157,18 @@
                 <td width="40%" class="text-center">
                     Bangil, {{ $tanggal }}<br>
                     Kepala Prodi
-
-                    <table width="100%" cellpadding="0" cellspacing="0">
+                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -20px; margin-bottom: -30px;">
                         <tr>
                             <td style="
+                                height: 155px;
                                 text-align:center;
                                 vertical-align:middle;
-                                background-image: url('{{ $stempel }}');
+                                /* background-image: url('{{ $stempel }}'); */
                                 background-repeat: no-repeat;
-                                background-position: 20% 60%;
-                                background-size: 130px 130px;
+                                background-position: 20% 50%;
+                                background-size: 145px 145px;
                             ">
-                                <img src="{{ $ttd }}" style="width:300px;">
+                                <!-- <img src="{{ $ttd }}" style="width:330px;"> -->
                             </td>
                         </tr>
                     </table>

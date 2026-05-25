@@ -42,7 +42,6 @@ export default defineComponent({
           }
         }
       } catch (error) {
-        console.log(error);
         toast.error("Terjadi kesalahan saat menambahkan hasil rapat");
       } finally {
         loading.value = false;

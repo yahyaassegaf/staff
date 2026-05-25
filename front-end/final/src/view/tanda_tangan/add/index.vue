@@ -38,7 +38,6 @@ export default defineComponent({
           }
         }
       } catch (error) {
-        console.log(error);
         toast.error("Terjadi kesalahan");
       } finally {
         loading.value = false;

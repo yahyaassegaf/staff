@@ -176,18 +176,18 @@
                 {{ $staff }}<br>
 
                 <!-- AREA TTD (OVERLAY AMAN) -->
-                <table width="100%" cellpadding="0" cellspacing="0">
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -20px; margin-bottom: -25px;">
                     <tr>
                         <td style="
-            height:70px;
+            height:115px;
             text-align:center;
             vertical-align:middle;
-            background-image: url('{{ $stempel }}');
+            /* background-image: url('{{ $stempel }}'); */
             background-repeat: no-repeat;
-            background-position: 20% 60%;
-            background-size: 90px 90px;
+            background-position: 20% 50%;
+            background-size: 110px 110px;
         ">
-                            <img src="{{ $ttd }}" style="width:250px;">
+                            <!-- <img src="{{ $ttd }}" style="width:280px;"> -->
                         </td>
                     </tr>
                 </table>

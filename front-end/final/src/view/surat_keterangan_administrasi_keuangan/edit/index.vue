@@ -42,7 +42,7 @@ export default defineComponent({
 
           suratData.value = {
             id: data.id,
-            no_surat: data.no_surat || "",
+            no_surat: data.no_surat || data.nomor_surat || data.nomor || "",
             kepala_biro: data.kepala_biro || "",
             tanda_tangan_id: data.tanda_tangan_id
               ? Number(data.tanda_tangan_id)

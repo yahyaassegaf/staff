@@ -89,7 +89,6 @@ export default defineComponent({
           buildCards({ cards: response.data.data });
         }
       } catch (error) {
-        console.log(error);
       }
     }
 
@@ -115,7 +114,6 @@ export default defineComponent({
           total.value = payload.total || 0;
         }
       } catch (error) {
-        console.log(error);
       } finally {
         loadingTable.value = false;
       }

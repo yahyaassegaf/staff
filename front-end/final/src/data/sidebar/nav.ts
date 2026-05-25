@@ -140,7 +140,10 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
 
       { path: "/prodi", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Prodi" },
       { path: "/fakultas", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Fakultas" },
+
       { path: "/tanda-tangan", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Tanda Tangan" },
+      { path: "/setting-jabatan", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Setting Jabatan" },
+      { path: "/jenis-surat", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Jenis Surat" },
       // {
       //   title: "Email", type: "sub", icon: Svgicons.Emailicon, active: false, children: [
 
@@ -299,7 +302,8 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
 
   {
     icon: Svgicons.Pagesicon, title: "Surat", type: "sub", active: false, dirchange: false, children: [
-      { path: "/sklmk", icon: Svgicons.Emptyicon, type: "link", active: false, selected: false, dirchange: false, title: "Surat Keterangan Lulus Mata Kuliah"},
+      { path: "/sk6", icon: Svgicons.Emptyicon, type: "link", active: false, selected: false, dirchange: false, title: "SK 6 (5 Surat Keterangan)" },
+      { path: "/sklmk", icon: Svgicons.Emptyicon, type: "link", active: false, selected: false, dirchange: false, title: "Surat Keterangan Lulus Mata Kuliah" },
       { path: "/skukd", icon: Svgicons.Landingicon, type: "link", active: false, selected: false, dirchange: false, title: "Surat Keterangan Ujian Komprehensif Diniyah" },
       { path: "/skak", icon: Svgicons.Pricingicon, type: "link", active: false, selected: false, dirchange: false, title: "Surat Keterangan Administrasi Keuangan" },
       { path: "/sktkp", type: "link", icon: Svgicons.Profileicon, active: false, selected: false, dirchange: false, title: "Surat Keterangan Tasma" },
@@ -310,12 +314,22 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
       // { path: "/pages/terms-conditions", type: "link", icon: Svgicons.Termsicon, active: false, selected: false, dirchange: false, title: "Surat Keputusan Dekan" },
       { path: "/sip", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Izin Penelitian" },
       { path: "/skt", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Keterangan Transfer" },
+      { path: "/skds2", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Keterangan Daftar S2" },
       { path: "/spvn", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Pernyataan Melakukan Verifikasi Nilai Mahasiswa" },
-      { path: "/sk", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Keterangan" },
-      { path: "/st", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Tugas" },
+      { path: "/spm", type: "link", icon: Svgicons.Teamicon, active: false, selected: false, dirchange: false, title: "Surat Keterangan SPM" },
+      // { path: "/sk", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Keterangan" },
+      // { path: "/st", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Tugas" },
       { path: "/hasil-rapat", type: "link", icon: Svgicons.Formsicon, active: false, selected: false, dirchange: false, title: "Hasil Rapat" },
-      { path: "/skk", type: "link", icon: Svgicons.Formsicon, active: false, selected: false, dirchange: false, title: "Surat Keterangan KKN" },
-      { path: "/skp", type: "link", icon: Svgicons.Formsicon, active: false, selected: false, dirchange: false, title: "Surat Keterangan PPL" },
+    ]
+  },
+  {
+    menutitle: 'Ijazah',
+    allowedLevels: ['baak', 'admin']
+  },
+  {
+    icon: Svgicons.Pagesicon, title: "Ijazah", type: "sub", active: false, dirchange: false, allowedLevels: ['baak', 'admin'], children: [
+      { path: "/mahasiswa", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Mahasiswa" },
+      { path: "/template-ijazah", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Template Ijazah" },
     ]
   },
 
@@ -444,7 +458,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   //   ],
   // },
 
-    {
+  {
     title: "Account", icon: Svgicons.Profileicon, type: "sub", active: false, selected: false, dirchange: false, children: [
       { path: "/profile", icon: Svgicons.Profileicon, type: "link", active: false, selected: false, dirchange: false, title: "Profile" },
       { path: "/users", type: "link", active: false, selected: false, dirchange: false, title: "Users", allowedLevels: ['admin'] },

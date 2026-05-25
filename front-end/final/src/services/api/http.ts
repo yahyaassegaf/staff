@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 export const BASE_URL = 'http://staff.test:8081/api';
+// export const BASE_URL = 'https://staffapp.uiidalwa.web.id/api';
 
 const http = axios.create({
     baseURL: BASE_URL,
@@ -10,7 +11,6 @@ const http = axios.create({
 http.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
-         console.log("TOKEN KIRIM:", token);
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }

@@ -33,24 +33,18 @@ const tandaTanganOptions = ref<any[]>([]);
 const loadTandaTangan = async () => {
   try {
     const response = await apiGet('/get-all-tanda-tangan');
-    console.log('API Response tanda tangan:', response);
     
     if (response.success) {
       // Handle the actual response structure: {success: true, data: {data: [], message: "...", status: true}}
       const data = response.data?.data || [];
-      console.log('Extracted tanda tangan data:', data);
       
       // Ensure tandaTanganOptions is always an array
       tandaTanganOptions.value = Array.isArray(data) ? data : [];
-      console.log('Tanda tangan options loaded:', tandaTanganOptions.value);
     } else {
-      console.error('API response failed:', response);
       if (response.error === 'Unauthorized') {
-        console.error('User not authenticated - need to login first');
       }
     }
   } catch (error) {
-    console.error('Error loading tanda tangan:', error);
   }
 };
 
@@ -71,8 +65,6 @@ watch(
       Object.assign(form, defaultForm);
       Object.assign(form, val);
       
-      console.log('Form data after assignment:', form);
-      console.log('Tanda tangan options available:', tandaTanganOptions.value);
       
       // Ensure form.tanda_tangan is properly set for single select
       if (!form.tanda_tangan) form.tanda_tangan = null;

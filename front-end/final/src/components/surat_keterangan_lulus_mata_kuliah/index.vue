@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { reactive, ref, watch, onMounted, nextTick } from "vue";
+import { computed } from "vue";
 import Multiselect from "vue-multiselect";
 import "vue-multiselect/dist/vue-multiselect.min.css";
 import { apiGet } from "../../services/api/request";
@@ -79,7 +80,6 @@ const listProdi = ref<any[]>([]);
 async function getProdi() {
   try {
     const response = await apiGet(`/get-prodi`);
-    console.log(response);
 
     if (response.success) {
       const data = response.data?.data;
@@ -92,11 +92,74 @@ async function getProdi() {
       }
     }
   } catch (error) {
-    console.log(error);
   }
 }
 
+
+const listJenisSurat = ref<any[]>([]);
+
+async function getJenisSurat() {
+  try {
+    const response = await apiGet(`/jenis-surat`);
+    if (response.success) {
+      const data = response.data?.data || response.data;
+      listJenisSurat.value = Array.isArray(data) ? data : [data];
+    }
+  } catch (error) {
+  }
+}
+
+function getRoman(num: number) {
+  const roman: any = { 1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "VIII", 9: "IX", 10: "X", 11: "XI", 12: "XII" };
+  return roman[num] || "";
+}
+
+const formatParts = computed(() => {
+  const getFormat = (id: number) => {
+    const js = listJenisSurat.value.find((x: any) => Number(x.id) === id);
+    if (!js) return "";
+    let str = js.format_surat;
+    
+    const dateObj = form.tanggal ? new Date(form.tanggal) : new Date();
+    const dd = String(dateObj.getDate()).padStart(2, "0");
+    const romanBulan = getRoman(dateObj.getMonth() + 1);
+    const yyyy = dateObj.getFullYear();
+    
+    let aliasProdi = "";
+    if (typeof listProdi !== 'undefined' && listProdi.value) {
+        const prodiItem = listProdi.value.find((p: any) => Number(p.id) === Number(form.prodi_id));
+        aliasProdi = prodiItem ? prodiItem.alias : "";
+    }
+    
+    str = str.replace(/{TGL}/g, dd)
+             .replace(/{BULAN}/g, romanBulan)
+             .replace(/{TAHUN}/g, String(yyyy))
+             .replace(/{PRODI}/g, aliasProdi);
+             
+    return str;
+  };
+
+  const parseToParts = (str: string) => {
+    if(!str) return { prefix: "SU-", suffix: "" };
+    const splitted = str.split("{NO}");
+    return {
+      prefix: splitted[0] || "",
+      suffix: splitted[1] || ""
+    };
+  };
+
+  return parseToParts(getFormat(2));
+});
+
+
+function extractNo(fullStr: string) {
+  if (!fullStr) return "";
+  const firstPart = fullStr.split("/")[0];
+  return firstPart.replace("SU-", "").trim();
+}
+
 onMounted(() => {
+  getJenisSurat();
   getProdi();
 });
 
@@ -181,7 +244,6 @@ const getMhs = debounce(async (params: string) => {
       }
     }
   } catch (error) {
-    console.log(error);
   } finally {
     loading.value = false;
   }
@@ -207,11 +269,29 @@ function submitForm() {
         <div class="card custom-card">
           <div class="card-header">
             <div class="card-title">
-              {{ isEdit ? "Edit" : "Tambah" }} Fakultas
+              {{ isEdit ? "Edit" : "Tambah" }} Surat Keterangan Lulus Mata Kuliah
             </div>
           </div>
           <div class="card-body">
             <div class="row gy-3">
+              <div class="col-xl-12">
+                <label class="form-label">Nomor Surat:</label>
+                
+                <div class="input-group">
+                  <span class="input-group-text" v-if="formatParts.prefix">{{ formatParts.prefix }}</span>
+                  <input
+                    type="text"
+                    v-model="form.no_surat"
+                    class="form-control"
+                    :class="{ 'is-invalid': errors?.no_surat }"
+                    placeholder="No"
+                  />
+                  <span class="input-group-text" v-if="formatParts.suffix">{{ formatParts.suffix }}</span>
+                  <div v-if="errors?.no_surat" class="invalid-feedback">
+                    {{ errors.no_surat[0] }}
+                  </div>
+                </div>
+              </div>
               <div class="col-xl-12">
                 <label for="input-nama-kepala" class="form-label"
                   >Program Studi:</label

@@ -16,7 +16,6 @@ class LoginController extends Controller
 {
     public function login(Request $request)
     {
-        Log::info($request->all());
 
         $validator = Validator::make($request->all(), [
             'username' => 'required',
@@ -33,8 +32,10 @@ class LoginController extends Controller
 
         $validate = $validator->validated();
 
-        $user = User::join('level', 'level.id', '=', 'users.level_id')->where('username', $validate['username'])
-            ->select('users.*', 'level.nama as level')
+        $user = User::join('level', 'level.id', '=', 'users.level_id')
+            ->join('prodi', 'prodi.id', '=', 'users.prodi_id')
+            ->where('username', $validate['username'])
+            ->select('users.*', 'level.nama as level', 'prodi.nama as prodi','prodi.alias as prodi_alias')
             ->first();
 
         Log::info($user);
@@ -65,12 +66,18 @@ class LoginController extends Controller
 
     public function profile(Request $request)
     {
-
         $user = $request->user();
+
+        // Ambil data user beserta nama level
+        $userWithLevel = User::join('level', 'level.id', '=', 'users.level_id')
+        ->leftJoin('prodi', 'prodi.id', '=', 'users.prodi_id') 
+            ->where('users.id', $user->id)
+            ->select('users.*', 'level.nama as level')
+            ->first();
 
         return response()->json([
             'status' => true,
-            'user' => $user,
+            'user' => $userWithLevel,
             'message' => 'Profile berhasil diambil'
         ]);
     }

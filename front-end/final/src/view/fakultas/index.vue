@@ -60,14 +60,12 @@ export default defineComponent({
 
         total.value = response.data.data.total;
       } catch (error) {
-        console.log(error);
       } finally {
         loading.value = false;
       }
     }
 
     function edit(params: any) {
-      console.log(params.id);
       router.push(`/fakultas/edit/${params.id}`);
     }
 
@@ -93,7 +91,6 @@ export default defineComponent({
           });
         }
       } catch (error) {
-        console.log(error);
         toast.error("Terjadi kesalahan saat menghapus fakultas", {
           theme: "auto",
           icon: true,

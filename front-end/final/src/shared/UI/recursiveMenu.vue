@@ -108,33 +108,10 @@ const props = defineProps({
 });
 
 function handleLinkClick() {
-  // Delay closing to allow navigation to complete first
-  setTimeout(() => {
-    // Close all open dropdown menus
-    const openMenus = document.querySelectorAll(".slide.has-sub.open");
-    openMenus.forEach((menu) => {
-      menu.classList.remove("open");
-      const slideMenu = menu.querySelector(".slide-menu");
-      if (slideMenu) {
-        slideMenu.style.display = "none";
-      }
-    });
-
-    // Set menuData.active to false for parent
-    if (props.menuData) {
-      props.menuData.active = false;
-    }
-
-    // Close sidebar on mobile
-    if (window.innerWidth < 992) {
-      document.documentElement.setAttribute("data-toggled", "close");
-    }
-
-    // Also call the parent function if needed
-    if (props.closeMenuOnNavigate) {
-      props.closeMenuOnNavigate();
-    }
-  }, 100);
+  // Close sidebar on mobile
+  if (window.innerWidth < 992) {
+    document.documentElement.setAttribute("data-toggled", "close");
+  }
 }
 </script>
 

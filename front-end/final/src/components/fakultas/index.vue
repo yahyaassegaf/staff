@@ -38,7 +38,6 @@ async function getProdi() {
       listProdi.value = Array.isArray(data) ? data : data ? [data] : [];
     }
   } catch (error) {
-    console.log(error);
   } finally {
     isLoadingProdi.value = false;
   }
@@ -53,7 +52,6 @@ async function getTandaTangan() {
       listTandaTangan.value = Array.isArray(data) ? data : [data];
     }
   } catch (error) {
-    console.log(error);
   }
 }
 

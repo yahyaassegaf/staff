@@ -1,4 +1,5 @@
 <script lang="ts">
+import Swal from "sweetalert2";
 import { onMounted, ref, watch } from "vue";
 import { defineComponent } from "vue";
 import type { ServerOptions } from "vue3-easy-data-table";
@@ -50,7 +51,6 @@ export default defineComponent({
           listProdi.value = Array.isArray(data) ? data : [data];
         }
       } catch (error) {
-        console.log(error);
       }
     }
 
@@ -79,7 +79,6 @@ export default defineComponent({
 
         total.value = response.data.data.total;
       } catch (error) {
-        console.log(error);
       } finally {
         loading.value = false;
       }
@@ -92,12 +91,22 @@ export default defineComponent({
     }
 
     function edit(params: any) {
-      console.log(params.id);
       router.push(`/skk/edit/${params.id}`);
     }
 
     async function remove(params: any) {
-      if (!confirm("Apakah anda yakin ingin menghapus data ini?")) return;
+      
+      Swal.fire({
+        title: "Apakah anda yakin?",
+        text: "Data yang dihapus tidak dapat dikembalikan!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#d33",
+        confirmButtonText: "Ya, hapus!",
+        cancelButtonText: "Batal",
+      }).then(async (result) => {
+        if (result.isConfirmed) {
       try {
         const response = await apiDelete("/skk/" + params.id);
         if (response.data.status || response.success) {
@@ -121,7 +130,6 @@ export default defineComponent({
           });
         }
       } catch (error) {
-        console.log(error);
         toast.error("Terjadi kesalahan saat menghapus data", {
           theme: "auto",
           icon: true,
@@ -131,6 +139,8 @@ export default defineComponent({
           isLoading: false,
         });
       }
+        }
+      });
     }
 
     watch([searchValue, prodiFilter], () => {
@@ -147,7 +157,6 @@ export default defineComponent({
 
         openFileExport(res.data);
       } catch (error) {
-        console.log(error);
         toast.error("Gagal mengunduh file PDF", {
           theme: "auto",
           icon: true,

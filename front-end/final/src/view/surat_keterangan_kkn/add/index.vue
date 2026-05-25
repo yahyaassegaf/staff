@@ -17,7 +17,6 @@ export default defineComponent({
       try {
         errors.value = {};
         const response = await apiPost("/skk", params);
-        console.log("data berhasil :", response);
 
         if (response.success == true) {
           toast.success("Surat Berhasil Ditambahkan", {
@@ -47,7 +46,6 @@ export default defineComponent({
           }
         }
       } catch (error) {
-        console.log(error);
       }
     }
 

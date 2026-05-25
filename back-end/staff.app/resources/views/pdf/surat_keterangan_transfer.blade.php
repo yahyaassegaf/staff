@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Surat Keterangan Transfer</title>
+    <title>Surat Keterangan Mutasi</title>
 
     <style>
         /* WAJIB untuk DomPDF */
@@ -14,7 +14,8 @@
         body {
             font-family: "Times New Roman", Times, serif;
             font-size: 12pt;
-            line-height: 1.5;
+            line-height: 1.6;
+            color: #000;
         }
 
         .text-center {
@@ -25,27 +26,26 @@
             text-align: right;
         }
 
-        .header-univ {
+        .judul {
             font-size: 14pt;
             font-weight: bold;
             text-transform: uppercase;
-        }
-
-        .judul {
-            font-weight: bold;
-            text-transform: uppercase;
             text-decoration: underline;
-            margin-top: 20px;
+            margin-top: 15px;
+            letter-spacing: 0.5px;
         }
 
         .nomor {
+            font-size: 12pt;
+            margin-top: 2px;
             margin-bottom: 25px;
         }
 
         .paragraf {
             text-align: justify;
             text-indent: 1.25cm;
-            margin-bottom: 10px;
+            margin-top: 12px;
+            margin-bottom: 12px;
         }
 
         table.data {
@@ -53,17 +53,27 @@
             border-collapse: collapse;
             margin-top: 10px;
             margin-bottom: 15px;
-            margin-left: 30px;
-            /* indent seperti Word */
+            margin-left: 55px;
+            /* Aligned with standard indent */
         }
 
         table.data td {
-            padding: 2px 0;
+            padding: 3px 0;
             vertical-align: top;
         }
 
         table.data td.label {
             width: 180px;
+        }
+
+        table.data td.separator {
+            width: 15px;
+            text-align: center;
+        }
+
+        table.data td.value {
+            padding-right: 60px;
+            /* Prevent value text overflowing to the right edge */
         }
 
         table.ttd {
@@ -72,9 +82,16 @@
         }
 
         .nama-ttd {
-            margin-top: 10px;
+            margin-top: 4px;
             font-weight: bold;
             text-decoration: underline;
+            font-size: 12pt;
+        }
+
+        .nidn-ttd {
+            font-weight: bold;
+            margin-top: 2px;
+            font-size: 12pt;
         }
 
         .kop img {
@@ -85,11 +102,6 @@
             display: block;
         }
 
-        .text-left {
-            text-align: left;
-            margin-left: 30px;
-        }
-
         .kop {
             margin-top: -1.1cm;
             /* naik ke atas */
@@ -97,6 +109,7 @@
             /* tembus margin kiri */
             margin-right: -1.5cm;
             /* tembus margin kanan */
+            margin-bottom: 15px;
         }
     </style>
 </head>
@@ -105,92 +118,99 @@
 
     <!-- HEADER -->
     <div class="kop">
+        @if(!empty($kopBase64))
         <img src="{{ $kopBase64 }}" alt="Kop Surat">
+        @endif
     </div>
 
     <!-- JUDUL -->
     <div class="text-center">
-        <div class="judul">SURAT KETERANGAN TRANSFER</div>
+        <div class="judul">SURAT KETERANGAN MUTASI</div>
         <div class="nomor">
-            Nomor: {{ $nomor }}
+            Nomor : {{ $nomor }}
         </div>
     </div>
 
     <!-- PEMBUKA -->
     <div class="paragraf">
-        Yang bertanda tangan di bawah ini, Dekan {{ $nama_fakultas }}
-        Universitas Islam Internasional Darullughah Wadda'wah Bangil,
-        Pasuruan, Jawa Timur, menerangkan dengan sesungguhnya bahwa:
+        Yang bertanda tangan di bawah ini, Dekan {{ $nama_fakultas }} Universitas Islam Internasional
+        Darullughah Wadda'wah Bangil Pasuruan Jawa Timur, menerangkan dengan sesungguhnya bahwa :
     </div>
 
     <!-- DATA MAHASISWA -->
     <table class="data">
         <tr>
             <td class="label">Nama</td>
-            <td width="10">:</td>
-            <td>{{ $nama }}</td>
-        </tr>
-        <tr>
-            <td class="label">Tempat, Tanggal Lahir</td>
-            <td>:</td>
-            <td>{{ $tanggal_lahir }}</td>
+            <td class="separator">:</td>
+            <td class="value"><strong>{{ strtoupper($nama ?? '') }}</strong></td>
         </tr>
         <tr>
             <td class="label">NIM</td>
-            <td>:</td>
-            <td>{{ $nim }}</td>
+            <td class="separator">:</td>
+            <td class="value">{{ $nim }}</td>
         </tr>
         <tr>
-            <td class="label">Jurusan / Program Studi</td>
-            <td>:</td>
-            <td>{{ $jurusan_prodi }}</td>
+            <td class="label">TTL</td>
+            <td class="separator">:</td>
+            <td class="value">{{ strtoupper($tempat_lahir ?? '') }}, {{ strtoupper($tanggal_lahir ?? '') }}</td>
+        </tr>
+        <tr>
+            <td class="label">Jurusan/Program Studi</td>
+            <td class="separator">:</td>
+            <td class="value">{{ $jurusan_prodi }}</td>
+        </tr>
+        <tr>
+            <td class="label">Alamat</td>
+            <td class="separator">:</td>
+            <td class="value">{{ $alamat }}</td>
         </tr>
     </table>
 
     <!-- ISI -->
     <div class="paragraf">
-        Adalah benar-benar mahasiswa Universitas Islam Internasional
-        Darullughah Wadda'wah yang terakhir terdaftar pada Semester {{ $semester }}
-        Tahun Akademik {{ $tahun_akademik }} dan yang bersangkutan pindah dari
-        Universitas Islam Internasional Darullughah Wadda'wah
-        untuk melanjutkan studi ke perguruan tinggi lain.
+        Adalah benar-benar mahasiswa Universitas Islam Internasional Darullughah Wadda'wah
+        yang terakhir terdaftar pada semester {{ $semester }} Tahun Akademik {{ $tahun_akademik }}
+        akan pindah ke {{ $universitas_tujuan }}.
     </div>
 
     <div class="paragraf">
-        Demikian surat keterangan ini dibuat untuk dipergunakan
-        sebagaimana mestinya.
+        Demikian surat keterangan ini dibuat untuk dipergunakan sebagaimana mestinya.
     </div>
 
     <!-- TANDA TANGAN -->
-    <table class="ttd" width="100%" cellpadding="0" cellspacing="0" style="margin-top:50px;">
+    <table class="ttd" width="100%" cellpadding="0" cellspacing="0">
         <tr>
-            <td width="60%"></td>
+            <td width="55%"></td>
 
             <!-- BLOK KANAN -->
-            <td width="40%" style="text-align:center;">
+            <td width="45%" style="text-align:center; vertical-align: top;">
                 Bangil, {{ $tanggal }}<br>
                 Dekan {{ $nama_fakultas }}<br>
 
                 <!-- AREA TTD (OVERLAY AMAN) -->
-                <table width="100%" cellpadding="0" cellspacing="0">
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 5px; margin-bottom: 5px;">
                     <tr>
                         <td style="
-            height:70px;
-            text-align:center;
-            vertical-align:middle;
-            background-image: url('{{ $stempel }}');
-            background-repeat: no-repeat;
-            background-position: 20% 60%;
-            background-size: 90px 90px;
-        ">
-                            <img src="{{ $ttd }}" style="width:250px;">
+                            height:60px;
+                            text-align:center;
+                            vertical-align:middle;
+                            @if(!empty($stempel)) /* background-image: url('{{ $stempel }}'); */ @endif
+                            background-repeat: no-repeat;
+                            background-position: center left;
+                            background-size: 110px 110px;
+                        ">
+                            @if(!empty($ttd))
+                            <!-- <img src="{{ $ttd }}" style="width:200px; max-height:85px; object-fit:contain; margin-left: 40px; display: block;"> -->
+                            @endif
                         </td>
                     </tr>
                 </table>
-                <div class="nama-ttd" style="margin-top:4px;">
+                <div class="nama-ttd">
                     {{ $dekan }}
                 </div>
-                <!-- NIDN : {{ $nidn_kepala }} -->
+                <!-- <div class="nidn-ttd">
+                    NIDN {{ $nidn_dosen }}
+                </div> -->
             </td>
         </tr>
     </table>

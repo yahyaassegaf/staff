@@ -1,6 +1,5 @@
 <script lang="ts" setup>
 const particlesLoaded = async (container: any) => {
-  console.log("Particles container loaded", container);
 };
 </script>
 <template>
@@ -119,3 +118,4 @@ const particlesLoaded = async (container: any) => {
 
 <style scoped>
 </style>
+

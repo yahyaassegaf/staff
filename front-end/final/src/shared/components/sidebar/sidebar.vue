@@ -496,19 +496,18 @@ import { switcherStore } from "../../../stores/switcher";
 import RecursiveMenu from "../../UI/recursiveMenu.vue";
 import { apiGet } from "../../../services/api/request";
 
-const userLevel = ref("");
+const userLevel = ref(localStorage.getItem('userLevel') || "");
 
 // Fetch user profile to get level
 async function fetchUserLevel() {
   try {
     const response = await apiGet("/profile");
-    console.log("Profile response:", response);
     if (response.success && response.data?.status && response.data?.user) {
-      userLevel.value = response.data.user.level?.toLowerCase() || "";
-      console.log("User level set to:", userLevel.value);
+      const level = response.data.user.level?.toLowerCase() || "";
+      userLevel.value = level;
+      localStorage.setItem('userLevel', level);
     }
   } catch (error) {
-    console.error("Error fetching user level:", error);
   }
 }
 
@@ -526,23 +525,43 @@ function deepClone(obj) {
 }
 
 // Filter menu based on user level
-function filterMenuByLevel(items, level) {
+function filterMenuByLevel(items, level, parentAllowed = false) {
+  // Let it process with empty level to show default menus that don't require specific roles
+  // if (!level) return [];
+
   return items
     .filter((item) => {
+      let isAllowed = true;
+
       // If item has allowedLevels, check if user level is included
       if (item.allowedLevels && item.allowedLevels.length > 0) {
-        // If level is empty/not loaded yet, hide restricted items
-        if (!level) return false;
-        return item.allowedLevels.includes(level);
+        isAllowed = item.allowedLevels.includes(level);
+      } else {
+        // If no allowedLevels and user is baak, only allow specific menus
+        if (level === 'baak' && !parentAllowed) {
+            const allowedForBaak = ['Ijazah', 'Account', 'MAIN', 'Dashboard'];
+            if (allowedForBaak.includes(item.title) || allowedForBaak.includes(item.menutitle)) {
+                isAllowed = true;
+            } else {
+                isAllowed = false;
+            }
+        }
       }
-      return true; // Show item if no allowedLevels restriction
+      
+      return isAllowed;
     })
     .map((item) => {
       // Recursively filter children
       if (item.children && item.children.length > 0) {
+        let passParentAllowed = parentAllowed;
+        const allowedForBaak = ['Ijazah', 'Account', 'MAIN', 'Dashboard'];
+        if (level === 'baak' && (allowedForBaak.includes(item.title) || allowedForBaak.includes(item.menutitle) || (item.allowedLevels && item.allowedLevels.includes('baak')))) {
+            passParentAllowed = true;
+        }
+
         return {
           ...item,
-          children: filterMenuByLevel(item.children, level),
+          children: filterMenuByLevel(item.children, level, passParentAllowed),
         };
       }
       return item;
@@ -557,7 +576,6 @@ const menuData = reactive(filterMenuByLevel(deepClone(staticMenuData), ""));
 watch(
   userLevel,
   (newLevel) => {
-    console.log("Watch triggered, filtering menu with level:", newLevel);
     const filteredMenu = filterMenuByLevel(deepClone(staticMenuData), newLevel);
     // Clear and repopulate the reactive menuData
     menuData.length = 0;
@@ -1147,9 +1165,6 @@ watchEffect(() => {
   currentPath = currentPath || "/dashboard/ecommerce";
 
   if (currentPath !== previousUrl.value) {
-    // Close all open dropdown menus when navigating
-    closeMenuFn();
-
     setMenuUsingUrl(currentPath);
     previousUrl.value = currentPath;
 

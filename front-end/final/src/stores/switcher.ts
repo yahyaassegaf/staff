@@ -4,9 +4,9 @@ export const switcherStore = defineStore('switcher', {
     state: () => ({
         colortheme: 'light',            // light, dark
         direction: 'ltr',               // ltr, rtl
-        navigationStyles: 'horizontal',   // vertical, horizontal (forced to horizontal)
+        navigationStyles: localStorage.getItem('vyzornavstyles') || 'vertical',   // vertical, horizontal
         menuStyles: '',                 // menu-click, menu-hover, icon-click, icon-hover
-        layoutStyles: 'double-menu',   // double-menu, detached, icon-overlay, icontext-menu, closed-menu, default-menu
+        layoutStyles: localStorage.getItem('vyzorverticalstyles') || 'default-menu',   // double-menu, detached, icon-overlay, icontext-menu, closed-menu, default-menu
         pageStyles: 'flat',          // regular, classic, modern,flat
         widthStyles: 'fullwidth',       // fullwidth, boxed
         menuPosition: 'fixed',          // fixed, scrollable
@@ -93,7 +93,7 @@ export const switcherStore = defineStore('switcher', {
             } else {
                 this.$state.navigationStyles = 'vertical';
                 this.$state.menuStyles = "";
-                this.$state.layoutStyles = "double-menu";
+                this.$state.layoutStyles = "default-menu";
                 html.setAttribute('data-nav-layout', 'vertical');
                 html.setAttribute('data-vertical-style', 'overlay');
                 html.removeAttribute('data-nav-style');
@@ -115,7 +115,9 @@ export const switcherStore = defineStore('switcher', {
             mainContentDiv?.removeEventListener('click', this.icontextCloseFn);
             localStorage.removeItem('vyzormenuStyles');
             html.removeAttribute('data-nav-style');
-            mainMenu.style.marginInlineStart = '0';
+            if (mainMenu) {
+                mainMenu.style.marginInlineStart = '0';
+            }
             switch (value) {
                 case 'default-menu':
                     this.$state.layoutStyles = value;
@@ -458,11 +460,11 @@ export const switcherStore = defineStore('switcher', {
             // reseting to ltr
             this.directionFn('ltr');
 
-            // reseting to horizontal (always horizontal)
-            this.navigationStylesFn('horizontal');
+            // reseting to vertical (always vertical)
+            this.navigationStylesFn('vertical');
 
             // reseting the layout styles
-            this.layoutStylesFn('double-menu')
+            this.layoutStylesFn('default-menu')
 
 
             // resetting the menu Colot
@@ -479,8 +481,7 @@ export const switcherStore = defineStore('switcher', {
         retrieveFromLocalStorage() {
             this.direction = localStorage.getItem('vyzordirection') || this.direction;
             this.directionFn(this.direction);
-            // Force navigation to always be horizontal
-            this.navigationStyles = 'horizontal';
+            this.navigationStyles = localStorage.getItem('vyzornavstyles') || this.navigationStyles;
             this.navigationStylesFn(this.navigationStyles);
             this.pageStyles = localStorage.getItem('vyzorpageStyle') || this.pageStyles;
             this.pageStylesFn(this.pageStyles);
@@ -515,7 +516,7 @@ export const switcherStore = defineStore('switcher', {
                 this.menuStylesFn(this.menuStyles);
             }
             this.layoutStyles = localStorage.getItem('vyzorverticalstyles') || this.layoutStyles;
-            if (!localStorage.getItem('vyzormenuStyles') && localStorage.getItem('vyzornavstyles') != 'horizontal' && !localStorage.getItem('vyzormenuStyles')) {
+            if (!localStorage.getItem('vyzormenuStyles') && this.navigationStyles != 'horizontal') {
                 this.layoutStylesFn(this.layoutStyles);
             }
         },
@@ -526,7 +527,7 @@ export const switcherStore = defineStore('switcher', {
             this.direction = localStorage.getItem('vyzordirection') || this.direction;
             this.directionFn(this.direction);
 
-            this.navigationStyles = 'horizontal';
+            this.navigationStyles = localStorage.getItem('vyzornavstyles') || 'vertical';
             this.navigationStylesFn(this.navigationStyles);
 
             this.widthStyles = 'fullwidth';

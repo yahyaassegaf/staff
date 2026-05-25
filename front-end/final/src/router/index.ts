@@ -1352,6 +1352,41 @@ const routes: RouteRecordRaw[] = [
         component: () => import("../view/fakultas/edit/index.vue"),
       },
       {
+        path: `template-ijazah`,
+        name: "template-ijazah",
+        component: () => import("../view/template_ijazah/index.vue"),
+      },
+      {
+        path: `template-ijazah/add`,
+        name: "template-ijazah-add",
+        component: () => import("../view/template_ijazah/add/index.vue"),
+      },
+      {
+        path: `template-ijazah/edit/:id`,
+        name: "template-ijazah-edit",
+        component: () => import("../view/template_ijazah/edit/index.vue"),
+      },
+      {
+        path: `template-ijazah/editor/:id`,
+        name: "template-ijazah-editor",
+        component: () => import("../view/template_ijazah/editor/index.vue"),
+      },
+      {
+        path: `mahasiswa`,
+        name: "mahasiswa",
+        component: () => import("../view/mahasiswa/index.vue"),
+      },
+      {
+        path: `mahasiswa/add`,
+        name: "mahasiswa-add",
+        component: () => import("../view/mahasiswa/add/index.vue"),
+      },
+      {
+        path: `mahasiswa/edit/:id`,
+        name: "mahasiswa-edit",
+        component: () => import("../view/mahasiswa/edit/index.vue"),
+      },
+      {
         path: `sklmk`,
         name: "sklmk",
         component: () =>
@@ -1464,6 +1499,24 @@ const routes: RouteRecordRaw[] = [
           import("../view/surat_keterangan_aktif_mahasiswa/edit/index.vue"),
       },
       {
+        path: `spm`,
+        name: "spm",
+        component: () =>
+          import("../view/surat_keterangan_spm/index.vue"),
+      },
+      {
+        path: `spm/add`,
+        name: "spm-add",
+        component: () =>
+          import("../view/surat_keterangan_spm/add/index.vue"),
+      },
+      {
+        path: `spm/edit/:id`,
+        name: "spm-edit",
+        component: () =>
+          import("../view/surat_keterangan_spm/edit/index.vue"),
+      },
+      {
         path: `spvn`,
         name: "spvn",
         component: () =>
@@ -1529,6 +1582,23 @@ const routes: RouteRecordRaw[] = [
           import("../view/surat_keterangan_transfer/edit/index.vue"),
       },
       {
+        path: `skds2`,
+        name: "skds2",
+        component: () => import("../view/surat_keterangan_daftar_s2/index.vue"),
+      },
+      {
+        path: `skds2/add`,
+        name: "skds2-add",
+        component: () =>
+          import("../view/surat_keterangan_daftar_s2/add/index.vue"),
+      },
+      {
+        path: `skds2/edit/:id`,
+        name: "skds2-edit",
+        component: () =>
+          import("../view/surat_keterangan_daftar_s2/edit/index.vue"),
+      },
+      {
         path: `sip`,
         name: "sip",
         component: () => import("../view/surat_izin_penelitian/index.vue"),
@@ -1579,6 +1649,21 @@ const routes: RouteRecordRaw[] = [
         component: () => import("../view/tanda_tangan/edit/index.vue"),
       },
       {
+        path: `setting-jabatan`,
+        name: "setting-jabatan",
+        component: () => import("../view/setting_jabatan/index.vue"),
+      },
+      {
+        path: `setting-jabatan/add`,
+        name: "setting-jabatan-add",
+        component: () => import("../view/setting_jabatan/add/index.vue"),
+      },
+      {
+        path: `setting-jabatan/edit/:id`,
+        name: "setting-jabatan-edit",
+        component: () => import("../view/setting_jabatan/edit/index.vue"),
+      },
+      {
         path: `skk`,
         name: "skk",
         component: () => import("../view/surat_keterangan_kkn/index.vue"),
@@ -1607,6 +1692,51 @@ const routes: RouteRecordRaw[] = [
         path: `skp/edit/:id`,
         name: "skp-edit",
         component: () => import("../view/surat_keterangan_ppl/edit/index.vue"),
+      },
+      {
+        path: `batch`,
+        name: "batch",
+        component: () => import("../view/batch/index.vue"),
+      },
+      {
+        path: `batch/add`,
+        name: "batch-add",
+        component: () => import("../view/batch/add/index.vue"),
+      },
+      {
+        path: `batch/edit/:id`,
+        name: "batch-edit",
+        component: () => import("../view/batch/edit/index.vue"),
+      },
+      {
+        path: `jenis-surat`,
+        name: "jenis-surat",
+        component: () => import("../view/jenis_surat/index.vue"),
+      },
+      {
+        path: `jenis-surat/add`,
+        name: "jenis-surat-add",
+        component: () => import("../view/jenis_surat/add/index.vue"),
+      },
+      {
+        path: `jenis-surat/edit/:id`,
+        name: "jenis-surat-edit",
+        component: () => import("../view/jenis_surat/edit/index.vue"),
+      },
+      {
+        path: `sk6`,
+        name: "sk6",
+        component: () => import("../view/sk_6/index.vue"),
+      },
+      {
+        path: `sk6/add`,
+        name: "sk6-add",
+        component: () => import("../view/sk_6/add/index.vue"),
+      },
+      {
+        path: `sk6/edit/:id`,
+        name: "sk6-edit",
+        component: () => import("../view/sk_6/edit/index.vue"),
       },
     ],
   },

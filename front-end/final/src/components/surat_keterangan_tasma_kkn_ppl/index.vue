@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { reactive, ref, watch, onMounted, nextTick } from "vue";
+import { computed } from "vue";
 import Multiselect from "vue-multiselect";
 import "vue-multiselect/dist/vue-multiselect.min.css";
 import { apiGet } from "../../services/api/request";
@@ -16,9 +17,9 @@ const props = defineProps({
 
 const defaultForm = {
   id: "",
+  no_surat: "",
   nomor_surat: "",
   ketua: "",
-  tanda_tangan_id: null as null | number,
   prodi_id: 0,
   nama_lengkap: null,
   nama_mhs: "",
@@ -81,12 +82,10 @@ watch(listMhs, async (val) => {
 });
 
 const listProdi = ref<any[]>([]);
-const listTandaTangan = ref<any[]>([]);
 
 async function getProdi() {
   try {
     const response = await apiGet(`/get-prodi`);
-    console.log(response);
 
     if (response.success) {
       const data = response.data?.data;
@@ -99,26 +98,75 @@ async function getProdi() {
       }
     }
   } catch (error) {
-    console.log(error);
   }
 }
 
-async function getTandaTangan() {
+
+const listJenisSurat = ref<any[]>([]);
+
+async function getJenisSurat() {
   try {
-    const response = await apiGet(`/tanda-tangan`);
+    const response = await apiGet(`/jenis-surat`);
     if (response.success) {
-      const data =
-        response.data?.data?.data || response.data?.data || response.data;
-      listTandaTangan.value = Array.isArray(data) ? data : [data];
+      const data = response.data?.data || response.data;
+      listJenisSurat.value = Array.isArray(data) ? data : [data];
     }
   } catch (error) {
-    console.log(error);
   }
+}
+
+function getRoman(num: number) {
+  const roman: any = { 1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "VIII", 9: "IX", 10: "X", 11: "XI", 12: "XII" };
+  return roman[num] || "";
+}
+
+const formatParts = computed(() => {
+  const getFormat = (id: number) => {
+    const js = listJenisSurat.value.find((x: any) => Number(x.id) === id);
+    if (!js) return "";
+    let str = js.format_surat;
+    
+    const dateObj = form.tanggal ? new Date(form.tanggal) : new Date();
+    const dd = String(dateObj.getDate()).padStart(2, "0");
+    const romanBulan = getRoman(dateObj.getMonth() + 1);
+    const yyyy = dateObj.getFullYear();
+    
+    let aliasProdi = "";
+    if (typeof listProdi !== 'undefined' && listProdi.value) {
+        const prodiItem = listProdi.value.find((p: any) => Number(p.id) === Number(form.prodi_id));
+        aliasProdi = prodiItem ? prodiItem.alias : "";
+    }
+    
+    str = str.replace(/{TGL}/g, dd)
+             .replace(/{BULAN}/g, romanBulan)
+             .replace(/{TAHUN}/g, String(yyyy))
+             .replace(/{PRODI}/g, aliasProdi);
+             
+    return str;
+  };
+
+  const parseToParts = (str: string) => {
+    if(!str) return { prefix: "SU-", suffix: "" };
+    const splitted = str.split("{NO}");
+    return {
+      prefix: splitted[0] || "",
+      suffix: splitted[1] || ""
+    };
+  };
+
+  return parseToParts(getFormat(3));
+});
+
+
+function extractNo(fullStr: string) {
+  if (!fullStr) return "";
+  const firstPart = fullStr.split("/")[0];
+  return firstPart.replace("SU-", "").trim();
 }
 
 onMounted(() => {
+  getJenisSurat();
   getProdi();
-  getTandaTangan();
 });
 
 function customName(params: any) {
@@ -138,23 +186,12 @@ watch(
     disableListMhsWatcher.value = true;
     isLoadingData.value = true;
 
-    // Pastikan listTandaTangan sudah terisi sebelum set form
-    if (listTandaTangan.value.length === 0) {
-      await getTandaTangan();
-    }
-
     await new Promise((resolve) => setTimeout(resolve, 300));
 
-    // Simpan tanda_tangan_id sebelum Object.assign
-    const savedTandaTanganId = val.tanda_tangan_id
-      ? Number(val.tanda_tangan_id)
-      : null;
-
-    // Copy semua data kecuali tanda_tangan_id
-    const { tanda_tangan_id, ...restVal } = val;
-    Object.assign(form, restVal);
+    Object.assign(form, val);
 
     form.id = val.id ?? "";
+    form.no_surat = extractNo(val.no_surat ?? val.nomor_surat ?? "");
     form.nomor_surat = val.nomor_surat ?? "";
     form.ketua = val.ketua ?? "";
     form.prodi_id = val.prodi_id ?? 0;
@@ -181,9 +218,6 @@ watch(
       };
       options.value = [listMhs.value];
     }
-
-    // Set tanda_tangan_id dengan nilai Number yang sudah dikonversi
-    form.tanda_tangan_id = savedTandaTanganId;
 
     isLoadingData.value = false;
 
@@ -214,7 +248,6 @@ const getMhs = debounce(async (params: string) => {
       }
     }
   } catch (error) {
-    console.log(error);
   } finally {
     loading.value = false;
   }
@@ -240,6 +273,24 @@ function submitForm() {
           </div>
           <div class="card-body">
             <div class="row gy-3">
+              <div class="col-xl-12">
+                <label class="form-label">Nomor Surat:</label>
+                
+                <div class="input-group">
+                  <span class="input-group-text" v-if="formatParts.prefix">{{ formatParts.prefix }}</span>
+                  <input
+                    type="text"
+                    v-model="form.no_surat"
+                    class="form-control"
+                    :class="{ 'is-invalid': errors?.no_surat }"
+                    placeholder="No"
+                  />
+                  <span class="input-group-text" v-if="formatParts.suffix">{{ formatParts.suffix }}</span>
+                  <div v-if="errors?.no_surat" class="invalid-feedback">
+                    {{ errors.no_surat[0] }}
+                  </div>
+                </div>
+              </div>
               <div class="col-xl-12">
                 <label for="input-prodi" class="form-label"
                   >Program Studi:</label
@@ -384,31 +435,6 @@ function submitForm() {
                 />
                 <div v-if="errors?.kelas_pondok" class="invalid-feedback">
                   {{ errors.kelas_pondok[0] }}
-                </div>
-              </div>
-              <div class="col-xl-6">
-                <label for="input-tanda-tangan" class="form-label"
-                  >Ketua TASMA, KKN & PPL:</label
-                >
-                <div v-if="isLoadingData" class="skeleton-input"></div>
-                <select
-                  v-else
-                  v-model="form.tanda_tangan_id"
-                  class="form-select"
-                  :class="{ 'is-invalid': errors?.tanda_tangan_id }"
-                  id="input-tanda-tangan"
-                >
-                  <option :value="null">-- Pilih Ketua --</option>
-                  <option
-                    v-for="ttd in listTandaTangan"
-                    :key="ttd.id"
-                    :value="Number(ttd.id)"
-                  >
-                    {{ ttd.nama }}
-                  </option>
-                </select>
-                <div v-if="errors?.tanda_tangan_id" class="invalid-feedback">
-                  {{ errors.tanda_tangan_id[0] }}
                 </div>
               </div>
               <div class="col-xl-6">

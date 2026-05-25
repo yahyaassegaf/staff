@@ -77,12 +77,16 @@ class SuratKeteranganTransferController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required',
-                'th_akademik_id' => 'nullable|exists:th_akademik,id',
+                'no_surat' => 'required|string',
+                'tahun_akademik' => 'nullable|string|max:255',
                 'nama' => 'required|string|max:255',
                 'tanggal_lahir' => 'required|date',
+                'tempat_lahir' => 'nullable|string|max:100',
                 'nim' => 'required|string|max:255',
                 'jurusan_prodi' => 'required|string|max:255',
-                'semester' => 'required|string|max:255',
+                'semester' => 'nullable|string|max:255',
+                'alamat' => 'nullable|string',
+                'universitas_tujuan' => 'nullable|string|max:255',
                 'tanggal' => 'required|date',
             ]);
 
@@ -96,29 +100,33 @@ class SuratKeteranganTransferController extends Controller
 
             $validate = $validator->validated();
 
-            // $login = Auth::user()->prodi->alias;
-            $no = NoSurat::orderByDesc('id')->value('nomor') ?? 0;
-            $no_surat = str_pad($no + 1, 3, '0', STR_PAD_LEFT);
-
-            $fakultas = FakultasProdi::join('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')->where('prodi_id', $validate['prodi_id'])
-                ->first();
-            $besar = ucwords($fakultas->nama);
-            $nama_fakultas = 'Fakultas ' . $besar;
-
-            $inisial = collect(explode(' ', $nama_fakultas))
-                ->map(fn($kata) => strtoupper(substr($kata, 0, 1)))
-                ->take(2)
-                ->implode('');
-            $formattedNoSurat = SuratService::NoSuratKeteranganTransfer($no_surat, $inisial);
+            $no_surat = $validate['no_surat'];
+            $formattedNoSurat = \App\Services\SuratService::formatNomorSurat('SKM', $no_surat, $validate['tanggal'], $validate['prodi_id']);
 
             $skt = new SuratKeteranganTransfer();
             $skt->nomor = $formattedNoSurat;
             $skt->nama = $validate['nama'];
             $skt->tanggal_lahir = $validate['tanggal_lahir'];
+            $skt->tempat_lahir = $validate['tempat_lahir'] ?? null;
             $skt->nim = $validate['nim'];
             $skt->jurusan_prodi = $validate['jurusan_prodi'];
-            $skt->semester = $validate['semester'];
-            $skt->tahun_akademik = $validate['th_akademik_id'] ?? null;
+
+            $semesterVal = $validate['semester'] ?? null;
+            if (empty($semesterVal)) {
+                try {
+                    $mhsApi = \App\Services\Mahasiswa::nim($validate['nim']);
+                    if ($mhsApi && isset($mhsApi->semester)) {
+                        $semesterVal = self::formatSemester($mhsApi->semester);
+                    }
+                } catch (\Throwable $e) {
+                    Log::error("Failed to fetch student semester in store: " . $e->getMessage());
+                }
+            }
+            $skt->semester = $semesterVal ?? 'IX (Sembilan)';
+
+            $skt->tahun_akademik = $validate['tahun_akademik'] ?? null;
+            $skt->alamat = $validate['alamat'] ?? null;
+            $skt->universitas_tujuan = $validate['universitas_tujuan'] ?? null;
             // Set tahun_akademik from th_akademik if provided
             // if (!empty($validate['th_akademik_id'])) {
             //     $thAkademik = ThAkademik::find($validate['th_akademik']);
@@ -173,6 +181,17 @@ class SuratKeteranganTransferController extends Controller
             ], 404);
         }
 
+
+        $nomorStr = $data->nomor_surat ?? $data->nomor ?? null;
+        if ($nomorStr) {
+            $parts = explode('/', $nomorStr);
+            $firstPart = $parts[0];
+            if (strpos($firstPart, '-') !== false) {
+                $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+            }
+            $data->no_surat = trim($firstPart);
+        }
+
         return response()->json([
             'status' => true,
             'data' => $data,
@@ -186,13 +205,16 @@ class SuratKeteranganTransferController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required',
-                'th_akademik_id' => 'nullable|exists:th_akademik,id',
+                'no_surat' => 'required|string',
                 'nama' => 'required|string|max:255',
                 'tanggal_lahir' => 'required|date',
+                'tempat_lahir' => 'nullable|string|max:100',
                 'nim' => 'required|string|max:255',
                 'jurusan_prodi' => 'required|string|max:255',
-                'semester' => 'required|string|max:255',
+                'semester' => 'nullable|string|max:255',
                 'tahun_akademik' => 'nullable|string|max:255',
+                'alamat' => 'nullable|string',
+                'universitas_tujuan' => 'nullable|string|max:255',
                 'tanggal' => 'required|date',
             ]);
 
@@ -214,24 +236,87 @@ class SuratKeteranganTransferController extends Controller
                 ], 404);
             }
 
+            $oldDriveFileId = $skt->drive_file_id;
 
             $skt->nama = $validate['nama'];
             $skt->tanggal_lahir = $validate['tanggal_lahir'];
+            $skt->tempat_lahir = $validate['tempat_lahir'] ?? $skt->tempat_lahir;
             $skt->nim = $validate['nim'];
             $skt->jurusan_prodi = $validate['jurusan_prodi'];
-            $skt->semester = $validate['semester'];
-            $skt->th_akademik_id = $validate['th_akademik_id'] ?? $skt->th_akademik_id;
-            // Set tahun_akademik from th_akademik if provided
-            if (!empty($validate['th_akademik_id'])) {
-                $thAkademik = ThAkademik::find($validate['th_akademik_id']);
-                $skt->tahun_akademik = $thAkademik ? $thAkademik->nama . ' ' . $thAkademik->semester : $validate['tahun_akademik'];
-            } elseif (!empty($validate['tahun_akademik'])) {
-                $skt->tahun_akademik = $validate['tahun_akademik'];
+
+            $formattedNoSurat = \App\Services\SuratService::formatNomorSurat('SKM', $validate['no_surat'], $validate['tanggal'], $validate['prodi_id']);
+            $skt->nomor = $formattedNoSurat;
+
+            $semesterVal = $validate['semester'] ?? null;
+            if (empty($semesterVal)) {
+                try {
+                    $mhsApi = \App\Services\Mahasiswa::nim($validate['nim']);
+                    if ($mhsApi && isset($mhsApi->semester)) {
+                        $semesterVal = self::formatSemester($mhsApi->semester);
+                    }
+                } catch (\Throwable $e) {
+                    Log::error("Failed to fetch student semester in update: " . $e->getMessage());
+                }
             }
+            $skt->semester = $semesterVal ?? $skt->semester ?? 'IX (Sembilan)';
+
+            $skt->tahun_akademik = $validate['tahun_akademik'] ?? $skt->tahun_akademik;
+            $skt->alamat = $validate['alamat'] ?? $skt->alamat;
+            $skt->universitas_tujuan = $validate['universitas_tujuan'] ?? $skt->universitas_tujuan;
             $skt->tanggal = $validate['tanggal'];
             $skt->prodi_id = $validate['prodi_id'];
             $skt->jenis_kelamin = Auth::user()->jenis_kelamin;
+
+            // Delete old file from Google Drive if exists
+            if (!empty($oldDriveFileId)) {
+                \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
+            }
+
+            $skt->drive_file_id = null;
+            $skt->drive_link = null;
+            $skt->status = 'pending';
             $skt->save();
+
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratKeteranganTransfer::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_transfer.prodi_id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'fakultas.tanda_tangan_id')
+                ->leftJoin('th_akademik', 'th_akademik.id', '=', 'surat_keterangan_transfer.tahun_akademik')
+                ->select(
+                    'surat_keterangan_transfer.*',
+                    'prodi.nama as prodi_name',
+                    'prodi.nama_kepala',
+                    'prodi.nidn_kepala',
+                    'fakultas.nama as fakultas_name',
+                    'fakultas.dekan as dekan',
+                    'fakultas.nidn as nidn_dekan',
+                    'tanda_tangan.gambar as ttd',
+                    'th_akademik.nama as th_akademik_nama',
+                    'th_akademik.semester as th_akademik_semester'
+                )
+                ->where('surat_keterangan_transfer.id', $skt->id)
+                ->first();
+
+            if ($data) {
+                $pdfData = $this->buildPdfData($data);
+                $pdf = Pdf::loadView('pdf.surat_keterangan_transfer', $pdfData)->setPaper('a4', 'portrait');
+
+                $fileName = 'surat_keterangan_transfer_' . $data->nim . '.pdf';
+                $directory = base_path('../public_html/pdf');
+
+                if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+                }
+
+                $path = $directory . '/' . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan Transfer';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->prodi_name, SuratKeteranganTransfer::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -273,6 +358,9 @@ class SuratKeteranganTransferController extends Controller
 
     public function downloadPdf($id)
     {
+        ini_set('memory_limit', '512M');
+        ini_set('max_execution_time', '300');
+
         try {
             $data = SuratKeteranganTransfer::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_transfer.prodi_id')
                 ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
@@ -286,10 +374,10 @@ class SuratKeteranganTransferController extends Controller
                     'prodi.nidn_kepala',
                     'fakultas.nama as fakultas_name',
                     'fakultas.dekan as dekan',
+                    'fakultas.nidn as nidn_dekan',
                     'tanda_tangan.gambar as ttd',
                     'th_akademik.nama as th_akademik_nama',
-                    'th_akademik.semester as th_akademik_semester',
-                    'fakultas.dekan as dekan'
+                    'th_akademik.semester as th_akademik_semester'
                 )
                 ->where('surat_keterangan_transfer.id', $id)
                 ->first();
@@ -298,58 +386,21 @@ class SuratKeteranganTransferController extends Controller
                 return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
             }
 
-            $kopPath = base_path('../public_html/img/kop.jpg');
-            $kopBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath));
-
-            $stempelPath = base_path('../public_html/img/stempel.png');
-            $stempelBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($stempelPath));
-
-            $ttdPath = base_path('../public_html/' . $data->ttd);
-            $ttdBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($ttdPath));
-
-            // Build tahun_akademik from th_akademik or fallback to stored value
-            $tahunAkademik = $data->th_akademik_nama;
-            // if ($data->th_akademik_nama) {
-            //     $tahunAkademik = $data->th_akademik_nama . ' ' . $data->th_akademik_semester;
-            // }
-
-            $fakultas = ucwords($data->fakultas_name);
-            $nama_fakultas = 'Fakultas ' . $fakultas;
-
-            $pdfData = [
-                'nomor' => $data->nomor,
-                'dekan' => $data->nama_ttd ?? $data->dekan,
-                'nama' => $data->nama,
-                'tanggal_lahir' => Carbon::parse($data->tanggal_lahir)->translatedFormat('d F Y'),
-                'nim' => $data->nim,
-                'jurusan_prodi' => $data->jurusan_prodi,
-                'semester' => $data->semester,
-                'tahun_akademik' => $tahunAkademik,
-                'nama_fakultas' => $nama_fakultas,
-                'dekan' => $data->dekan,
-                'tanggal' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
-                'nama_kepala' => $data->nama_ttd ?? $data->nama_kepala,
-                'nidn_kepala' => $data->nidn_kepala,
-                'kopBase64' => $kopBase64,
-                'ttd' => $ttdBase64,
-                'stempel' => $stempelBase64
-            ];
+            $pdfData = $this->buildPdfData($data);
 
             $pdf = Pdf::loadView('pdf.surat_keterangan_transfer', $pdfData)->setPaper('a4', 'portrait');
             $fileName = 'surat_keterangan_transfer_' . $data->nim . '.pdf';
-            $directory = base_path('../public_html/pdf/');
 
-            if (!file_exists($directory)) {
-                mkdir($directory, 0755, true);
+            $directory = base_path('../public_html/pdf');
+            if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
             }
+            $path = $directory . '/' . $fileName;
 
-            $path = $directory . $fileName;
             $pdf->save($path);
-
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Keterangan Transfer';
-
             $googlePath = $data->prodi_name . '/' . $nameTable . '/' . $fileName;
 
             if (!Storage::disk('google')->exists($googlePath)) {
@@ -361,9 +412,93 @@ class SuratKeteranganTransferController extends Controller
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
-            Log::error($th->getMessage());
-            return response()->json(['status' => false, 'message' => 'Gagal generate PDF']);
+            Log::error((string) $th);
+            return response()->json(['status' => false, 'message' => 'Gagal generate PDF: Terjadi kesalahan pada server'], 500);
         }
+    }
+
+    private function resolveMahasiswaData($nim)
+    {
+        $mahasiswaData = [
+            'tempat_lahir' => '',
+            'alamat' => '',
+            'semester' => ''
+        ];
+
+        try {
+            $mhsApi = \App\Services\Mahasiswa::nim($nim);
+            if ($mhsApi) {
+                $mahasiswaData['tempat_lahir'] = $mhsApi->tempat_lahir ?? $mhsApi->tmp_lahir ?? '';
+                $mahasiswaData['alamat'] = $mhsApi->alamat ?? $mhsApi->alamat_rumah ?? $mhsApi->jalan ?? '';
+                if (isset($mhsApi->semester)) {
+                    $mahasiswaData['semester'] = self::formatSemester($mhsApi->semester);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::error("Failed to fetch student from Simkeu API in SKT: " . $e->getMessage());
+        }
+
+        // Fallback local DB for tempat_lahir if still empty
+        if (empty($mahasiswaData['tempat_lahir'])) {
+            $mhsLocal = \App\Models\Mahasiswa::where('nim', $nim)->first();
+            if ($mhsLocal) {
+                $mahasiswaData['tempat_lahir'] = $mhsLocal->tempat_lahir ?? '';
+            }
+        }
+
+        return $mahasiswaData;
+    }
+
+    private function buildPdfData($data)
+    {
+        $kopPath = base_path('../public_html/img/kop.jpg');
+        $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
+
+        $stempelPath = base_path('../public_html/img/stempel.png');
+        $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+
+        $ttdPath = base_path('../public_html/' . $data->ttd);
+        $ttdBase64 = \App\Services\SuratService::getBase64Image($ttdPath);
+
+        $tahunAkademik = $data->th_akademik_nama ?? $data->tahun_akademik;
+        $nama_fakultas = 'Fakultas ' . ucwords($data->fakultas_name);
+        $universitasTujuan = $data->universitas_tujuan ?? 'perguruan tinggi lain';
+
+        $tempatLahir = $data->tempat_lahir;
+        $alamat = $data->alamat;
+        $semester = $data->semester;
+
+        // Resolve missing data from API if needed
+        if (empty($tempatLahir) || empty($alamat) || empty($semester)) {
+            $apiData = $this->resolveMahasiswaData($data->nim);
+            $tempatLahir = $tempatLahir ?: $apiData['tempat_lahir'];
+            $alamat = $alamat ?: $apiData['alamat'];
+            $semester = $semester ?: $apiData['semester'];
+        }
+
+        $semester = $semester ?: 'IX (Sembilan)';
+
+        return [
+            'nomor' => $data->nomor,
+            'nama' => $data->nama,
+            'tanggal_lahir' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_lahir),
+            'tempat_lahir' => $tempatLahir,
+            'nim' => $data->nim,
+            'jurusan_prodi' => $data->jurusan_prodi,
+            'semester' => $semester,
+            'tahun_akademik' => $tahunAkademik,
+            'nama_fakultas' => $nama_fakultas,
+            'dekan' => $data->nama_ttd ?? $data->dekan,
+            'nidn_dosen' => $data->nidn_dekan ?? $data->nidn ?? '',
+            'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+            'nama_kepala' => $data->nama_ttd ?? $data->nama_kepala,
+            'nidn_kepala' => $data->nidn_kepala,
+            'alamat' => $alamat,
+            'universitas_tujuan' => $universitasTujuan,
+            'kopBase64' => $kopBase64,
+            'ttd' => $ttdBase64,
+            'stempel' => $stempelBase64
+        ];
     }
 
     public function getProdi()
@@ -389,5 +524,32 @@ class SuratKeteranganTransferController extends Controller
         } catch (\Throwable $th) {
             return response()->json(['status' => false, 'message' => 'Gagal ambil data tahun akademik']);
         }
+    }
+
+    private static function formatSemester($semesterNum)
+    {
+        $map = [
+            1 => 'I (Satu)',
+            2 => 'II (Dua)',
+            3 => 'III (Tiga)',
+            4 => 'IV (Empat)',
+            5 => 'V (Lima)',
+            6 => 'VI (Enam)',
+            7 => 'VII (Tujuh)',
+            8 => 'VIII (Delapan)',
+            9 => 'IX (Sembilan)',
+            10 => 'X (Sepuluh)',
+            11 => 'XI (Sebelas)',
+            12 => 'XII (Dua Belas)',
+            13 => 'XIII (Tiga Belas)',
+            14 => 'XIV (Empat Belas)',
+        ];
+
+        $clean = filter_var($semesterNum, FILTER_SANITIZE_NUMBER_INT);
+        if ($clean && isset($map[$clean])) {
+            return $map[$clean];
+        }
+
+        return $semesterNum;
     }
 }

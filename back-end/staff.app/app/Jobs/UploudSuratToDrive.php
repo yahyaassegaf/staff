@@ -21,10 +21,10 @@ class UploudSuratToDrive implements ShouldQueue
     public function __construct(
         public int $id,
         public string $nameTable,
-        public string $prodiName,
+        public ?string $prodiName,
         public string $modelClass
     ) {
-        //
+        $this->prodiName = $prodiName ?? 'UMUM';
     }
 
     /**

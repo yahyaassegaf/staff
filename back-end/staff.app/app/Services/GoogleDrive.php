@@ -40,6 +40,30 @@ class GoogleDrive
     }
 
     /**
+     * Hapus file dari Google Drive berdasarkan fileId
+     */
+    public static function deleteFile(string $fileId): bool
+    {
+        try {
+            $client = new \Google_Client();
+            $client->setClientId(config('filesystems.disks.google.clientId'));
+            $client->setClientSecret(config('filesystems.disks.google.clientSecret'));
+            $client->addScope(\Google_Service_Drive::DRIVE);
+
+            $client->setAccessType('offline');
+            $client->refreshToken(config('filesystems.disks.google.refreshToken'));
+
+            $service = new \Google_Service_Drive($client);
+            $service->files->delete($fileId);
+
+            return true;
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to delete file {$fileId} from Drive: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Memastikan folder ada, jika belum ada maka dibuat.
      * Mengembalikan path folder.
      */

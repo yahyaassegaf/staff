@@ -22,6 +22,11 @@ use App\Http\Controllers\Api\TandaTanganController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\SuratKeteranganKknController;
 use App\Http\Controllers\Api\SuratKeteranganPplController;
+use App\Http\Controllers\Api\TemplateIjazahController;
+use App\Http\Controllers\Api\BatchController;
+use App\Http\Controllers\Api\JenisSuratController;
+use App\Http\Controllers\Api\SuratKeteranganSpmController;
+use App\Http\Controllers\Api\SuratKeteranganDaftarS2Controller;
 
 // Route::get('/user', function (Request $request) {
 //     return $request->user();
@@ -63,8 +68,17 @@ Route::post('/sklmk', [SuratKeteranganLulusMataKuliahController::class, 'store']
 Route::put('/sklmk/{id}', [SuratKeteranganLulusMataKuliahController::class, 'update'])->middleware('auth:sanctum');
 Route::delete('/sklmk/{id}', [SuratKeteranganLulusMataKuliahController::class, 'destroy'])->middleware('auth:sanctum');
 Route::get('/get-prodi', [SuratKeteranganLulusMataKuliahController::class, 'getProdi'])->middleware('auth:sanctum');
-Route::get('/get-mhs/{search?}', [MahasiswaController::class, 'search'])->middleware('auth:sanctum');
-Route::get('/get-mhss/{search}', [MahasiswaController::class, 'search']);
+// Route::get('/get-mhs', [MahasiswaController::class, 'search'])->middleware('auth:sanctum');
+// Route::get('/get-mhss/{search}', [MahasiswaController::class, 'search']);
+
+// Mahasiswa CRUD Routes
+Route::get('/mahasiswa', [MahasiswaController::class, 'index'])->middleware('auth:sanctum');
+Route::get('/mahasiswa/{id}', [MahasiswaController::class, 'show'])->middleware('auth:sanctum');
+Route::post('/mahasiswa', [MahasiswaController::class, 'store'])->middleware('auth:sanctum');
+Route::put('/mahasiswa/{id}', [MahasiswaController::class, 'update'])->middleware('auth:sanctum');
+Route::delete('/mahasiswa/{id}', [MahasiswaController::class, 'destroy'])->middleware('auth:sanctum');
+Route::post('/mahasiswa/import', [MahasiswaController::class, 'import'])->middleware('auth:sanctum');
+Route::get('/get-mhs', [MahasiswaController::class, 'search'])->middleware('auth:sanctum');
 Route::get('/download-pdf/{id}', [SuratKeteranganLulusMataKuliahController::class, 'downloadPdf']);
 
 // Surat Keterangan Ujian Komprehensif Diniyah Routes
@@ -106,6 +120,22 @@ Route::post('/skam', [SuratKeteranganAktifMahasiswaController::class, 'store'])-
 Route::put('/skam/{id}', [SuratKeteranganAktifMahasiswaController::class, 'update'])->middleware('auth:sanctum');
 Route::delete('/skam/{id}', [SuratKeteranganAktifMahasiswaController::class, 'destroy'])->middleware('auth:sanctum');
 Route::get('/skam/download-pdf/{id}', [SuratKeteranganAktifMahasiswaController::class, 'downloadPdf']);
+
+// Surat Keterangan SPM Routes
+Route::get('/spm', [SuratKeteranganSpmController::class, 'index'])->middleware('auth:sanctum');
+Route::get('/spm/{id}', [SuratKeteranganSpmController::class, 'show'])->middleware('auth:sanctum');
+Route::post('/spm', [SuratKeteranganSpmController::class, 'store'])->middleware('auth:sanctum');
+Route::put('/spm/{id}', [SuratKeteranganSpmController::class, 'update'])->middleware('auth:sanctum');
+Route::delete('/spm/{id}', [SuratKeteranganSpmController::class, 'destroy'])->middleware('auth:sanctum');
+Route::get('/spm/download-pdf/{id}', [SuratKeteranganSpmController::class, 'downloadPdf']);
+
+// Surat Keterangan Daftar S2 Routes
+Route::get('/skds2', [SuratKeteranganDaftarS2Controller::class, 'index'])->middleware('auth:sanctum');
+Route::get('/skds2/{id}', [SuratKeteranganDaftarS2Controller::class, 'show'])->middleware('auth:sanctum');
+Route::post('/skds2', [SuratKeteranganDaftarS2Controller::class, 'store'])->middleware('auth:sanctum');
+Route::put('/skds2/{id}', [SuratKeteranganDaftarS2Controller::class, 'update'])->middleware('auth:sanctum');
+Route::delete('/skds2/{id}', [SuratKeteranganDaftarS2Controller::class, 'destroy'])->middleware('auth:sanctum');
+Route::get('/skds2/download-pdf/{id}', [SuratKeteranganDaftarS2Controller::class, 'downloadPdf']);
 
 // Surat Pernyataan Verifikasi Nilai Routes
 Route::get('/spvn', [SuratPernyataanVerifikasiNilaiController::class, 'index'])->middleware('auth:sanctum');
@@ -178,3 +208,39 @@ Route::post('/skp', [SuratKeteranganPplController::class, 'store'])->middleware(
 Route::put('/skp/{id}', [SuratKeteranganPplController::class, 'update'])->middleware('auth:sanctum');
 Route::delete('/skp/{id}', [SuratKeteranganPplController::class, 'destroy'])->middleware('auth:sanctum');
 Route::get('/skp/download-pdf/{id}', [SuratKeteranganPplController::class, 'downloadPdf']);
+
+// Template Ijazah Routes
+Route::get('/template-ijazah', [TemplateIjazahController::class, 'index'])->middleware('auth:sanctum');
+Route::get('/template-ijazah/{id}', [TemplateIjazahController::class, 'show'])->middleware('auth:sanctum');
+Route::post('/template-ijazah', [TemplateIjazahController::class, 'store'])->middleware('auth:sanctum');
+Route::put('/template-ijazah/{id}', [TemplateIjazahController::class, 'update'])->middleware('auth:sanctum');
+Route::delete('/template-ijazah/{id}', [TemplateIjazahController::class, 'destroy'])->middleware('auth:sanctum');
+
+// Batch Routes
+Route::get('/batch', [BatchController::class, 'index'])->middleware('auth:sanctum');
+Route::get('/batch/{id}', [BatchController::class, 'show'])->middleware('auth:sanctum');
+Route::post('/batch', [BatchController::class, 'store'])->middleware('auth:sanctum');
+Route::put('/batch/{id}', [BatchController::class, 'update'])->middleware('auth:sanctum');
+Route::delete('/batch/{id}', [BatchController::class, 'destroy'])->middleware('auth:sanctum');
+
+// Jenis Surat Routes
+Route::get('/jenis-surat', [JenisSuratController::class, 'index'])->middleware('auth:sanctum');
+Route::get('/jenis-surat/{id}', [JenisSuratController::class, 'show'])->middleware('auth:sanctum');
+Route::post('/jenis-surat', [JenisSuratController::class, 'store'])->middleware('auth:sanctum');
+Route::put('/jenis-surat/{id}', [JenisSuratController::class, 'update'])->middleware('auth:sanctum');
+Route::delete('/jenis-surat/{id}', [JenisSuratController::class, 'destroy'])->middleware('auth:sanctum');
+
+// Setting Jabatan Routes
+Route::get('/setting-jabatan', [\App\Http\Controllers\Api\SettingJabatanController::class, 'index'])->middleware('auth:sanctum');
+Route::get('/setting-jabatan/{id}', [\App\Http\Controllers\Api\SettingJabatanController::class, 'show'])->middleware('auth:sanctum');
+Route::post('/setting-jabatan', [\App\Http\Controllers\Api\SettingJabatanController::class, 'store'])->middleware('auth:sanctum');
+Route::put('/setting-jabatan/{id}', [\App\Http\Controllers\Api\SettingJabatanController::class, 'update'])->middleware('auth:sanctum');
+Route::delete('/setting-jabatan/{id}', [\App\Http\Controllers\Api\SettingJabatanController::class, 'destroy'])->middleware('auth:sanctum');
+
+// SK6 Routes
+Route::get('/sk6', [\App\Http\Controllers\Api\Sk6Controller::class, 'index'])->middleware('auth:sanctum');
+Route::get('/sk6/{id}', [\App\Http\Controllers\Api\Sk6Controller::class, 'show'])->middleware('auth:sanctum');
+Route::post('/sk6', [\App\Http\Controllers\Api\Sk6Controller::class, 'store'])->middleware('auth:sanctum');
+Route::put('/sk6/{id}', [\App\Http\Controllers\Api\Sk6Controller::class, 'update'])->middleware('auth:sanctum');
+Route::delete('/sk6/{id}', [\App\Http\Controllers\Api\Sk6Controller::class, 'destroy'])->middleware('auth:sanctum');
+Route::get('/sk6/download-pdf/{id}', [\App\Http\Controllers\Api\Sk6Controller::class, 'downloadPdf']);

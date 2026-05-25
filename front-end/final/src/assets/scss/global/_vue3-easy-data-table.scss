@@ -18,10 +18,10 @@
     --easy-table-border: 0.1px solid #{variables.$input-border} !important;
     --easy-table-rows-per-page-selector-z-index: 5 !important;
     --easy-table-footer-height: auto !important;
-    --easy-table-scrollbar-thumb-color : #{variables.$form-control-bg} !important;
-    --easy-table-scrollbar-color : #{variables.$form-control-bg} !important;
-    --easy-table-scrollbar-corner-color : #{variables.$form-control-bg} !important;
-    --easy-table-scrollbar-track-color: var(--scrollthumb) !important;
+    --easy-table-scrollbar-thumb-color : #{variables.$input-border} !important;
+    --easy-table-scrollbar-color : #{variables.$input-border} !important;
+    --easy-table-scrollbar-corner-color : transparent !important;
+    --easy-table-scrollbar-track-color: transparent !important;
 }
 
 [dir="rtl"] {
@@ -62,10 +62,51 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
+.vue3-easy-data-table__main::-webkit-scrollbar {
+    height: 12px !important;
+    width: 12px !important;
+    background: rgba(0,0,0,0.05) !important;
+    border-radius: 6px !important;
+}
+.vue3-easy-data-table__main::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.3) !important;
+    border-radius: 6px !important;
+    border: 2px solid transparent !important;
+    background-clip: content-box !important;
+}
+.vue3-easy-data-table__main::-webkit-scrollbar-thumb:hover {
+    background: rgba(0,0,0,0.5) !important;
+    border: 2px solid transparent !important;
+    background-clip: content-box !important;
 }
 
-.vue3-easy-data-table__main::-webkit-scrollbar {
-    height: 4px !important;
+.vue3-easy-data-table__main {
+    scrollbar-width: auto !important;
+    scrollbar-color: rgba(0,0,0,0.3) rgba(0,0,0,0.05) !important;
+    max-width: 100% !important;
+}
+
+.vue3-easy-data-table {
+    max-width: 100% !important;
+}
+
+.vue3-easy-data-table__main {
+    max-height: 480px;
+    overflow-y: auto;
+    overflow-x: auto !important;
+    max-width: 100% !important;
+
+    th {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 2 !important;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .vue3-easy-data-table__main {
+        max-height: 350px;
+    }
 }
 
 [dir="rtl"] {

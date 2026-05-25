@@ -373,6 +373,48 @@
         <!-- End::header-element -->
 
         <!-- Start::header-element -->
+        <li class="header-element header-layout-toggle">
+          <!-- Start::header-link|layout-toggle -->
+          <a
+            href="javascript:void(0);"
+            class="header-link"
+            @click="toggleNavigationStyle()"
+            data-bs-toggle="tooltip"
+            data-bs-placement="bottom"
+            :title="switcher.navigationStyles === 'horizontal' ? 'Ubah ke Mode Sidebar' : 'Ubah ke Mode Navbar'"
+          >
+            <span v-if="switcher.navigationStyles === 'horizontal'">
+              <!-- Ikon Layout Sidebar (Vertical) -->
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="header-link-icon"
+                viewBox="0 0 256 256"
+              >
+                <rect width="256" height="256" fill="none" />
+                <rect x="32" y="48" width="192" height="160" rx="8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" opacity="0.2" />
+                <rect x="32" y="48" width="192" height="160" rx="8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" />
+                <line x1="88" y1="48" x2="88" y2="208" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" />
+              </svg>
+            </span>
+            <span v-else>
+              <!-- Ikon Layout Navbar (Horizontal) -->
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="header-link-icon"
+                viewBox="0 0 256 256"
+              >
+                <rect width="256" height="256" fill="none" />
+                <rect x="32" y="48" width="192" height="160" rx="8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" opacity="0.2" />
+                <rect x="32" y="48" width="192" height="160" rx="8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" />
+                <line x1="32" y1="96" x2="224" y2="96" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" />
+              </svg>
+            </span>
+          </a>
+          <!-- End::header-link|layout-toggle -->
+        </li>
+        <!-- End::header-element -->
+
+        <!-- Start::header-element -->
         <!-- cart elemet -->
         <!-- <li class="header-element cart-dropdown dropdown">
           <a
@@ -887,7 +929,7 @@
         </li> -->
         <!-- End::header-element -->
 
-        <!-- Start::header-element (Switcher disabled)
+        <!-- Start::header-element -->
         <li class="header-element">
           <a
             href="javascript:void(0);"
@@ -926,7 +968,6 @@
             </svg>
           </a>
         </li>
-        End::header-element -->
       </ul>
       <!-- End::header-content-right -->
     </div>
@@ -1034,6 +1075,12 @@ const colorthemeFn = (value: string) => {
   localStorage.setItem("vyzorcolortheme", value);
   localStorage.removeItem("vyzorbodyBgRGB"); // ❌ Fix: removeItem takes only one argument
   switcher.colorthemeFn(value);
+};
+
+const toggleNavigationStyle = () => {
+  const targetStyle = switcher.navigationStyles === 'horizontal' ? 'vertical' : 'horizontal';
+  switcher.navigationStylesFn(targetStyle);
+  localStorage.setItem('vyzornavstyles', targetStyle);
 };
 
 const ToggleMenu = () => {

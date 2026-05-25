@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { reactive, ref, watch, onMounted, nextTick } from "vue";
+import { computed } from "vue";
 import Multiselect from "vue-multiselect";
 import "vue-multiselect/dist/vue-multiselect.min.css";
 import { apiGet } from "../../services/api/request";
@@ -16,6 +17,7 @@ const props = defineProps({
 
 const defaultForm = {
   id: "",
+  no_surat: "",
   nomor: "",
   prodi_id: 0,
   tanda_tangan_id: null as null | number,
@@ -89,7 +91,6 @@ async function getProdi() {
       }
     }
   } catch (error) {
-    console.log(error);
   }
 }
 
@@ -102,11 +103,74 @@ async function getTandaTangan() {
       listTandaTangan.value = Array.isArray(data) ? data : [data];
     }
   } catch (error) {
-    console.log(error);
   }
 }
 
+
+const listJenisSurat = ref<any[]>([]);
+
+async function getJenisSurat() {
+  try {
+    const response = await apiGet(`/jenis-surat`);
+    if (response.success) {
+      const data = response.data?.data || response.data;
+      listJenisSurat.value = Array.isArray(data) ? data : [data];
+    }
+  } catch (error) {
+  }
+}
+
+function getRoman(num: number) {
+  const roman: any = { 1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "VIII", 9: "IX", 10: "X", 11: "XI", 12: "XII" };
+  return roman[num] || "";
+}
+
+const formatParts = computed(() => {
+  const getFormat = (id: number) => {
+    const js = listJenisSurat.value.find((x: any) => Number(x.id) === id);
+    if (!js) return "";
+    let str = js.format_surat;
+    
+    const dateObj = form.tanggal ? new Date(form.tanggal) : new Date();
+    const dd = String(dateObj.getDate()).padStart(2, "0");
+    const romanBulan = getRoman(dateObj.getMonth() + 1);
+    const yyyy = dateObj.getFullYear();
+    
+    let aliasProdi = "";
+    if (typeof listProdi !== 'undefined' && listProdi.value) {
+        const prodiItem = listProdi.value.find((p: any) => Number(p.id) === Number(form.prodi_id));
+        aliasProdi = prodiItem ? prodiItem.alias : "";
+    }
+    
+    str = str.replace(/{TGL}/g, dd)
+             .replace(/{BULAN}/g, romanBulan)
+             .replace(/{TAHUN}/g, String(yyyy))
+             .replace(/{PRODI}/g, aliasProdi);
+             
+    return str;
+  };
+
+  const parseToParts = (str: string) => {
+    if(!str) return { prefix: "SU-", suffix: "" };
+    const splitted = str.split("{NO}");
+    return {
+      prefix: splitted[0] || "",
+      suffix: splitted[1] || ""
+    };
+  };
+
+  return parseToParts(getFormat(7));
+});
+
+
+function extractNo(fullStr: string) {
+  if (!fullStr) return "";
+  const firstPart = fullStr.split("/")[0];
+  return firstPart.replace("SU-", "").trim();
+}
+
 onMounted(() => {
+  getJenisSurat();
   getProdi();
   getTandaTangan();
 });
@@ -143,6 +207,7 @@ watch(
     Object.assign(form, val);
 
     form.id = val.id ?? "";
+    form.no_surat = extractNo(val.no_surat ?? val.nomor_surat ?? "");
     form.nomor = val.nomor ?? "";
     form.prodi_id = val.prodi_id ?? 0;
     form.tanda_tangan_id = savedTandaTanganId;
@@ -193,7 +258,6 @@ const getMhs = debounce(async (params: string) => {
       }
     }
   } catch (error) {
-    console.log(error);
   } finally {
     loading.value = false;
   }
@@ -219,6 +283,24 @@ function submitForm() {
           </div>
           <div class="card-body">
             <div class="row gy-3">
+              <div class="col-xl-12">
+                <label class="form-label">Nomor Surat:</label>
+                
+                <div class="input-group">
+                  <span class="input-group-text" v-if="formatParts.prefix">{{ formatParts.prefix }}</span>
+                  <input
+                    type="text"
+                    v-model="form.no_surat"
+                    class="form-control"
+                    :class="{ 'is-invalid': errors?.no_surat }"
+                    placeholder="No"
+                  />
+                  <span class="input-group-text" v-if="formatParts.suffix">{{ formatParts.suffix }}</span>
+                  <div v-if="errors?.no_surat" class="invalid-feedback">
+                    {{ errors.no_surat[0] }}
+                  </div>
+                </div>
+              </div>
               <div class="col-xl-6">
                 <label class="form-label">Program Studi Unit:</label>
                 <select
@@ -260,64 +342,6 @@ function submitForm() {
               </div>
 
               <hr />
-              <div class="card-title mb-0">Informasi Penandatangan</div>
-
-              <div class="col-xl-4">
-                <label class="form-label">Nama yang bertanda tangan :</label>
-                <div v-if="isLoadingData" class="skeleton-input"></div>
-                <select
-                  v-else
-                  v-model="form.tanda_tangan_id"
-                  class="form-select"
-                  :class="{ 'is-invalid': errors?.tanda_tangan_id }"
-                >
-                  <option :value="null">-- Pilih Penandatangan --</option>
-                  <option
-                    v-for="ttd in listTandaTangan"
-                    :key="ttd.id"
-                    :value="Number(ttd.id)"
-                  >
-                    {{ ttd.nama }}
-                  </option>
-                </select>
-                <div v-if="errors?.tanda_tangan_id" class="invalid-feedback">
-                  {{ errors.tanda_tangan_id[0] }}
-                </div>
-              </div>
-
-              <div class="col-xl-4">
-                <label class="form-label">NIY :</label>
-                <div v-if="isLoadingData" class="skeleton-input"></div>
-                <input
-                  v-else
-                  type="text"
-                  v-model="form.niy"
-                  class="form-control"
-                  :class="{ 'is-invalid': errors?.niy }"
-                  placeholder="Isikan NIY"
-                />
-                <div v-if="errors?.niy" class="invalid-feedback">
-                  {{ errors.niy[0] }}
-                </div>
-              </div>
-
-              <div class="col-xl-4">
-                <label class="form-label">Jabatan :</label>
-                <div v-if="isLoadingData" class="skeleton-input"></div>
-                <input
-                  v-else
-                  type="text"
-                  v-model="form.jabatan"
-                  class="form-control"
-                  :class="{ 'is-invalid': errors?.jabatan }"
-                  placeholder="Isikan Jabatan"
-                />
-                <div v-if="errors?.jabatan" class="invalid-feedback">
-                  {{ errors.jabatan[0] }}
-                </div>
-              </div>
-
-              <hr />
               <div class="card-title mb-0">Data Mahasiswa</div>
 
               <div class="col-xl-6">
@@ -353,7 +377,7 @@ function submitForm() {
                 </div>
               </div>
 
-              <div class="col-xl-4">
+              <div class="col-xl-6">
                 <label class="form-label">Program Studi :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
@@ -370,24 +394,7 @@ function submitForm() {
                 </div>
               </div>
 
-              <div class="col-xl-4">
-                <label class="form-label">Fakultas :</label>
-                <div v-if="isLoadingData" class="skeleton-input"></div>
-                <input
-                  v-else
-                  type="text"
-                  v-model="form.fakultas"
-                  class="form-control"
-                  :class="{ 'is-invalid': errors?.fakultas }"
-                  :readonly="readonlyField.fakultas"
-                  placeholder="Isikan Fakultas"
-                />
-                <div v-if="errors?.fakultas" class="invalid-feedback">
-                  {{ errors.fakultas[0] }}
-                </div>
-              </div>
-
-              <div class="col-xl-4">
+              <div class="col-xl-6">
                 <label class="form-label">Tanggal :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input

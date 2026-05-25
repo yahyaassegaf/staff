@@ -16,6 +16,7 @@ const props = defineProps({
 
 const defaultForm = {
   id: "",
+  no_surat: "",
   nomor: "",
   prodi_id: 0,
   th_akademik_id: null as null | number,
@@ -27,6 +28,9 @@ const defaultForm = {
   tahun_akademik: "",
   tanggal: "",
   jenis_kelamin: "",
+  tempat_lahir: "",
+  alamat: "",
+  universitas_tujuan: "",
 };
 
 const disableListMhsWatcher = ref(false);
@@ -65,11 +69,78 @@ watch(listMhs, async (val) => {
   if (val.jenis_kelamin) {
     form.jenis_kelamin = val.jenis_kelamin;
   }
+
+  // Auto-fill tempat_lahir, alamat, and tanggal_lahir if returned from API
+  form.tempat_lahir = val.tempat_lahir || val.tmp_lahir || "";
+  form.alamat = val.alamat || val.alamat_rumah || val.jalan || "";
+  if (val.tanggal_lahir) {
+    form.tanggal_lahir = val.tanggal_lahir.slice(0, 10);
+  }
+
   isLoadingData.value = false;
 });
 
 const listProdi = ref<any[]>([]);
 const listThAkademik = ref<any[]>([]);
+const listJenisSurat = ref<any[]>([]);
+
+async function getJenisSurat() {
+  try {
+    const response = await apiGet(`/jenis-surat`);
+    if (response.success) {
+      const data = response.data?.data || response.data;
+      listJenisSurat.value = Array.isArray(data) ? data : [data];
+    }
+  } catch (error) {
+  }
+}
+
+import { computed } from "vue";
+
+function getRoman(num: number) {
+  const roman: any = { 1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "VIII", 9: "IX", 10: "X", 11: "XI", 12: "XII" };
+  return roman[num] || "";
+}
+
+const formatParts = computed(() => {
+  const parts = {
+    skm: { prefix: "SU-", suffix: "" },
+  };
+
+  const getFormat = (alias: string) => {
+    const js = listJenisSurat.value.find((x: any) => x.alias === alias);
+    if (!js) return "";
+    let str = js.format_surat;
+    
+    const dateObj = form.tanggal ? new Date(form.tanggal) : new Date();
+    const dd = String(dateObj.getDate()).padStart(2, "0");
+    const romanBulan = getRoman(dateObj.getMonth() + 1);
+    const yyyy = dateObj.getFullYear();
+    
+    const prodiItem = listProdi.value.find((p) => Number(p.id) === Number(form.prodi_id));
+    const aliasProdi = prodiItem ? prodiItem.alias : "";
+    
+    str = str.replace(/{TGL}/g, dd)
+             .replace(/{BULAN}/g, romanBulan)
+             .replace(/{TAHUN}/g, String(yyyy))
+             .replace(/{PRODI}/g, aliasProdi);
+             
+    return str;
+  };
+
+  const parseToParts = (str: string) => {
+    if(!str) return { prefix: "SU-", suffix: "" };
+    const splitted = str.split("{NO}");
+    return {
+      prefix: splitted[0] || "",
+      suffix: splitted[1] || ""
+    };
+  };
+
+  parts.skm = parseToParts(getFormat("SKM"));
+
+  return parts;
+});
 
 async function getProdi() {
   try {
@@ -82,7 +153,6 @@ async function getProdi() {
       }
     }
   } catch (error) {
-    console.log(error);
   }
 }
 
@@ -94,13 +164,20 @@ async function getThAkademik() {
       listThAkademik.value = Array.isArray(data) ? data : [data];
     }
   } catch (error) {
-    console.log(error);
   }
+}
+
+
+function extractNo(fullStr: string) {
+  if (!fullStr) return "";
+  const firstPart = fullStr.split("/")[0];
+  return firstPart.replace("SU-", "").trim();
 }
 
 onMounted(() => {
   getProdi();
   getThAkademik();
+  getJenisSurat();
 });
 
 function customName(params: any) {
@@ -132,6 +209,11 @@ watch(
 
     form.id = val.id ?? "";
     form.nomor = val.nomor ?? "";
+    form.no_surat = val.no_surat ?? "";
+    if (!form.no_surat && form.nomor) {
+      const match = form.nomor.match(/SU-\s*(\d+)/i) || form.nomor.match(/^(\d+)/);
+      form.no_surat = match ? match[1] : "";
+    }
     form.prodi_id = val.prodi_id ?? 0;
     form.nama = val.nama || val.nama_mhs || "";
     form.tanggal_lahir = val.tanggal_lahir
@@ -143,6 +225,9 @@ watch(
     form.tahun_akademik = val.tahun_akademik ?? "";
     form.tanggal = val.tanggal ? val.tanggal.slice(0, 10) : "";
     form.jenis_kelamin = val.jenis_kelamin ?? "";
+    form.tempat_lahir = val.tempat_lahir ?? "";
+    form.alamat = val.alamat ?? "";
+    form.universitas_tujuan = val.universitas_tujuan ?? "";
 
     if (form.nim) {
       listMhs.value = {
@@ -187,7 +272,6 @@ const getMhs = debounce(async (params: string) => {
       }
     }
   } catch (error) {
-    console.log(error);
   } finally {
     loading.value = false;
   }
@@ -318,49 +402,94 @@ function submitForm() {
                   {{ errors.jurusan_prodi[0] }}
                 </div>
               </div>
-              <hr />
-              <div class="card-title mb-0">Informasi Surat</div>
 
               <div class="col-xl-6">
-                <label class="form-label">Semester :</label>
+                <label class="form-label">Tempat Lahir :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
                   v-else
                   type="text"
-                  v-model="form.semester"
+                  v-model="form.tempat_lahir"
                   class="form-control"
-                  :class="{ 'is-invalid': errors?.semester }"
-                  placeholder="Contoh: II (Dua)"
+                  :class="{ 'is-invalid': errors?.tempat_lahir }"
+                  placeholder="Isikan Tempat Lahir"
                 />
-                <div v-if="errors?.semester" class="invalid-feedback">
-                  {{ errors.semester[0] }}
+                <div v-if="errors?.tempat_lahir" class="invalid-feedback">
+                  {{ errors.tempat_lahir[0] }}
+                </div>
+              </div>
+
+              <div class="col-xl-12">
+                <label class="form-label">Alamat :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
+                <textarea
+                  v-else
+                  v-model="form.alamat"
+                  class="form-control"
+                  rows="2"
+                  :class="{ 'is-invalid': errors?.alamat }"
+                  placeholder="Isikan Alamat Lengkap"
+                ></textarea>
+                <div v-if="errors?.alamat" class="invalid-feedback">
+                  {{ errors.alamat[0] }}
+                </div>
+              </div>
+
+              <hr />
+              <div class="card-title mb-0">Informasi Surat</div>
+
+              <div class="col-xl-6">
+                <label class="form-label">Nomor Surat (Hanya Angka) :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
+                <div class="input-group" v-else>
+                  <span class="input-group-text" v-if="formatParts.skm.prefix">{{ formatParts.skm.prefix }}</span>
+                  <input
+                    type="text"
+                    v-model="form.no_surat"
+                    class="form-control"
+                    :class="{ 'is-invalid': errors?.no_surat }"
+                    placeholder="No"
+                  />
+                  <span class="input-group-text" v-if="formatParts.skm.suffix">{{ formatParts.skm.suffix }}</span>
+                  <div v-if="errors?.no_surat" class="invalid-feedback">
+                    {{ errors.no_surat[0] }}
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-xl-6">
+                <label class="form-label">Universitas Tujuan :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
+                <input
+                  v-else
+                  type="text"
+                  v-model="form.universitas_tujuan"
+                  class="form-control"
+                  :class="{ 'is-invalid': errors?.universitas_tujuan }"
+                  placeholder="Isikan Nama Universitas Tujuan"
+                />
+                <div v-if="errors?.universitas_tujuan" class="invalid-feedback">
+                  {{ errors.universitas_tujuan[0] }}
                 </div>
               </div>
 
               <div class="col-xl-6">
                 <label class="form-label">Tahun Akademik :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
-                <select
+                <input
                   v-else
-                  v-model="form.th_akademik_id"
-                  class="form-select"
-                  :class="{ 'is-invalid': errors?.th_akademik_id }"
-                >
-                  <option :value="null">-- Pilih Tahun Akademik --</option>
-                  <option
-                    v-for="thAkademik in listThAkademik"
-                    :key="thAkademik.id"
-                    :value="Number(thAkademik.id)"
-                  >
-                    {{ thAkademik.nama }} - {{ thAkademik.semester }}
-                  </option>
-                </select>
-                <div v-if="errors?.th_akademik_id" class="invalid-feedback">
-                  {{ errors.th_akademik_id[0] }}
+                  type="text"
+                  v-model="form.tahun_akademik"
+                  class="form-control"
+                  :class="{ 'is-invalid': errors?.tahun_akademik }"
+                  placeholder="Contoh: 2023/2024"
+                />
+                <div v-if="errors?.tahun_akademik" class="invalid-feedback">
+                  {{ errors.tahun_akademik[0] }}
                 </div>
               </div>
 
-              <div class="col-xl-12">
+              <div class="col-xl-6">
                 <label class="form-label">Tanggal Surat :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input

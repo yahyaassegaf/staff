@@ -34,7 +34,7 @@ class TandaTanganController extends Controller
 
         $data = $data->paginate($request->input('limit', 10));
 
-        Log::info('TandaTangan data count: ' . $data->total());
+        // Log::info('TandaTangan data count: ' . $data->total());
 
         return response()->json([
             'status' => true,

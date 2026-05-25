@@ -39,6 +39,7 @@ class SuratKeteranganTasmaKknPplController extends Controller
             'surat_keterangan_tasma_kkn_ppl.kelas_pondok',
             'surat_keterangan_tasma_kkn_ppl.tanggal',
             'surat_keterangan_tasma_kkn_ppl.drive_file_id',
+            'surat_keterangan_tasma_kkn_ppl.drive_link',
             'surat_keterangan_tasma_kkn_ppl.status',
             'surat_keterangan_tasma_kkn_ppl.created_at',
             'surat_keterangan_tasma_kkn_ppl.updated_at',
@@ -95,6 +96,7 @@ class SuratKeteranganTasmaKknPplController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'nullable|exists:prodi,id',
+                'no_surat' => 'required|string|max:255',
                 'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
                 'nama_mhs' => 'required|string|max:255',
                 'tempat_lahir' => 'required|string|max:100',
@@ -118,22 +120,16 @@ class SuratKeteranganTasmaKknPplController extends Controller
             Log::info($validate);
 
             $login = $validate['prodi_mhs'];
-            $no = NoSurat::orderByDesc('id')->value('nomor') ?? 0;
-            $no_surat = str_pad($no + 1, 3, '0', STR_PAD_LEFT);
+            $no_surat = $validate['no_surat'];
 
-            $unit = 'K.' . strtoupper($login);
-            // Handling if login is generic or derived logic needs adjustment, sticking to reference pattern
-
-            $noSurat = SuratService::NoSuratKeteranganTasmaKknPpl($no_surat);
+            $noSurat = \App\Services\SuratService::formatNomorSurat('STTKP', $no_surat, $validate['tanggal'], $validate['prodi_id'] ?? null);
 
             $sktkp                = new SuratKeteranganTasmaKknPpl();
             $sktkp->nomor_surat   = $noSurat;
-            $sktkp->tanda_tangan_id = $validate['tanda_tangan_id'] ?? null;
-            // Set ketua from tanda_tangan nama if provided
-            if (!empty($validate['tanda_tangan_id'])) {
-                $tandaTangan = TandaTangan::find($validate['tanda_tangan_id']);
-                $sktkp->ketua = $tandaTangan?->nama;
-            }
+            $settingTasma = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_tasma')->first();
+            $sktkp->tanda_tangan_id = $validate['tanda_tangan_id'] ?? ($settingTasma ? $settingTasma->tanda_tangan_id : null);
+            $sktkp->ketua = $settingTasma && $settingTasma->tandaTangan ? $settingTasma->tandaTangan->nama : null;
+
             $sktkp->nama_lengkap  = $validate['nama_mhs'];
             $sktkp->tempat_lahir  = $validate['tempat_lahir'];
             $sktkp->tanggal_lahir = $validate['tanggal_lahir'];
@@ -149,12 +145,12 @@ class SuratKeteranganTasmaKknPplController extends Controller
             $sktkp->save();
 
             $Nomor                = new NoSurat();
-            $Nomor->nomor         = $no_surat;
+            $Nomor->nomor = $no_surat;
             $Nomor->user_id       = Auth::user()->id;
             $Nomor->save();
 
             $log                  = new LogSurat();
-            $log->nomor         = $no_surat;
+            $log->nomor = $no_surat;
             $log->nomor_surat   = $noSurat;
             $log->nama_surat    = 'Surat Keterangan TASMA, KKN, PPL';
             $log->user_id       = Auth::user()->id;
@@ -192,6 +188,17 @@ class SuratKeteranganTasmaKknPplController extends Controller
             ], 404);
         }
 
+
+        $nomorStr = $sktkp->nomor_surat ?? $sktkp->nomor ?? null;
+        if ($nomorStr) {
+            $parts = explode('/', $nomorStr);
+            $firstPart = $parts[0];
+            if (strpos($firstPart, '-') !== false) {
+                $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+            }
+            $sktkp->no_surat = trim($firstPart);
+        }
+
         return response()->json([
             'status' => true,
             'data' => $sktkp,
@@ -204,6 +211,7 @@ class SuratKeteranganTasmaKknPplController extends Controller
         Log::info($request->all());
         try {
             $validator = Validator::make($request->all(), [
+                'no_surat' => 'required|string|max:255',
                 'prodi_id' => 'nullable|exists:prodi,id',
                 'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
                 'nama_mhs' => 'required|string|max:255',
@@ -226,6 +234,9 @@ class SuratKeteranganTasmaKknPplController extends Controller
 
             $validate = $validator->validated();
 
+
+
+
             $sktkp = SuratKeteranganTasmaKknPpl::find($id);
             if (!$sktkp) {
                 return response()->json([
@@ -233,6 +244,11 @@ class SuratKeteranganTasmaKknPplController extends Controller
                     'message' => 'Data tidak ditemukan'
                 ]);
             }
+
+            $oldDriveFileId = $sktkp->drive_file_id;
+
+            $noSurat = \App\Services\SuratService::formatNomorSurat('STTKP', $validate['no_surat'], $validate['tanggal'], $validate['prodi_id'] ?? null);
+            $sktkp->nomor_surat = $noSurat;
 
             $sktkp->prodi_id = $validate['prodi_id'] ?? $sktkp->prodi_id;
             if (array_key_exists('tanda_tangan_id', $validate)) {
@@ -251,7 +267,52 @@ class SuratKeteranganTasmaKknPplController extends Controller
             $sktkp->alamat_rumah = $validate['alamat_rumah'];
             $sktkp->kelas_pondok = $validate['kelas_pondok'];
             $sktkp->tanggal = $validate['tanggal'];
+
+            // Delete old file from Google Drive if exists
+            if (!empty($oldDriveFileId)) {
+                \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
+            }
+
+            $sktkp->drive_file_id = null;
+            $sktkp->drive_link = null;
+            $sktkp->status = 'pending';
             $sktkp->save();
+
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratKeteranganTasmaKknPpl::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_tasma_kkn_ppl.prodi_id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_keterangan_tasma_kkn_ppl.tanda_tangan_id')
+                ->select(
+                    'fakultas.nama as fakultas',
+                    'surat_keterangan_tasma_kkn_ppl.*',
+                    'prodi.nama as nama_prodi',
+                    'prodi.alias as alias_prodi',
+                    'tanda_tangan.nama as nama_ttd',
+                    'tanda_tangan.gambar as ttd',
+                )
+                ->where('surat_keterangan_tasma_kkn_ppl.id', $sktkp->id)
+                ->first();
+
+            if ($data) {
+                $pdfData = $this->buildPdfData($data);
+                $pdf = Pdf::loadView('pdf.surat_tasma_kkn_ppl', $pdfData)->setPaper('a4', 'portrait');
+
+                $fileName = 'surat_keterangan_tasma_kkn_ppl_' . $data->nim . '.pdf';
+                $directory = base_path('../public_html/pdf');
+
+                if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+                }
+
+                $path = $directory . '/' . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan TASMA, KKN, PPL';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->nama_prodi, SuratKeteranganTasmaKknPpl::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -294,6 +355,9 @@ class SuratKeteranganTasmaKknPplController extends Controller
 
     public function downloadPdf($id)
     {
+        ini_set('memory_limit', '512M');
+        ini_set('max_execution_time', '300');
+
         try {
             $data = SuratKeteranganTasmaKknPpl::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_tasma_kkn_ppl.prodi_id')
                 ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
@@ -302,7 +366,7 @@ class SuratKeteranganTasmaKknPplController extends Controller
                 ->select(
                     'fakultas.nama as fakultas',
                     'surat_keterangan_tasma_kkn_ppl.*',
-                    'prodi.nama as prodi',
+                    'prodi.nama as nama_prodi',
                     'prodi.alias as alias_prodi',
                     'tanda_tangan.nama as nama_ttd',
                     'tanda_tangan.gambar as ttd',
@@ -317,59 +381,27 @@ class SuratKeteranganTasmaKknPplController extends Controller
                 ], 404);
             }
 
-            $kopPath = base_path('../public_html/img/kop.jpg');
-            // Assuming img exists; use placeholder or catch error if needed.
+            $pdfData = $this->buildPdfData($data);
 
-            $kopBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath));
-
-            $tddPath = base_path('../public_html/' . $data->ttd);
-
-            $tddBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tddPath));
-            $stempelPath = base_path('../public_html/img/stempel.png');
-
-            $stempelBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($stempelPath));
-
-            $pdfData = [
-                'nomor_surat' => $data->nomor_surat,
-                'ketua' => $data->nama_ttd ?? $data->ketua,
-                'nama' => $data->nama_lengkap,
-                'tempat_lahir' => $data->tempat_lahir,
-                'tanggal_lahir' => Carbon::parse($data->tanggal_lahir)->translatedFormat('d F Y'),
-                'nim' => $data->nim,
-                'tanggal' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
-                'fakultas' => $data->fakultas,
-                'prodi' => $data->prodi_mahasiswa, // Using prodi_mhs field as per migration text
-                'alamat' => $data->alamat_rumah,
-                'kelas' => $data->kelas_pondok,
-                'jenis_kelamin' => $data->jenis_kelamin,
-                'tanggal_surat' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
-                'kopBase64' => $kopBase64,
-                'ttd' => $tddBase64,
-                'stempel' => $stempelBase64,
-            ];
-
-            // Use the view found in user's open documents
-            $pdf = Pdf::loadView('pdf.surat_tasma_kkn_ppl', $pdfData)
-                ->setPaper('a4', 'portrait');
+            $pdf = Pdf::loadView('pdf.surat_tasma_kkn_ppl', $pdfData)->setPaper('a4', 'portrait');
 
             $fileName = 'surat_keterangan_tasma_kkn_ppl_' . $data->nim . '.pdf';
-            $directory = base_path('../public_html/pdf/');
+            $directory = base_path('../public_html/pdf');
 
-            if (!file_exists($directory)) {
-                mkdir($directory, 0755, true);
+            if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
             }
 
-            $path = $directory . $fileName;
+            $path = $directory . '/' . $fileName;
             $pdf->save($path);
 
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Keterangan TASMA, KKN, PPL';
-
-            $googlePath = $data->prodi . '/' . $nameTable . '/' . $fileName;
+            $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
 
             if (!Storage::disk('google')->exists($googlePath)) {
-                UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi, SuratKeteranganTasmaKknPpl::class);
+                UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganTasmaKknPpl::class);
             }
 
             return response($pdf->output(), 200, [
@@ -377,12 +409,54 @@ class SuratKeteranganTasmaKknPplController extends Controller
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
-            Log::error($th->getMessage());
+            Log::error((string) $th);
             return response()->json([
                 'status' => false,
-                'message' => 'Data gagal diunduh: ' . $th->getMessage()
-            ]);
+                'message' => 'Gagal mengunduh PDF: Terjadi kesalahan pada server'
+            ], 500);
         }
+    }
+
+    private function buildPdfData($data)
+    {
+        $kopPath = base_path('../public_html/img/kop.jpg');
+        $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
+
+        // Fetch signature from setting_jabatan
+        $settingTasma = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_tasma')->first();
+        $namaKetua = 'Ketua TASMA';
+        $tddBase64 = '';
+
+        if ($settingTasma && $settingTasma->tandaTangan) {
+            $namaKetua = $settingTasma->tandaTangan->nama;
+            if ($settingTasma->tandaTangan->gambar) {
+                $tddBase64 = \App\Services\SuratService::getBase64Image(base_path('../public_html/' . $settingTasma->tandaTangan->gambar));
+            } elseif ($settingTasma->tandaTangan->tdd) {
+                $tddBase64 = $settingTasma->tandaTangan->tdd;
+            }
+        }
+
+        $stempelPath = base_path('../public_html/img/stempel.png');
+        $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+
+        return [
+            'nomor_surat' => $data->nomor_surat,
+            'ketua' => $namaKetua,
+            'nama' => $data->nama_lengkap,
+            'tempat_lahir' => $data->tempat_lahir,
+            'tanggal_lahir' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_lahir),
+            'nim' => $data->nim,
+            'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+            'fakultas' => $data->fakultas,
+            'prodi' => $data->prodi_mhs,
+            'alamat' => $data->alamat_rumah,
+            'kelas' => $data->kelas_pondok,
+            'jenis_kelamin' => $data->jenis_kelamin,
+            'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+            'kopBase64' => $kopBase64,
+            'ttd' => $tddBase64,
+            'stempel' => $stempelBase64,
+        ];
     }
 
     public function getProdi()

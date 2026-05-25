@@ -45,15 +45,16 @@ export default defineComponent({
 
           suratData.value = {
             id: data.id,
+            no_surat: data.no_surat || data.nomor_surat || data.nomor || "",
             prodi_id: data.prodi_id || 0,
             nama_mhs: data.nama_lengkap || "",
             tempat_lahir: data.tempat_lahir || "",
-            tanggal_lahir: data.tanggal_lahir || "",
+            tanggal_lahir: data.tanggal_lahir ? data.tanggal_lahir.slice(0, 10) : "",
             nim: data.nim || "",
             prodi_mhs: data.prodi_mahasiswa || "",
             alamat_rumah: data.alamat_rumah || "",
             kelas_pondok: data.kelas_pondok || "",
-            tanggal: data.tanggal || "",
+            tanggal: data.tanggal ? data.tanggal.slice(0, 10) : "",
           };
 
           isDataReady.value = true;

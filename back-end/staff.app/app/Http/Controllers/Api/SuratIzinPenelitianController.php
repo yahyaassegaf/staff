@@ -75,6 +75,7 @@ class SuratIzinPenelitianController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required',
+                'no_surat' => 'required|string|max:255',
                 'nama' => 'required|string|max:255',
                 'nim' => 'required|string|max:255',
                 'prodi_mhs' => 'nullable|string|max:255',
@@ -94,24 +95,9 @@ class SuratIzinPenelitianController extends Controller
 
             $validate = $validator->validated();
 
-            $login = Auth::user()->prodi->alias;
-            $no = NoSurat::orderByDesc('id')->value('nomor') ?? 0;
-            $no_surat = str_pad($no + 1, 3, '0', STR_PAD_LEFT);
+            $no_surat = $validate['no_surat'];
 
-            $unit = 'K.' . strtoupper($login);
-            $fakultas = FakultasProdi::join('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')->where('prodi_id', $validate['prodi_id'])
-                ->first();
-            $besar = ucwords($fakultas->nama);
-            $nama_fakultas = 'Fakultas ' . $besar;
-
-            $inisial = collect(explode(' ', $nama_fakultas))
-                ->map(fn($kata) => strtoupper(substr($kata, 0, 1)))
-                ->take(2)
-                ->implode(''); // FT
-
-
-            $formattedNoSurat = SuratService::NoSuratIzinPenelitian($no_surat, $inisial);
-
+            $formattedNoSurat = SuratService::formatNomorSurat('SIP', $no_surat, $validate['tanggal'], $validate['prodi_id']);
             $sip = new SuratIzinPenelitian();
             $sip->nomor = $formattedNoSurat;
             $sip->nama = $validate['nama'];
@@ -167,6 +153,17 @@ class SuratIzinPenelitianController extends Controller
             ], 404);
         }
 
+
+        $nomorStr = $data->nomor_surat ?? $data->nomor ?? null;
+        if ($nomorStr) {
+            $parts = explode('/', $nomorStr);
+            $firstPart = $parts[0];
+            if (strpos($firstPart, '-') !== false) {
+                $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+            }
+            $data->no_surat = trim($firstPart);
+        }
+
         return response()->json([
             'status' => true,
             'data' => $data,
@@ -178,6 +175,7 @@ class SuratIzinPenelitianController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
+                'no_surat' => 'required|string|max:255',
                 'prodi_id' => 'required',
                 'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
                 'nama' => 'required|string|max:255',
@@ -207,6 +205,8 @@ class SuratIzinPenelitianController extends Controller
                 ], 404);
             }
 
+            $oldDriveFileId = $sip->drive_file_id;
+
             $sip->nama = $validate['nama'];
             $sip->nim = $validate['nim'];
             $sip->prodi_mhs = $validate['prodi_mhs'] ?? $sip->prodi_mhs;
@@ -218,8 +218,85 @@ class SuratIzinPenelitianController extends Controller
             if (array_key_exists('tanda_tangan_id', $validate)) {
                 $sip->tanda_tangan_id = $validate['tanda_tangan_id'];
             }
+
+            $formattedNoSurat = \App\Services\SuratService::formatNomorSurat('SIP', $validate['no_surat'], $validate['tanggal'], $validate['prodi_id'] ?? null);
+            $sip->nomor = $formattedNoSurat;
+
+
             $sip->jenis_kelamin = Auth::user()->jenis_kelamin;
+
+            // Delete old file from Google Drive if exists
+            if (!empty($oldDriveFileId)) {
+                \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
+            }
+
+            $sip->drive_file_id = null;
+            $sip->drive_link = null;
+            $sip->status = 'pending';
             $sip->save();
+
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratIzinPenelitian::leftJoin('prodi', 'prodi.id', '=', 'surat_izin_penelitian.prodi_id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'fakultas.tanda_tangan_id')
+                ->select(
+                    'surat_izin_penelitian.*',
+                    'prodi.nama as prodi_name',
+                    'prodi.nama_kepala',
+                    'prodi.nidn_kepala',
+                    'fakultas.nama as fakultas_name',
+                    'fakultas.dekan as nama_dekan',
+                    'fakultas.nidn_dekan',
+                    'tanda_tangan.nama as nama_ttd',
+                    'tanda_tangan.gambar as ttd',
+                )
+                ->where('surat_izin_penelitian.id', $sip->id)
+                ->first();
+
+            if ($data) {
+                $kopPath = base_path('../public_html/img/kop.jpg');
+                $kopBase64 = SuratService::getBase64Image($kopPath);
+
+                $tddPath = base_path('../public_html/' . $data->ttd);
+                $tddBase64 = SuratService::getBase64Image($tddPath);
+
+                $stempelPath = base_path('../public_html/img/stempel.png');
+                $stempelBase64 = SuratService::getBase64Image($stempelPath);
+                $pdfData = [
+                    'nomor' => $data->nomor,
+                    'nama' => $data->nama,
+                    'nim' => $data->nim,
+                    'kepada' => $data->kepada,
+                    'semester' => $data->semester,
+                    'dari_tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->dari_tanggal),
+                    'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+                    'nama_kepala' => $data->nama_ttd ?? $data->nama_kepala,
+                    'nidn_kepala' => $data->nidn_kepala,
+                    'prodi_name' => $data->prodi_name,
+                    'fakultas_name' => $data->fakultas_name,
+
+                    'kopBase64' => $kopBase64,
+                    'ttd' => $tddBase64,
+                    'stempel' => $stempelBase64
+                ];
+
+                $pdf = Pdf::loadView('pdf.surat_izin_penelitian', $pdfData)->setPaper('a4', 'portrait');
+                $fileName = 'surat_izin_penelitian_' . $data->nim . '.pdf';
+                $directory = base_path('../public_html/pdf/');
+
+                if (!file_exists($directory)) {
+                    mkdir($directory, 0755, true);
+                }
+
+                $path = $directory . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Izin Penelitian';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->prodi_name, SuratIzinPenelitian::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -272,6 +349,8 @@ class SuratIzinPenelitianController extends Controller
                     'prodi.nama_kepala',
                     'prodi.nidn_kepala',
                     'fakultas.nama as fakultas_name',
+                    'fakultas.dekan as nama_dekan',
+                    'fakultas.nidn_dekan',
                     'tanda_tangan.nama as nama_ttd',
                     'tanda_tangan.gambar as ttd',
                 )
@@ -283,26 +362,26 @@ class SuratIzinPenelitianController extends Controller
             }
 
             $kopPath = base_path('../public_html/img/kop.jpg');
-            $kopBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath));
+            $kopBase64 = SuratService::getBase64Image($kopPath);
 
             $tddPath = base_path('../public_html/' . $data->ttd);
+            $tddBase64 = SuratService::getBase64Image($tddPath);
 
-            $tddBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tddPath));
             $stempelPath = base_path('../public_html/img/stempel.png');
-
-            $stempelBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($stempelPath));
+            $stempelBase64 = SuratService::getBase64Image($stempelPath);
             $pdfData = [
                 'nomor' => $data->nomor,
                 'nama' => $data->nama,
                 'nim' => $data->nim,
                 'kepada' => $data->kepada,
                 'semester' => $data->semester,
-                'dari_tanggal' => Carbon::parse($data->dari_tanggal)->translatedFormat('d F Y'),
-                'tanggal' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
+                'dari_tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->dari_tanggal),
+                'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
                 'nama_kepala' => $data->nama_ttd ?? $data->nama_kepala,
                 'nidn_kepala' => $data->nidn_kepala,
                 'prodi_name' => $data->prodi_name,
                 'fakultas_name' => $data->fakultas_name,
+
                 'kopBase64' => $kopBase64,
                 'ttd' => $tddBase64,
                 'stempel' => $stempelBase64

@@ -47,18 +47,6 @@ const addTag = (newTag) => {
 
 // Dummy submit handler
 const submitProduct = () => {
-  console.log('Submitting Product With Data:')
-  console.log({
-    brand: BrandselectValue.value,
-    category: CategoryselectValue.value,
-    gender: GenderselectValue.value,
-    color: ColorselectValue.value,
-    size: SizeselectValue.value,
-    status: StatusselectValue.value,
-    availability: AvailabilityselectValue.value,
-    tags: value.value,
-  })
-  alert('Product submitted (check console for details)')
 }
 </script>
 

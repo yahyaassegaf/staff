@@ -22,16 +22,11 @@ export default defineComponent({
       password: null,
     });
 
-    watch(
-      () => user.value.password,
-      (v) => console.log("password:", v),
-    );
+
 
     const router = useRouter();
 
     const login = async () => {
-      console.log("isinya: ", user.value);
-
       let data = await authenticateUser(user.value);
       if (data.authenticated) {
         toast.success("Logged In", {

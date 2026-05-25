@@ -60,9 +60,7 @@ const options = ref({
 const Netsedsortable = ref(null);
 const logEvent = (evt, evt2) => {
     if (evt2) {
-        console.log(evt, evt2);
     } else {
-        console.log(evt);
     }
 };
 

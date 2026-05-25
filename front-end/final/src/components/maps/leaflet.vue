@@ -39,7 +39,6 @@ const iconSize = computed(() => [iconWidth.value, iconHeight.value])
 
 // Example log method
 const log = (value: any) => {
-  console.log(value)
 }
 </script>
 

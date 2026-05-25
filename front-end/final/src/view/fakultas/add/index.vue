@@ -43,7 +43,6 @@ export default defineComponent({
           }
         }
       } catch (error) {
-        console.log(error);
         toast.error("Terjadi kesalahan", {
           theme: "auto",
           icon: true,

@@ -3,92 +3,241 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Mahasiswa;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use App\Services\Mahasiswa;
-use Illuminate\Support\Facades\Auth;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Imports\MahasiswaImport;
 use Illuminate\Support\Facades\Log;
 
 class MahasiswaController extends Controller
 {
     public function index(Request $request)
     {
+        $data = Mahasiswa::query();
 
-        $data = Mahasiswa::table($request);
-        return response()->json($data);
-    }
-
-    /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show($id)
-    {
-        return response()->json(Mahasiswa::find($id), 200);
-    }
-
-    /**
-     * Display the specified resource.
-     *
-     * @param  string  $nim
-     * @return \Illuminate\Http\Response
-     */
-    public function nim(Request $request)
-    {
-        $nim = $request->nim;
-        $whereIn = $request->whereIn;
-        return response()->json(Mahasiswa::nim($nim, $whereIn), 200);
-    }
-
-    /**
-     * Display the specified resource.
-     *
-     * @param  string  $search
-     * @return \Illuminate\Http\Response
-     */
-    public function search(Request $request, $search = null)
-    {
-        // Ambil keyword dari segment URL atau query parameter 'search'
-        $keyword = $search ?? $request->query('search');
-        $keyword = trim($keyword ?? '');
-
-        $where = null;
-        // Hanya filter prodi jika user memiliki prodi_id
-        if (Auth::user() && Auth::user()->prodi_id) {
-            $where = [
-                ['mst_mhs.prodi_id', '=', Auth::user()->prodi_id]
-            ];
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $data->where(function ($q) use ($search) {
+                $q->where('nama', 'LIKE', "%{$search}%");
+                $q->orWhere('nim', 'LIKE', "%{$search}%");
+                $q->orWhere('nik', 'LIKE', "%{$search}%");
+            });
         }
 
-        Log::info("Mahasiswa Search - Keyword: '{$keyword}', User Prodi: " . (Auth::user()->prodi_id ?? 'None'));
+        $data->orderBy(
+            $request->input('sortBy', 'id'),
+            $request->input('sortType', 'asc')
+        );
 
-        $data = Mahasiswa::all(null, 30, $keyword, 'mst_mhs.nim', 'asc', $where);
-        return response()->json($data);
+        $data = $data->paginate($request->input('limit', 10));
+
+        return response()->json([
+            'status' => true,
+            'data' => $data,
+            'message' => 'Data berhasil diambil'
+        ]);
     }
 
-    /**
-     * Display the specified resource.
-     *
-     * @param  string  $search
-     * @return \Illuminate\Http\Response
-     */
-    public function getSemester(Request $request)
+    public function store(Request $request)
     {
-        $data = Mahasiswa::getSemester($request->th_akademik_id, $request->prodi_id, $request->jk_id);
-        return response()->json($data);
+        try {
+            $validator = Validator::make($request->all(), [
+                'nama' => 'required|string|max:255',
+                'nim' => 'required|string|max:255',
+                'nik' => 'required|string|max:255',
+                'tgl_lahir' => 'required|date',
+                'nilai_akreditasi' => 'required|string|max:255',
+                'nomor_sk_ban_pt' => 'required|string|max:255',
+                'nomor_ijazah_nasional' => 'required|string|max:255',
+                'tanggal_sk_yudisium' => 'required|string|max:255',
+                'tanggal_penerbitan' => 'required|string|max:255',
+                'prodi_id' => 'required|exists:prodi,id',
+                'status' => 'required|in:belum,sudah',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            Mahasiswa::create($validator->validated());
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Data berhasil ditambahkan'
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Data gagal ditambahkan: ' . $th->getMessage()
+            ], 500);
+        }
     }
 
-    public function updateStatusMahasiswa(Request $request)
+    public function show($id)
     {
-        $data = Mahasiswa::updateStatusMahasiswa($request->nim, $request->status_id);
-        return response()->json($data);
+        $mahasiswa = Mahasiswa::find($id);
+
+        if (!$mahasiswa) {
+            return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
+        }
+
+        return response()->json(['status' => true, 'data' => $mahasiswa, 'message' => 'Data berhasil diambil']);
     }
 
-    public function cekPelanggaran($nim)
+    public function update(Request $request, $id)
     {
-        $data = Mahasiswa::cekPelanggaran($nim);
-        return response()->json($data);
+        try {
+            $validator = Validator::make($request->all(), [
+                'nama' => 'required|string|max:255',
+                'nim' => 'required|string|max:255',
+                'nik' => 'required|string|max:255',
+                'tgl_lahir' => 'required|date',
+                'nilai_akreditasi' => 'required|string|max:255',
+                'nomor_sk_ban_pt' => 'required|string|max:255',
+                'nomor_ijazah_nasional' => 'required|string|max:255',
+                'tanggal_sk_yudisium' => 'required|string|max:255',
+                'tanggal_penerbitan' => 'required|string|max:255',
+                'prodi_id' => 'required|exists:prodi,id',
+                'status' => 'required|in:belum,sudah',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['status' => false, 'message' => 'Validasi gagal', 'errors' => $validator->errors()], 422);
+            }
+
+            $mahasiswa = Mahasiswa::find($id);
+            if (!$mahasiswa) {
+                return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
+            }
+
+            $mahasiswa->update($validator->validated());
+
+            return response()->json(['status' => true, 'message' => 'Data berhasil diupdate']);
+        } catch (\Throwable $th) {
+            return response()->json(['status' => false, 'message' => 'Data gagal diupdate'], 500);
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $mahasiswa = Mahasiswa::find($id);
+            if (!$mahasiswa) {
+                return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
+            }
+            $mahasiswa->delete();
+            return response()->json(['status' => true, 'message' => 'Data berhasil dihapus']);
+        } catch (\Throwable $th) {
+            return response()->json(['status' => false, 'message' => 'Data gagal dihapus'], 500);
+        }
+    }
+
+    public function import(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['status' => false, 'message' => 'Validasi gagal', 'errors' => $validator->errors()], 422);
+            }
+
+            $import = new MahasiswaImport();
+            Excel::import($import, $request->file('file'));
+
+            if ($import->getFailedCount() > 0) {
+                Log::warning('Beberapa baris gagal diimpor pada Mahasiswa Import', [
+                    'failed_count' => $import->getFailedCount(),
+                    'errors' => $import->getErrors()
+                ]);
+            }
+
+            $skippedSheets = $import->getSkippedSheets();
+            $skippedMsg = count($skippedSheets) > 0 ? ", " . count($skippedSheets) . " sheet dilewati (" . implode(', ', $skippedSheets) . ")" : "";
+
+            return response()->json([
+                'status' => true,
+                'message' => "Import selesai. {$import->getSuccessCount()} berhasil, {$import->getFailedCount()} gagal{$skippedMsg}",
+                'data' => [
+                    'success' => $import->getSuccessCount(),
+                    'failed' => $import->getFailedCount(),
+                    'skipped_sheets' => $skippedSheets,
+                    'errors' => $import->getErrors(),
+                ],
+            ]);
+        } catch (\Throwable $th) {
+            Log::error('Gagal melakukan import Mahasiswa', [
+                'message' => $th->getMessage(),
+                'file' => $th->getFile(),
+                'line' => $th->getLine(),
+                'trace' => $th->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Import gagal: ' . $th->getMessage()
+            ], 500);
+        }
+    }
+
+    public function search(Request $request)
+    {
+        try {
+            $search = $request->query('search', '');
+
+            // $user = $request->user();
+            // $where = null;
+
+            // if ($user && $user->prodi_id) {
+            //     $where = ['prodi_id' => $user->prodi_id];
+            // }
+
+            // $data = \App\Services\Mahasiswa::all(
+            //     null,   // offset
+            //     20,     // limit
+            //     $search,
+            //     null,   // order
+            //     null,   // dir
+            //     $where, // where
+            //     null    // pluck
+            // );
+            $user = $request->user();
+            $where = null;
+            if ($user && $user->prodi_id) {
+                $prodi = $user->prodi->alias;
+                // $prodi2 = strval($prodi);
+
+                $where = [
+                    ['mst_prodi.alias', '=', $prodi]
+                ];
+            }
+
+            $data = \App\Services\Mahasiswa::all(
+                null,   // offset
+                20,     // limit
+                $search,
+                null,   // order
+                null,   // dir
+                $where, // where
+                null    // pluck
+            );
+
+            return response()->json([
+                'status' => true,
+                'data' => $data,
+                'message' => 'Data berhasil diambil',
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Gagal mengambil data mahasiswa: ' . $th->getMessage()
+            ], 500);
+        }
     }
 }

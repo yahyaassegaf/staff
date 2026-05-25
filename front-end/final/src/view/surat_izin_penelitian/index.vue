@@ -1,4 +1,5 @@
 <script lang="ts">
+import Swal from "sweetalert2";
 import { onMounted, ref, watch } from "vue";
 import { defineComponent } from "vue";
 import type { ServerOptions } from "vue3-easy-data-table";
@@ -47,7 +48,6 @@ export default defineComponent({
           listProdi.value = Array.isArray(data) ? data : [data];
         }
       } catch (error) {
-        console.log(error);
       }
     }
 
@@ -74,7 +74,6 @@ export default defineComponent({
           total.value = response.data.data.total || 0;
         }
       } catch (error) {
-        console.log(error);
       } finally {
         loading.value = false;
       }
@@ -91,7 +90,18 @@ export default defineComponent({
     }
 
     async function remove(params: any) {
-      if (!confirm("Apakah Anda yakin ingin menghapus data ini?")) return;
+      
+      Swal.fire({
+        title: "Apakah anda yakin?",
+        text: "Data yang dihapus tidak dapat dikembalikan!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#d33",
+        confirmButtonText: "Ya, hapus!",
+        cancelButtonText: "Batal",
+      }).then(async (result) => {
+        if (result.isConfirmed) {
       try {
         const response = await apiDelete("/surat-izin-penelitian/" + params.id);
         if (response.success || response.data.status) {
@@ -101,9 +111,10 @@ export default defineComponent({
           toast.error("Data gagal dihapus");
         }
       } catch (error) {
-        console.log(error);
         toast.error("Terjadi kesalahan saat menghapus data");
       }
+        }
+      });
     }
 
     async function download(params: any) {
@@ -115,7 +126,6 @@ export default defineComponent({
         );
         openFileExport(res.data);
       } catch (error) {
-        console.log(error);
         toast.error("Gagal mengunduh file PDF");
       }
     }

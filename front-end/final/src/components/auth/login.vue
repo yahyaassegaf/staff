@@ -36,7 +36,7 @@ export default defineComponent({
         // setTimeout(() => {
         // router.push("dashboards/courses");
         // }, 300);
-        console.log("NAVIGATE NOW");
+
         router.push("/dashboard");
       } else {
         toast.error("Invalid credentials", {

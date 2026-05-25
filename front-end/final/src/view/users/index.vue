@@ -63,7 +63,6 @@ export default defineComponent({
           sortType: serverOptions.value.sortType,
           search: searchValue3.value,
         });
-        console.log(response.data.data);
 
         const rows = Array.isArray(response.data.data.data)
           ? response.data.data.data
@@ -77,11 +76,8 @@ export default defineComponent({
         }));
 
         total.value = response.data.data.total;
-        console.log("total data ", total.value);
 
-        console.log("ITEMS:", items.value);
       } catch (error) {
-        console.log(error);
       } finally {
         loading.value = false;
       }
@@ -112,7 +108,6 @@ export default defineComponent({
           });
         }
       } catch (error) {
-        console.log(error);
         toast.error("Terjadi kesalahan saat menghapus user", {
           theme: "auto",
           icon: true,
@@ -136,7 +131,6 @@ export default defineComponent({
     });
 
     function goAdd() {
-      console.log("masuk kok");
 
       return router.push("/users/add");
     }

@@ -77,6 +77,7 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id'      => 'nullable',
+                'no_surat'      => 'required|string|max:255',
                 'nama_mhs'      => 'required|string|max:255',
                 'tempat_lahir'  => 'required|string|max:100',
                 'tanggal_lahir' => 'required|date',
@@ -98,15 +99,41 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
 
             $validate = $validator->validated();
 
-            $loginArgs = $validate['prodi_mhs'];
-            $no = NoSurat::orderByDesc('id')->value('nomor') ?? 0;
-            Log::info($no);
-            $no_surat = str_pad($no + 1, 3, '0', STR_PAD_LEFT);
-            Log::info($no_surat);
+            $no_surat = $validate['no_surat'];
 
-            $unit = 'BAK';
+            $data = SuratKeteranganAdministrasiKeuangan::find($id);
+            if (!$data) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Data tidak ditemukan'
+                ]);
+            }
 
-            $noSurat = SuratService::NoSuratKeteranganAdministrasiKeuangan($no_surat, $unit);
+
+            $data->prodi_id = $validate['prodi_id'];
+            $data->nama_lengkap = $validate['nama_mhs'];
+            $data->tempat_lahir = $validate['tempat_lahir'];
+            $data->tanggal_lahir = $validate['tanggal_lahir'];
+            $data->nim = $validate['nim'];
+            $data->prodi_mhs = $validate['prodi_mhs'];
+            $data->alamat_rumah = $validate['alamat_rumah'];
+            $data->kelas_pondok = $validate['kelas_pondok'];
+            $data->tanggal = $validate['tanggal'];
+            if (array_key_exists('tanda_tangan_id', $validate)) {
+                $data->tanda_tangan_id = $validate['tanda_tangan_id'];
+                if (!empty($validate['tanda_tangan_id'])) {
+                    $tandaTangan = \App\Models\TandaTangan::find($validate['tanda_tangan_id']);
+                    $data->kepala_biro = $tandaTangan?->nama;
+                }
+            } else if (empty($data->tanda_tangan_id)) {
+                $settingKeuangan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'kepala_biro_keuangan')->first();
+                if ($settingKeuangan) {
+                    $data->tanda_tangan_id = $settingKeuangan->tanda_tangan_id;
+                    $data->kepala_biro = $settingKeuangan->tandaTangan ? $settingKeuangan->tandaTangan->nama : null;
+                }
+            }
+
+            $noSurat = \App\Services\SuratService::formatNomorSurat('SKAK', $no_surat, $validate['tanggal'], $validate['prodi_id'] ?? null);
 
             $data = new SuratKeteranganAdministrasiKeuangan();
             $data->nomor_surat  = $noSurat;
@@ -119,23 +146,26 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
             $data->alamat_rumah = $validate['alamat_rumah'];
             $data->kelas_pondok = $validate['kelas_pondok'];
             $data->tanggal      = $validate['tanggal'];
-            $data->tanda_tangan_id = $validate['tanda_tangan_id'] ?? null;
+            $settingKeuangan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'kepala_biro_keuangan')->first();
+            $data->tanda_tangan_id = $validate['tanda_tangan_id'] ?? ($settingKeuangan ? $settingKeuangan->tanda_tangan_id : null);
             // Set kepala_biro from tanda_tangan nama if provided
             if (!empty($validate['tanda_tangan_id'])) {
-                $tandaTangan = TandaTangan::find($validate['tanda_tangan_id']);
+                $tandaTangan = \App\Models\TandaTangan::find($validate['tanda_tangan_id']);
                 $data->kepala_biro = $tandaTangan?->nama;
+            } else {
+                $data->kepala_biro = $settingKeuangan && $settingKeuangan->tandaTangan ? $settingKeuangan->tandaTangan->nama : null;
             }
             $data->jenis_kelamin = Auth::user()->jenis_kelamin;
             $data->user_id      = Auth::user()->id;
             $data->save();
 
             $Nomor              = new NoSurat();
-            $Nomor->nomor      = $no_surat;
+            $Nomor->nomor = $no_surat;
             $Nomor->user_id    = Auth::user()->id;
             $Nomor->save();
 
             $log                = new LogSurat();
-            $log->nomor         = $no_surat;
+            $log->nomor = $no_surat;
             $log->nomor_surat   = $noSurat;
             $log->nama_surat = 'Surat Keterangan Administrasi Keuangan';
             $log->user_id = Auth::user()->id;
@@ -171,6 +201,17 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
             ], 404);
         }
 
+        
+        $nomorStr = $data->nomor_surat ?? $data->nomor ?? null;
+        if ($nomorStr) {
+            $parts = explode('/', $nomorStr);
+            $firstPart = $parts[0];
+            if (strpos($firstPart, '-') !== false) {
+                $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+            }
+            $data->no_surat = trim($firstPart);
+        }
+
         return response()->json([
             'status' => true,
             'data' => $data,
@@ -183,7 +224,8 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
         Log::info($request->all());
         try {
             $validator = Validator::make($request->all(), [
-                'prodi_id'      => 'required|exists:prodi,id',
+                'no_surat' => 'required|string|max:255',
+'prodi_id'      => 'required|exists:prodi,id',
                 'nama_mhs'      => 'required|string|max:255',
                 'tempat_lahir'  => 'required|string|max:100',
                 'tanggal_lahir' => 'required|date',
@@ -210,10 +252,13 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
                 return response()->json([
                     'status' => false,
                     'message' => 'Data tidak ditemukan'
-                ]);
+                ], 404);
             }
 
+            $oldDriveFileId = $data->drive_file_id;
 
+            $noSurat = \App\Services\SuratService::formatNomorSurat('SKAK', $validate['no_surat'], $validate['tanggal'], $validate['prodi_id'] ?? null);
+            $data->nomor_surat = $noSurat;
             $data->prodi_id = $validate['prodi_id'];
             $data->nama_lengkap = $validate['nama_mhs'];
             $data->tempat_lahir = $validate['tempat_lahir'];
@@ -223,16 +268,69 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
             $data->alamat_rumah = $validate['alamat_rumah'];
             $data->kelas_pondok = $validate['kelas_pondok'];
             $data->tanggal = $validate['tanggal'];
+
             if (array_key_exists('tanda_tangan_id', $validate)) {
                 $data->tanda_tangan_id = $validate['tanda_tangan_id'];
                 if (!empty($validate['tanda_tangan_id'])) {
-                    $tandaTangan = TandaTangan::find($validate['tanda_tangan_id']);
+                    $tandaTangan = \App\Models\TandaTangan::find($validate['tanda_tangan_id']);
                     $data->kepala_biro = $tandaTangan?->nama;
                 }
+            } else if (empty($data->tanda_tangan_id)) {
+                $settingKeuangan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'kepala_biro_keuangan')->first();
+                if ($settingKeuangan) {
+                    $data->tanda_tangan_id = $settingKeuangan->tanda_tangan_id;
+                    $data->kepala_biro = $settingKeuangan->tandaTangan ? $settingKeuangan->tandaTangan->nama : null;
+                }
             }
+
             $data->jenis_kelamin = Auth::user()->jenis_kelamin;
             $data->user_id      = Auth::user()->id;
+
+            // Delete old file from Google Drive if exists
+            if (!empty($oldDriveFileId)) {
+                \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
+            }
+
+            $data->drive_file_id = null;
+            $data->drive_link = null;
+            $data->status = 'pending';
             $data->save();
+
+            // Re-fetch record with joins to build the new PDF
+            $refetched = SuratKeteranganAdministrasiKeuangan::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_administrasi_keuangan.prodi_id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_keterangan_administrasi_keuangan.tanda_tangan_id')
+                ->select(
+                    'surat_keterangan_administrasi_keuangan.*',
+                    'prodi.nama as nama_prodi',
+                    'prodi.alias as alias_prodi',
+                    'fakultas.nama as fakultas',
+                    'tanda_tangan.nama as nama_ttd',
+                    'tanda_tangan.gambar as ttd',
+                )
+                ->where('surat_keterangan_administrasi_keuangan.id', $data->id)
+                ->first();
+
+            if ($refetched) {
+                $pdfData = $this->buildPdfData($refetched);
+                $pdf = Pdf::loadView('pdf.administrasi_keuangan', $pdfData)->setPaper('a4', 'portrait');
+
+                $fileName = 'surat_keterangan_administrasi_keuangan_' . $refetched->nim . '.pdf';
+                $directory = base_path('../public_html/pdf');
+
+                if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+                }
+
+                $path = $directory . '/' . $fileName;
+                $pdf->save($path);
+
+                $refetched->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan Administrasi Keuangan';
+                UploudSuratToDrive::dispatch($refetched->id, $nameTable, $refetched->nama_prodi, SuratKeteranganAdministrasiKeuangan::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -275,8 +373,9 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
 
     public function downloadPdf($id)
     {
-        Log::info('masuk.....');
-        Log::info($id);
+        ini_set('memory_limit', '512M');
+        ini_set('max_execution_time', '300');
+
         try {
             $data = SuratKeteranganAdministrasiKeuangan::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_administrasi_keuangan.prodi_id')
                 ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
@@ -299,51 +398,24 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
                     'message' => 'Data tidak ditemukan'
                 ], 404);
             }
-            Log::info($data);
-            $kopPath = base_path('../public_html/img/kop.jpg');
-            $kopBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath));
 
-            // Get ttd from tanda_tangan table
-            $tddPath = base_path('../public_html/' . $data->ttd);
-            $stempelPath = base_path('../public_html/img/stempel.png');
-            $stempelBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($stempelPath));
-            $tddBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tddPath));
-            $pdfData = [
-                'nomor_surat' => $data->nomor_surat,
-                'nama' => $data->nama_lengkap,
-                'tempat_lahir' => $data->tempat_lahir,
-                'tanggal_lahir' => Carbon::parse($data->tanggal_lahir)->translatedFormat('d F Y'),
-                'nim' => $data->nim,
-                'fakultas' => $data->fakultas ?? '-',
-                'prodi' => $data->prodi_mhs ?? '-',
-                'alamat' => $data->alamat_rumah,
-                'kelas' => $data->kelas_pondok,
-                'tanggal_surat' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
-                'nama_penandatangan' => $data->nama_ttd ?? $data->kepala_biro,
-                'jabatan_penandatangan' => 'Kepala Biro',
-                'kopBase64' => $kopBase64,
-                'ttd' => $tddBase64,
-                'stempel' => $stempelBase64,
-            ];
+            $pdfData = $this->buildPdfData($data);
 
-            $pdf = Pdf::loadView('pdf.administrasi_keuangan', $pdfData)
-                ->setPaper('a4', 'portrait');
-            // Log::info('pdf');
+            $pdf = Pdf::loadView('pdf.administrasi_keuangan', $pdfData)->setPaper('a4', 'portrait');
+
             $fileName = 'surat_keterangan_administrasi_keuangan_' . $data->nim . '.pdf';
+            $directory = base_path('../public_html/pdf');
 
-            $directory = base_path('../public_html/pdf/');
-
-            if (!file_exists($directory)) {
-                mkdir($directory, 0755, true);
+            if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
             }
 
-            $path = $directory . $fileName;
+            $path = $directory . '/' . $fileName;
             $pdf->save($path);
 
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Keterangan Administrasi Keuangan';
-
             $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
 
             if (!Storage::disk('google')->exists($googlePath)) {
@@ -355,11 +427,46 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
-            Log::info($th->getMessage());
+            Log::error((string) $th);
             return response()->json([
                 'status' => false,
-                'message' => 'Data gagal diunduh'
-            ]);
+                'message' => 'Gagal mengunduh PDF: Terjadi kesalahan pada server'
+            ], 500);
         }
+    }
+
+    private function buildPdfData($data)
+    {
+        $settingKeuangan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'kepala_biro_keuangan')->first();
+        $namaKetua = $settingKeuangan && $settingKeuangan->tandaTangan ? $settingKeuangan->tandaTangan->nama : ($data->nama_ttd ?? $data->kepala_biro);
+        $ttdKetua = $settingKeuangan && $settingKeuangan->tandaTangan ? $settingKeuangan->tandaTangan->gambar : $data->ttd;
+        $namaJabatan = $settingKeuangan ? $settingKeuangan->nama_jabatan : 'Kepala Biro Administrasi Keuangan';
+
+        $kopPath = base_path('../public_html/img/kop.jpg');
+        $kopBase64 = SuratService::getBase64Image($kopPath);
+
+        $tddPath = base_path('../public_html/' . $ttdKetua);
+        $tddBase64 = SuratService::getBase64Image($tddPath);
+
+        $stempelPath = base_path('../public_html/img/stempel.png');
+        $stempelBase64 = SuratService::getBase64Image($stempelPath);
+
+        return [
+            'nomor_surat' => $data->nomor_surat,
+            'nama' => $data->nama_lengkap,
+            'tempat_lahir' => $data->tempat_lahir,
+            'tanggal_lahir' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_lahir),
+            'nim' => $data->nim,
+            'fakultas' => $data->fakultas ?? '-',
+            'prodi' => $data->prodi_mhs ?? '-',
+            'alamat' => $data->alamat_rumah,
+            'kelas' => $data->kelas_pondok,
+            'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+            'nama_penandatangan' => $namaKetua,
+            'jabatan_penandatangan' => $namaJabatan,
+            'kopBase64' => $kopBase64,
+            'ttd' => $tddBase64,
+            'stempel' => $stempelBase64,
+        ];
     }
 }

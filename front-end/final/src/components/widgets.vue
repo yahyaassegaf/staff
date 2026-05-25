@@ -53,7 +53,6 @@ onMounted(() => {
         selector: '#sales-locations',
         markersSelectable: true,
         onMarkerSelected(index: number, isSelected: boolean, selectedMarkers: any[]) {
-            console.log(index, isSelected, selectedMarkers);
         },
         labels: {
             markers: {

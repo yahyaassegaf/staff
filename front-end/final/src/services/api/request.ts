@@ -16,7 +16,6 @@ export async function apiGet(
             data : response.data
         } 
   } catch (error: any) {
-    console.error("GET Error:", error);
     if (error.response?.status === 401) {
         return { success: false, error: 'Unauthorized' };
     }
@@ -37,7 +36,6 @@ export async function apiPdf(
 
     return response;
   } catch (error) {
-    console.error("GET Error:", error);
     throw error; // 🔥 biar catch di pemanggil
   }
 }
@@ -52,7 +50,6 @@ export async function apiPost(url: string, params?:Object) {
             data : response.data
         }
     } catch (error: any) {
-        console.error("POST Error:", error);
         if (error.response?.status === 401) {
             return { success: false, error: 'Unauthorized' };
         }
@@ -68,7 +65,6 @@ export async function apiPut(url: string, params?:Object) {
             data : response.data
         }
     } catch (error) {
-         console.error("GET Error:", error);
         return { success: false, error };
     }
 }
@@ -81,7 +77,6 @@ export async function apiDelete(url: string, params?:Object) {
             data : response.data
         }
     } catch (error) {
-         console.error("GET Error:", error);
         return { success: false, error };
     }
 }

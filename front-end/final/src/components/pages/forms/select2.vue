@@ -40,10 +40,8 @@ export default {
     },
     methods: {
         myChangeEvent(val) {
-            console.log(val);
         },
         mySelectEvent(selectedOption1) {
-            console.log(selectedOption1);
         }
     },
     setup() {
@@ -69,7 +67,6 @@ export default {
         };
 
         const handleChange = (value) => {
-            console.log(value);
         };
 
         return {

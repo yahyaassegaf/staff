@@ -42,7 +42,6 @@ async function getProdi() {
       }
     }
   } catch (error) {
-    console.log(error);
   }
 }
 
@@ -54,7 +53,6 @@ async function getUsers() {
       userOptions.value = response.data.data.data || response.data.data || [];
     }
   } catch (error) {
-    console.log(error);
   } finally {
     loadingUsers.value = false;
   }

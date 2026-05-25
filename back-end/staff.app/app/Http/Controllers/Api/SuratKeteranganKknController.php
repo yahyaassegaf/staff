@@ -39,6 +39,7 @@ class SuratKeteranganKknController extends Controller
             'surat_keterangan_kkn.kelas_pondok',
             'surat_keterangan_kkn.tanggal',
             'surat_keterangan_kkn.drive_file_id',
+            'surat_keterangan_kkn.drive_link',
             'surat_keterangan_kkn.status',
             'surat_keterangan_kkn.created_at',
             'surat_keterangan_kkn.updated_at',
@@ -95,6 +96,7 @@ class SuratKeteranganKknController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'nullable|exists:prodi,id',
+                'no_surat' => 'required|string|max:255',
                 'ketua' => 'nullable|string|max:255',
                 'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
                 'nama_mhs' => 'required|string|max:255',
@@ -119,8 +121,7 @@ class SuratKeteranganKknController extends Controller
             Log::info($validate);
 
             $login = $validate['prodi_mhs'];
-            $no = NoSurat::orderByDesc('id')->value('nomor') ?? 0;
-            $no_surat = str_pad($no + 1, 3, '0', STR_PAD_LEFT);
+            $no_surat = $validate['no_surat'];
 
             // Reusing the service method as per previous controller patterns
             $noSurat = SuratService::NoSuratKeteranganTasmaKknPpl($no_surat);
@@ -144,12 +145,12 @@ class SuratKeteranganKknController extends Controller
             $skk->save();
 
             $Nomor                = new NoSurat();
-            $Nomor->nomor         = $no_surat;
+            $Nomor->nomor = $no_surat;
             $Nomor->user_id       = Auth::user()->id;
             $Nomor->save();
 
             $log                  = new LogSurat();
-            $log->nomor         = $no_surat;
+            $log->nomor = $no_surat;
             $log->nomor_surat   = $noSurat;
             $log->nama_surat    = 'Surat Keterangan KKN';
             $log->user_id       = Auth::user()->id;
@@ -188,6 +189,17 @@ class SuratKeteranganKknController extends Controller
             ], 404);
         }
 
+
+        $nomorStr = $skk->nomor_surat ?? $skk->nomor ?? null;
+        if ($nomorStr) {
+            $parts = explode('/', $nomorStr);
+            $firstPart = $parts[0];
+            if (strpos($firstPart, '-') !== false) {
+                $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+            }
+            $skk->no_surat = trim($firstPart);
+        }
+
         return response()->json([
             'status' => true,
             'data' => $skk,
@@ -200,6 +212,7 @@ class SuratKeteranganKknController extends Controller
         Log::info($request->all());
         try {
             $validator = Validator::make($request->all(), [
+                'no_surat' => 'required|string|max:255',
                 'prodi_id' => 'nullable|exists:prodi,id',
                 'ketua' => 'nullable|string|max:255',
                 'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
@@ -231,6 +244,11 @@ class SuratKeteranganKknController extends Controller
                 ], 404);
             }
 
+            $oldDriveFileId = $skk->drive_file_id;
+
+            $noSurat = \App\Services\SuratService::NoSuratKeteranganTasmaKknPpl($validate['no_surat']);
+            $skk->nomor_surat = $noSurat;
+
             $skk->prodi_id = $validate['prodi_id'] ?? $skk->prodi_id;
             $skk->ketua = $validate['ketua'] ?? null;
             $skk->tanda_tangan_id = $validate['tanda_tangan_id'] ?? null;
@@ -244,6 +262,80 @@ class SuratKeteranganKknController extends Controller
             $skk->kelas_pondok = $validate['kelas_pondok'];
             $skk->tanggal = $validate['tanggal'];
             $skk->save();
+
+            // Delete old file from Google Drive if exists
+            if (!empty($oldDriveFileId)) {
+                \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
+            }
+
+            $skk->update([
+                'drive_file_id' => null,
+                'drive_link' => null,
+                'status' => 'pending'
+            ]);
+
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratKeteranganKkn::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_kkn.prodi_id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
+                ->select(
+                    'fakultas.nama as fakultas',
+                    'surat_keterangan_kkn.*',
+                    'prodi.nama as nama_prodi',
+                    'prodi.alias as alias_prodi',
+                    'tanda_tangan.gambar as ttd',
+                    'tanda_tangan.nama as ttd_nama'
+                )
+                ->where('surat_keterangan_kkn.id', $skk->id)
+                ->first();
+
+            if ($data) {
+                $tddPath = base_path('../public_html/' . $data->ttd);
+                $tddBase64 = SuratService::getBase64Image($tddPath);
+
+                $kopPath = base_path('../public_html/img/kop.jpg');
+                $kopBase64 = SuratService::getBase64Image($kopPath);
+
+                $stempPath = base_path('../public_html/img/stempel.png');
+                $stempBase64 = SuratService::getBase64Image($stempPath);
+
+                $pdfData = [
+                    'nomor_surat' => $data->nomor_surat,
+                    'ketua' => $data->ttd_nama,
+                    'nama' => $data->nama_lengkap,
+                    'tempat_lahir' => $data->tempat_lahir,
+                    'tanggal_lahir' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_lahir),
+                    'nim' => $data->nim,
+                    'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+                    'fakultas' => $data->fakultas,
+                    'prodi' => $data->prodi_mhs,
+                    'alamat' => $data->alamat_rumah,
+                    'kelas' => $data->kelas_pondok,
+                    'jenis_kelamin' => $data->jenis_kelamin,
+                    'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+                    'kopBase64' => $kopBase64,
+                    'ttd' => $tddBase64,
+                    'stempel' => $stempBase64,
+                ];
+
+                $pdf = Pdf::loadView('pdf.kkn', $pdfData)->setPaper('a4', 'portrait');
+
+                $fileName = 'surat_keterangan_kkn_' . $data->nim . '.pdf';
+                $directory = base_path('../public_html/pdf/');
+
+                if (!file_exists($directory)) {
+                    mkdir($directory, 0755, true);
+                }
+
+                $path = $directory . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan KKN';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->nama_prodi, SuratKeteranganKkn::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -294,7 +386,7 @@ class SuratKeteranganKknController extends Controller
                 ->select(
                     'fakultas.nama as fakultas',
                     'surat_keterangan_kkn.*',
-                    'prodi.nama as prodi',
+                    'prodi.nama as nama_prodi',
                     'prodi.alias as alias_prodi',
                     'tanda_tangan.gambar as ttd',
                     'tanda_tangan.nama as ttd_nama',
@@ -309,27 +401,28 @@ class SuratKeteranganKknController extends Controller
                 ], 404);
             }
             $tddPath = base_path('../public_html/' . $data->ttd);
+            $tddBase64 = SuratService::getBase64Image($tddPath);
 
-            $tddBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tddPath));
             $kopPath = base_path('../public_html/img/kop.jpg');
-            $kopBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath));
+            $kopBase64 = SuratService::getBase64Image($kopPath);
+
             $stempPath = base_path('../public_html/img/stempel.png');
-            $stempBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($stempPath));
+            $stempBase64 = SuratService::getBase64Image($stempPath);
 
             $pdfData = [
                 'nomor_surat' => $data->nomor_surat,
                 'ketua' => $data->ttd_nama,
                 'nama' => $data->nama_lengkap,
                 'tempat_lahir' => $data->tempat_lahir,
-                'tanggal_lahir' => Carbon::parse($data->tanggal_lahir)->translatedFormat('d F Y'),
+                'tanggal_lahir' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_lahir),
                 'nim' => $data->nim,
-                'tanggal' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
+                'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
                 'fakultas' => $data->fakultas,
-                'prodi' => $data->prodi_mahasiswa,
+                'prodi' => $data->prodi_mhs,
                 'alamat' => $data->alamat_rumah,
                 'kelas' => $data->kelas_pondok,
                 'jenis_kelamin' => $data->jenis_kelamin,
-                'tanggal_surat' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
+                'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
                 'kopBase64' => $kopBase64,
                 'ttd' => $tddBase64,
                 'stempel' => $stempBase64,
@@ -353,10 +446,10 @@ class SuratKeteranganKknController extends Controller
 
             $nameTable = 'Surat Keterangan KKN';
 
-            $googlePath = $data->prodi . '/' . $nameTable . '/' . $fileName;
+            $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
 
             if (!Storage::disk('google')->exists($googlePath)) {
-                UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi, SuratKeteranganKkn::class);
+                UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganKkn::class);
             }
 
             return response($pdf->output(), 200, [

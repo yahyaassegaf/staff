@@ -159,6 +159,8 @@ class HasilRapatController extends Controller
             $hasilRapat = HasilRapat::find($id);
             if (!$hasilRapat) return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
 
+            $oldDriveFileId = $hasilRapat->drive_file_id;
+
             $validator = Validator::make($request->all(), [
                 'agenda' => 'required|string|max:255',
                 'tanggal' => 'required|date',
@@ -184,7 +186,6 @@ class HasilRapatController extends Controller
             $hasilRapat->tempat = $validate['tempat'] ?? null;
             $hasilRapat->pembahasan = $validate['pembahasan'] ?? null;
             $hasilRapat->user_id = Auth::user()->id;
-            $hasilRapat->save();
 
             if (!empty($validate['anggota_ids'])) {
                 AnggotaRapat::where('hasil_rapat_id', $id)->delete();
@@ -196,7 +197,50 @@ class HasilRapatController extends Controller
                 }
             }
 
+            // Delete old file from Google Drive if exists
+            if (!empty($oldDriveFileId)) {
+                \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
+            }
+
+            $hasilRapat->drive_file_id = null;
+            $hasilRapat->drive_link = null;
+            $hasilRapat->status = 'pending';
+            $hasilRapat->save();
+
             DB::commit();
+
+            // Re-fetch record with joins to build the new PDF
+            $data = HasilRapat::with(['prodi'])->find($id);
+            if ($data) {
+                $anggota = AnggotaRapat::with('user')->where('hasil_rapat_id', $id)->get();
+                $kopPath = base_path('../public_html/img/kop.jpg');
+                $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
+
+                $pdfData = [
+                    'nomor_surat' => $data->nomor_surat,
+                    'agenda' => $data->agenda,
+                    'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+                    'waktu' => $data->waktu,
+                    'tempat' => $data->tempat,
+                    'pembahasan' => $data->pembahasan,
+                    'anggota' => $anggota,
+                    'kopBase64' => $kopBase64,
+                ];
+
+                $pdf = Pdf::loadView('pdf.v_hasil_rapat', $pdfData)->setPaper('a4', 'portrait');
+                $fileName = 'hasil_rapat_' . str_replace('/', '_', $data->nomor_surat) . '.pdf';
+                $directory = base_path('../public_html/pdf/');
+                if (!file_exists($directory)) mkdir($directory, 0755, true);
+
+                $path = $directory . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Hasil Rapat';
+                $prodiName = $data->prodi->nama ?? 'Umum';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $prodiName, HasilRapat::class);
+            }
             return response()->json(['status' => true, 'message' => 'Data berhasil diupdate']);
         } catch (\Throwable $th) {
             DB::rollBack();
@@ -220,12 +264,12 @@ class HasilRapatController extends Controller
 
             $anggota = AnggotaRapat::with('user')->where('hasil_rapat_id', $id)->get();
             $kopPath = base_path('../public_html/img/kop.jpg');
-            $kopBase64 = file_exists($kopPath) ? 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath)) : null;
+            $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
 
             $pdfData = [
                 'nomor_surat' => $data->nomor_surat,
                 'agenda' => $data->agenda,
-                'tanggal' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
+                'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
                 'waktu' => $data->waktu,
                 'tempat' => $data->tempat,
                 'pembahasan' => $data->pembahasan,

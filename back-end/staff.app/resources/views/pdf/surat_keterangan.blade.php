@@ -145,22 +145,24 @@
                     <!-- AREA TTD (OVERLAY AMAN) -->
                     <table width="100%" cellpadding="0" cellspacing="0"
                         style="
-                        margin: 0;
+                        margin-top: -15px;
+                        margin-bottom: -20px;
                         padding: 0;
                         line-height: 0;">
                         <tr>
                             <td style="
+                                height: 125px;
                                 text-align:center;
                                 vertical-align:middle;
                                 padding: 0;
                                 margin: 0;
                                 line-height: 0;
-                                background-image: url('{{ $stempel }}');
+                                /* background-image: url('{{ $stempel }}'); */
                                 background-repeat: no-repeat;
                                 background-position: 20% 50%;
-                                background-size: 100px 100px;
+                                background-size: 115px 115px;
                             ">
-                                <img src="{{ $ttd }}" style="width:220px;">
+                                <!-- <img src="{{ $ttd }}" style="width:240px;"> -->
                             </td>
                         </tr>
                     </table>

@@ -33,7 +33,6 @@ async function fetchLists() {
       }
     }
   } catch (error) {
-    console.error("Error fetching form lists:", error);
   } finally {
     loadingLists.value = false;
   }

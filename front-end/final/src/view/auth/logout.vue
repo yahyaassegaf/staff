@@ -13,7 +13,6 @@ export default defineComponent({
         await logoutUser();
         router.push("/");
       } catch (error) {
-        console.error("Logout error:", error);
         router.push("/");
       }
     };

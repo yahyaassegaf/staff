@@ -47,7 +47,6 @@ export default defineComponent({
           levels.value = Array.isArray(data) ? data : [data];
         }
       } catch (error) {
-        console.error("Error fetching levels:", error);
       }
     }
 
@@ -63,7 +62,6 @@ export default defineComponent({
           }
         }
       } catch (error) {
-        console.error("Error fetching prodi:", error);
       }
     }
 
@@ -88,7 +86,6 @@ export default defineComponent({
           toast.error("Gagal memuat profil");
         }
       } catch (error) {
-        console.error("Error fetching profile:", error);
         toast.error("Terjadi kesalahan saat memuat profil");
       } finally {
         loading.value = false;
@@ -129,7 +126,6 @@ export default defineComponent({
           );
         }
       } catch (error) {
-        console.error("Error uploading image:", error);
         toast.error("Terjadi kesalahan saat mengunggah foto");
       } finally {
         uploading.value = false;
@@ -184,7 +180,6 @@ export default defineComponent({
           toast.error(errorMessage);
         }
       } catch (error) {
-        console.error("Error submitting profile update:", error);
         toast.error("Terjadi kesalahan saat mengupdate profile");
       } finally {
         loading.value = false;

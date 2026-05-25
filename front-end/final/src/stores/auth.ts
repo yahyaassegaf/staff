@@ -38,7 +38,6 @@ export const useAuthStore = defineStore('auth', {
           auth = await apiPost('/login', { username, password });
           break;
         } catch (error: any) {
-          console.warn(`Login attempt ${retryCount + 1} failed:`, error.message);
           if (retryCount === maxRetries) {
             auth = { success: false };
             break;
@@ -51,7 +50,6 @@ export const useAuthStore = defineStore('auth', {
       if (auth.success) {
 
         const token = auth.data.token;
-        console.log(token);
         localStorage.setItem('token', token); // Store token in localStorage
         this.authenticated = true;
         this.loading = false;
@@ -76,7 +74,6 @@ export const useAuthStore = defineStore('auth', {
         sessionStorage.clear();
         this.authenticated = false;
       } catch (error) {
-        console.error('Logout API error:', error);
         // Force logout even if API fails
         localStorage.clear();
         sessionStorage.clear();

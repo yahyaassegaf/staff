@@ -166,11 +166,6 @@
                 <td>{{ $nik_ortu }}</td>
             </tr>
             <tr>
-                <td>NIP</td>
-                <td>:</td>
-                <td>{{ $nip_ortu }}</td>
-            </tr>
-            <tr>
                 <td>Alamat</td>
                 <td>:</td>
                 <td>{{ $alamat_ortu }}</td>
@@ -193,28 +188,28 @@
                 <td width="60%"></td>
                 <td width="40%" class="text-center">
                     Bangil, {{ $tanggal_surat }}<br>
-                    Kepala Prodi {{ $prodi_mhs }}<br>
+                    Dekan Fakultas {{ $fakultas }}<br>
 
-                    <table width="100%" cellpadding="0" cellspacing="0">
+                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -20px; margin-bottom: -25px;">
                         <tr>
                             <td style="
-                                height:70px;
+                                height:115px;
                                 text-align:center;
                                 vertical-align:middle;
-                                background-image: url('{{ $stempel }}');
+                                /* background-image: url('{{ $stempel }}'); */
                                 background-repeat: no-repeat;
-                                background-position: 20% 60%;
-                                background-size: 90px 90px;
+                                background-position: 20% 50%;
+                                background-size: 110px 110px;
                             ">
-                                <img src="{{ $ttd }}" style="width:250px;">
+                                <!-- <img src="{{ $ttd }}" style="width:280px;"> -->
                             </td>
                         </tr>
                     </table>
 
                     <div class="nama-ttd" style="margin-top:4px;">
-                        <strong style="text-decoration: underline;">{{ $nama_kepala_prodi }}</strong>
+                        <strong style="text-decoration: underline;">{{ $dekan }}</strong>
                     </div>
-                    NIY: {{ $nidn_kepala_prodi }}
+                    <!-- NIY: {{ $nidn_dekan }} -->
                 </td>
             </tr>
         </table>

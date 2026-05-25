@@ -53,7 +53,6 @@ export default defineComponent({
           listProdi.value = Array.isArray(data) ? data : [data];
         }
       } catch (error) {
-        console.log(error);
       }
     }
 
@@ -82,7 +81,6 @@ export default defineComponent({
 
         total.value = response.data.data.total;
       } catch (error) {
-        console.log(error);
       } finally {
         loading.value = false;
       }
@@ -95,7 +93,6 @@ export default defineComponent({
     }
 
     function edit(params: any) {
-      console.log(params.id);
       router.push(`/sklmk/edit/${params.id}`);
     }
 
@@ -121,7 +118,6 @@ export default defineComponent({
           });
         }
       } catch (error) {
-        console.log(error);
         toast.error("Terjadi kesalahan saat menghapus fakultas", {
           theme: "auto",
           icon: true,
@@ -146,7 +142,6 @@ export default defineComponent({
 
         openFileExport(res.data);
       } catch (error) {
-        console.log(error);
         toast.error("Gagal mengunduh file PDF", {
           theme: "auto",
           icon: true,
@@ -303,13 +298,14 @@ export default defineComponent({
             >
               <i class="ri-edit-line"></i>
             </button>
-            <button
+            <!-- Delete button disabled as requested -->
+            <!-- <button
               class="btn btn-sm btn-icon btn-danger-light btn-wave"
               title="Hapus"
               @click="remove(item)"
             >
               <i class="ri-delete-bin-line"></i>
-            </button>
+            </button> -->
           </div>
         </template>
       </EasyDataTable>

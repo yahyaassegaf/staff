@@ -17,11 +17,15 @@ export default defineComponent({
     const errors = ref<any>({});
     const suratData = ref({
       id: "",
+      no_surat: "",
       nomor: "",
       prodi_id: "",
       th_akademik_id: null as null | number,
       nama: "",
       tanggal_lahir: "",
+      tempat_lahir: "",
+      alamat: "",
+      universitas_tujuan: "",
       nim: "",
       jurusan_prodi: "",
       semester: "",
@@ -39,6 +43,7 @@ export default defineComponent({
           const data = response.data.data;
           suratData.value = {
             id: data.id,
+            no_surat: data.no_surat || data.nomor_surat || data.nomor || "",
             nomor: data.nomor || "",
             prodi_id: data.prodi_id || "",
             th_akademik_id: data.th_akademik_id
@@ -48,6 +53,9 @@ export default defineComponent({
             tanggal_lahir: data.tanggal_lahir
               ? data.tanggal_lahir.slice(0, 10)
               : "",
+            tempat_lahir: data.tempat_lahir || "",
+            alamat: data.alamat || "",
+            universitas_tujuan: data.universitas_tujuan || "",
             nim: data.nim || "",
             jurusan_prodi: data.jurusan_prodi || "",
             semester: data.semester || "",

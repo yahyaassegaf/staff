@@ -90,7 +90,7 @@ function onInput(e: Event) {
   inputValue.value = val;
   emit('update:modelValue', val);
   // debug sementara:
-  // console.log('PasswordInput emitted:', val);
+
 }
 
 const changeInputType = () => {

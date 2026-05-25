@@ -46,7 +46,6 @@ export default defineComponent({
           sortType: serverOptions.value.sortType,
           search: searchValue.value,
         });
-        console.log(response.data.data);
 
         const rows = Array.isArray(response.data.data.data)
           ? response.data.data.data
@@ -60,18 +59,14 @@ export default defineComponent({
         }));
 
         total.value = response.data.data.total;
-        console.log("total data ", total.value);
 
-        console.log("ITEMS:", items.value);
       } catch (error) {
-        console.log(error);
       } finally {
         loading.value = false;
       }
     }
 
     function edit(params: any) {
-      console.log(params);
       router.push(`/prodi/edit/${params.id}`);
     }
 
@@ -97,7 +92,6 @@ export default defineComponent({
           });
         }
       } catch (error) {
-        console.log(error);
         toast.error("Terjadi kesalahan saat menghapus prodi", {
           theme: "auto",
           icon: true,

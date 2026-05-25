@@ -1,4 +1,5 @@
 <script lang="ts">
+import Swal from "sweetalert2";
 import { onMounted, ref, watch } from "vue";
 import { defineComponent } from "vue";
 import type { ServerOptions } from "vue3-easy-data-table";
@@ -20,13 +21,13 @@ export default defineComponent({
     const searchValue = ref("");
     const total = ref(0);
     const headers = [
-      { text: "No", value: "no", sortable: false },
-      { text: "NIM", value: "nim", sortable: true },
-      { text: "Nama Lengkap", value: "nama_lengkap", sortable: true },
-      { text: "Nama Prodi", value: "nama_prodi", sortable: true },
-      { text: "Kelas Pondok", value: "kelas_pondok", sortable: true },
-      { text: "URL", value: "drive_link", sortable: false },
-      { text: "Action", value: "action", sortable: false },
+      { text: "No", value: "no", sortable: false, width: 50 },
+      { text: "NIM", value: "nim", sortable: true, width: 200 },
+      { text: "Nama Lengkap", value: "nama_lengkap", sortable: true, width: 250 },
+      { text: "Nama Prodi", value: "nama_prodi", sortable: true, width: 200 },
+      { text: "Kelas Pondok", value: "kelas_pondok", sortable: true, width: 200 },
+      { text: "URL", value: "drive_link", sortable: false, width: 100 },
+      { text: "Action", value: "action", sortable: false, width: 150 },
     ];
 
     const serverOptions = ref<ServerOptions>({
@@ -49,7 +50,6 @@ export default defineComponent({
           listProdi.value = Array.isArray(data) ? data : [data];
         }
       } catch (error) {
-        console.log(error);
       }
     }
 
@@ -80,7 +80,6 @@ export default defineComponent({
 
         total.value = respData.data.total;
       } catch (error) {
-        console.log(error);
       } finally {
         loading.value = false;
       }
@@ -97,7 +96,18 @@ export default defineComponent({
     }
 
     async function remove(params: any) {
-      if (!confirm("Are you sure you want to delete this item?")) return;
+      
+      Swal.fire({
+        title: "Apakah anda yakin?",
+        text: "Data yang dihapus tidak dapat dikembalikan!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#d33",
+        confirmButtonText: "Ya, hapus!",
+        cancelButtonText: "Batal",
+      }).then(async (result) => {
+        if (result.isConfirmed) {
       try {
         const response = await apiDelete("/skukd/" + params.id);
         if (response.data.status || response.success) {
@@ -119,7 +129,6 @@ export default defineComponent({
           });
         }
       } catch (error) {
-        console.log(error);
         toast.error("Terjadi kesalahan saat menghapus data", {
           theme: "auto",
           icon: true,
@@ -128,6 +137,8 @@ export default defineComponent({
           position: "top-right",
         });
       }
+        }
+      });
     }
 
     watch([searchValue, prodiFilter], () => {
@@ -142,10 +153,8 @@ export default defineComponent({
           { responseType: "blob" }
         );
 
-        console.log(res.data);
         openFileExport(res.data);
       } catch (error) {
-        console.log(error);
         toast.error("Gagal mengunduh file PDF", {
           theme: "auto",
           icon: true,
@@ -252,6 +261,8 @@ export default defineComponent({
 
       <EasyDataTable
         class="table text-nowrap"
+        table-class-name="text-nowrap"
+        table-min-width="1200"
         :headers="headers"
         :items="items"
         border-cell
@@ -302,13 +313,14 @@ export default defineComponent({
             >
               <i class="ri-edit-line"></i>
             </button>
-            <button
+            <!-- Delete button disabled as requested -->
+            <!-- <button
               class="btn btn-sm btn-icon btn-danger-light btn-wave"
               title="Hapus"
               @click="remove(item)"
             >
               <i class="ri-delete-bin-line"></i>
-            </button>
+            </button> -->
           </div>
         </template>
       </EasyDataTable>
@@ -324,5 +336,18 @@ export default defineComponent({
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+:deep(.vue3-easy-data-table) {
+  max-width: 100% !important;
+}
+
+:deep(.vue3-easy-data-table__main) {
+  overflow-x: auto !important;
+  max-width: 100% !important;
+}
+
+:deep(.vue3-easy-data-table__main table) {
+  min-width: 1200px !important;
 }
 </style>

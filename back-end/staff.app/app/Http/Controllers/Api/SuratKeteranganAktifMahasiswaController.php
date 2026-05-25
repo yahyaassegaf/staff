@@ -78,7 +78,7 @@ class SuratKeteranganAktifMahasiswaController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required|exists:prodi,id',
-                'th_akademik_id' => 'nullable|exists:th_akademik,id',
+                'no_surat' => 'required|string|max:255',
                 'nama_mhs' => 'required|string|max:255',
                 'nim' => 'required|string|max:255',
                 'nik' => 'nullable|string|max:255',
@@ -86,10 +86,9 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 'tanggal_lahir' => 'required|date',
                 'prodi_mhs' => 'required|string|max:255',
                 'semester' => 'required|string|max:50',
-                'tahun_akademik' => 'nullable|string|max:100',
+                'tahun_akademik' => 'required|string|max:100',
                 'nama_ortu' => 'required|string|max:255',
                 'nik_ortu' => 'nullable|string|max:255',
-                'nip_ortu' => 'nullable|string|max:255',
                 'alamat_ortu' => 'required|string',
                 'hp_ortu' => 'nullable|string|max:50',
                 'tanggal' => 'required|date',
@@ -105,20 +104,14 @@ class SuratKeteranganAktifMahasiswaController extends Controller
 
             $validate = $validator->validated();
 
-            // $login = Auth::user()->prodi ? Auth::user()->prodi->alias : 'UMUM';
-            $login = $request->prodi_mhs;
-            $no = NoSurat::orderByDesc('id')->value('nomor') ?? 0;
-            $no_surat = str_pad($no + 1, 3, '0', STR_PAD_LEFT);
+            $no_surat = $validate['no_surat'];
 
-            // $unit = 'K.' . strtoupper($login);
-            $unit = 'K.' . strtoupper($login);
-
-            $noSurat = SuratService::NoSuratKeteranganAktifMahasiswa($no_surat, $unit);
+            $noSurat = SuratService::formatNomorSurat('SKAM', $no_surat, $validate['tanggal'], $validate['prodi_id']);
 
             $skam = new SuratKeteranganAktifMahasiswa();
             $skam->nomor_surat = $noSurat;
             $skam->prodi_id = $validate['prodi_id'];
-            $skam->th_akademik_id = $validate['th_akademik_id'] ?? null;
+            $skam->th_akademik_id = null;
             $skam->nama_lengkap = $validate['nama_mhs'];
             $skam->nim = $validate['nim'];
             $skam->nik = $validate['nik'] ?? null;
@@ -126,16 +119,10 @@ class SuratKeteranganAktifMahasiswaController extends Controller
             $skam->tanggal_lahir = $validate['tanggal_lahir'];
             $skam->prodi_mhs = $validate['prodi_mhs'];
             $skam->semester = $validate['semester'];
-            // Set tahun_akademik from th_akademik if provided
-            if (!empty($validate['th_akademik_id'])) {
-                $thAkademik = ThAkademik::find($validate['th_akademik_id']);
-                $skam->tahun_akademik = $thAkademik ? $thAkademik->nama . ' ' . $thAkademik->semester : $validate['tahun_akademik'];
-            } else {
-                $skam->tahun_akademik = $validate['tahun_akademik'] ?? '';
-            }
+            $skam->tahun_akademik = $validate['tahun_akademik'];
             $skam->nama_ortu = $validate['nama_ortu'];
             $skam->nik_ortu = $validate['nik_ortu'] ?? null;
-            $skam->nip_ortu = $validate['nip_ortu'] ?? null;
+            $skam->nip_ortu = null;
             $skam->alamat_ortu = $validate['alamat_ortu'];
             $skam->hp_ortu = $validate['hp_ortu'] ?? null;
             $skam->tanggal = $validate['tanggal'];
@@ -145,12 +132,12 @@ class SuratKeteranganAktifMahasiswaController extends Controller
             $skam->save();
 
             $Nomor              = new NoSurat();
-            $Nomor->nomor       = $no_surat;
+            $Nomor->nomor = $no_surat;
             $Nomor->user_id     = Auth::user()->id;
             $Nomor->save();
 
             $log                = new LogSurat();
-            $log->nomor         = $no_surat;
+            $log->nomor = $no_surat;
             $log->nomor_surat   = $noSurat;
             $log->nama_surat    = 'Surat Keterangan Aktif Mahasiswa';
             $log->user_id       = Auth::user()->id;
@@ -188,6 +175,17 @@ class SuratKeteranganAktifMahasiswaController extends Controller
             ], 404);
         }
 
+
+        $nomorStr = $skam->nomor_surat ?? $skam->nomor ?? null;
+        if ($nomorStr) {
+            $parts = explode('/', $nomorStr);
+            $firstPart = $parts[0];
+            if (strpos($firstPart, '-') !== false) {
+                $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+            }
+            $skam->no_surat = trim($firstPart);
+        }
+
         return response()->json([
             'status' => true,
             'data' => $skam,
@@ -200,8 +198,8 @@ class SuratKeteranganAktifMahasiswaController extends Controller
         Log::info($request->all());
         try {
             $validator = Validator::make($request->all(), [
+                'no_surat' => 'required|string|max:255',
                 'prodi_id' => 'required|exists:prodi,id',
-                'th_akademik_id' => 'nullable|exists:th_akademik,id',
                 'nama_mhs' => 'required|string|max:255',
                 'nim' => 'required|string|max:255',
                 'nik' => 'nullable|string|max:255',
@@ -209,10 +207,9 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 'tanggal_lahir' => 'required|date',
                 'prodi_mhs' => 'required|string|max:255',
                 'semester' => 'required|string|max:50',
-                'tahun_akademik' => 'nullable|string|max:100',
+                'tahun_akademik' => 'required|string|max:100',
                 'nama_ortu' => 'required|string|max:255',
                 'nik_ortu' => 'nullable|string|max:255',
-                'nip_ortu' => 'nullable|string|max:255',
                 'alamat_ortu' => 'required|string',
                 'hp_ortu' => 'nullable|string|max:50',
                 'tanggal' => 'required|date',
@@ -236,17 +233,12 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 ], 404);
             }
 
-            // Determine tahun_akademik from th_akademik if provided
-            $tahunAkademik = $validate['tahun_akademik'] ?? $skam->tahun_akademik;
-            if (!empty($request->th_akademik_id)) {
-                $thAkademik = ThAkademik::find($request->th_akademik_id);
-                $tahunAkademik = $thAkademik ? $thAkademik->nama . ' ' . $thAkademik->semester : $tahunAkademik;
-            }
+            $oldDriveFileId = $skam->drive_file_id;
 
             // Map frontend fields (if different) to database fields
             $dataToUpdate = [
                 'prodi_id'       => $validate['prodi_id'],
-                'th_akademik_id' => $request->th_akademik_id ?? $skam->th_akademik_id,
+                'th_akademik_id' => null,
                 'nama_lengkap'   => $validate['nama_mhs'],
                 'nim'            => $validate['nim'],
                 'nik'            => $validate['nik'] ?? null,
@@ -254,10 +246,10 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 'tanggal_lahir'  => $validate['tanggal_lahir'],
                 'prodi_mhs'      => $validate['prodi_mhs'],
                 'semester'       => $validate['semester'],
-                'tahun_akademik' => $tahunAkademik,
+                'tahun_akademik' => $validate['tahun_akademik'],
                 'nama_ortu'      => $validate['nama_ortu'],
                 'nik_ortu'       => $validate['nik_ortu'] ?? null,
-                'nip_ortu'       => $validate['nip_ortu'] ?? null,
+                'nip_ortu'       => null,
                 'alamat_ortu'    => $validate['alamat_ortu'],
                 'hp_ortu'        => $validate['hp_ortu'] ?? null,
                 'tanggal'        => $validate['tanggal'],
@@ -266,7 +258,56 @@ class SuratKeteranganAktifMahasiswaController extends Controller
             ];
 
             $skam->fill($dataToUpdate);
+
+            $noSurat = \App\Services\SuratService::formatNomorSurat('SKAM', $validate['no_surat'], $validate['tanggal'], $validate['prodi_id']);
+            $skam->nomor_surat = $noSurat;
+
+            // Delete old file from Google Drive if exists
+            if (!empty($oldDriveFileId)) {
+                \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
+            }
+
+            $skam->drive_file_id = null;
+            $skam->drive_link = null;
+            $skam->status = 'pending';
             $skam->save();
+
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratKeteranganAktifMahasiswa::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_aktif_mahasiswa.prodi_id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'fakultas.tanda_tangan_id')
+                ->select(
+                    'surat_keterangan_aktif_mahasiswa.*',
+                    'prodi.nama as nama_prodi',
+                    'prodi.alias as alias_prodi',
+                    'fakultas.nama as fakultas',
+                    'fakultas.dekan as dekan',
+                    'fakultas.nidn as nidn_dekan',
+                    'tanda_tangan.gambar as ttd'
+                )
+                ->where('surat_keterangan_aktif_mahasiswa.id', $skam->id)
+                ->first();
+
+            if ($data) {
+                $pdfData = $this->buildPdfData($data);
+                $pdf = Pdf::loadView('pdf.surat_aktif', $pdfData)->setPaper('a4', 'portrait');
+
+                $fileName = 'surat_keterangan_aktif_mahasiswa_' . $data->nim . '.pdf';
+                $directory = base_path('../public_html/pdf');
+
+                if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+                }
+
+                $path = $directory . '/' . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan Aktif Mahasiswa';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->nama_prodi, SuratKeteranganAktifMahasiswa::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -292,6 +333,11 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 ], 404);
             }
 
+            // $noSurat = \App\Services\SuratService::formatNomorSurat('SKAM', $validate['no_surat'], $validate['tanggal'], $validate['prodi_id'] ?? null);
+            // $data->nomor_surat = $noSurat;
+
+
+
             $skam->delete();
 
             return response()->json([
@@ -309,24 +355,25 @@ class SuratKeteranganAktifMahasiswaController extends Controller
 
     public function downloadPdf($id)
     {
+        ini_set('memory_limit', '512M');
+        ini_set('max_execution_time', '300');
+
         try {
             $data = SuratKeteranganAktifMahasiswa::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_aktif_mahasiswa.prodi_id')
-                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
-                ->leftJoin('th_akademik', 'th_akademik.id', '=', 'surat_keterangan_aktif_mahasiswa.th_akademik_id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'fakultas.tanda_tangan_id')
                 ->select(
                     'surat_keterangan_aktif_mahasiswa.*',
                     'prodi.nama as nama_prodi',
                     'prodi.alias as alias_prodi',
-                    'prodi.nama_kepala as nama_kepala_prodi',
-                    'prodi.nidn_kepala as nidn_kepala_prodi',
-                    'tanda_tangan.gambar as ttd',
-                    'th_akademik.nama as th_akademik_nama',
-                    'th_akademik.semester as th_akademik_semester',
+                    'fakultas.nama as fakultas',
+                    'fakultas.dekan as dekan',
+                    'fakultas.nidn as nidn_dekan',
+                    'tanda_tangan.gambar as ttd'
                 )
                 ->where('surat_keterangan_aktif_mahasiswa.id', $id)
                 ->first();
-
-            Log::info($data);
 
             if (!$data) {
                 return response()->json([
@@ -335,67 +382,27 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 ], 404);
             }
 
-            $stempelPath = base_path('../public_html/img/stempel.png');
+            $pdfData = $this->buildPdfData($data);
 
-            $stempelBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($stempelPath));
-
-            $tddPath = base_path('../public_html/' . $data->ttd);
-            $tddBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tddPath));
-
-            $kopPath = base_path('../public_html/img/kop.jpg');
-            $kopBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath));
-
-            // Build tahun_akademik from th_akademik or fallback to stored value
-            $tahunAkademik = $data->tahun_akademik;
-            if ($data->th_akademik_nama) {
-                $tahunAkademik = $data->th_akademik_nama . ' ' . $data->th_akademik_semester;
-            }
-
-            $pdfData = [
-                'nomor_surat' => $data->nomor_surat,
-                'nama' => $data->nama_lengkap,
-                'nim' => $data->nim,
-                'nik' => $data->nik,
-                'tempat_lahir' => $data->tempat_lahir,
-                'tanggal_lahir' => Carbon::parse($data->tanggal_lahir)->translatedFormat('d F Y'),
-                'prodi_mhs' => $data->prodi_mhs,
-                'semester' => $data->semester,
-                'tahun_akademik' => $tahunAkademik,
-                'nama_ortu' => $data->nama_ortu,
-                'nik_ortu' => $data->nik_ortu,
-                'nip_ortu' => $data->nip_ortu,
-                'alamat_ortu' => $data->alamat_ortu,
-                'hp_ortu' => $data->hp_ortu,
-                'tanggal_surat' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
-                'nama_prodi' => $data->nama_prodi,
-                'nama_kepala_prodi' => $data->nama_kepala_prodi,
-                'nidn_kepala_prodi' => $data->nidn_kepala_prodi,
-                'kopBase64' => $kopBase64,
-                'stempel' => $stempelBase64,
-                'ttd' => $tddBase64,
-            ];
-
-            $pdf = Pdf::loadView('pdf.surat_aktif', $pdfData)
-                ->setPaper('a4', 'portrait');
+            $pdf = Pdf::loadView('pdf.surat_aktif', $pdfData)->setPaper('a4', 'portrait');
 
             $fileName = 'surat_keterangan_aktif_mahasiswa_' . $data->nim . '.pdf';
-            $directory = base_path('../public_html/pdf/');
+            $directory = base_path('../public_html/pdf');
 
-            if (!file_exists($directory)) {
-                mkdir($directory, 0755, true);
+            if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
             }
 
-            $path = $directory . $fileName;
+            $path = $directory . '/' . $fileName;
             $pdf->save($path);
 
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Keterangan Aktif Mahasiswa';
-
-            $googlePath = $data->prodi_mhs . '/' . $nameTable . '/' . $fileName;
+            $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
 
             if (!Storage::disk('google')->exists($googlePath)) {
-                UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi_mhs, SuratKeteranganAktifMahasiswa::class);
+                UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganAktifMahasiswa::class);
             }
 
             return response($pdf->output(), 200, [
@@ -403,12 +410,50 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
-            Log::error($th->getMessage());
+            Log::error((string) $th);
             return response()->json([
                 'status' => false,
-                'message' => 'Data gagal diunduh: ' . $th->getMessage()
-            ]);
+                'message' => 'Gagal mengunduh PDF: Terjadi kesalahan pada server'
+            ], 500);
         }
+    }
+
+    private function buildPdfData($data)
+    {
+        $stempelPath = base_path('../public_html/img/stempel.png');
+        $stempelBase64 = SuratService::getBase64Image($stempelPath);
+
+        $tddPath = base_path('../public_html/' . $data->ttd);
+        $tddBase64 = SuratService::getBase64Image($tddPath);
+
+        $kopPath = base_path('../public_html/img/kop.jpg');
+        $kopBase64 = SuratService::getBase64Image($kopPath);
+
+        return [
+            'nomor_surat' => $data->nomor_surat,
+            'nama' => $data->nama_lengkap,
+            'nim' => $data->nim,
+            'nik' => $data->nik,
+            'tempat_lahir' => $data->tempat_lahir,
+            'tanggal_lahir' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_lahir),
+            'prodi_mhs' => $data->prodi_mhs,
+            'semester' => $data->semester,
+            'tahun_akademik' => $data->tahun_akademik,
+            'nama_ortu' => $data->nama_ortu,
+            'nik_ortu' => $data->nik_ortu,
+            'alamat_ortu' => $data->alamat_ortu,
+            'hp_ortu' => $data->hp_ortu,
+            'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+            'nama_prodi' => $data->nama_prodi,
+            'nama_kepala_prodi' => $data->nama_kepala_prodi,
+            'nidn_kepala_prodi' => $data->nidn_kepala_prodi,
+            'dekan' => $data->dekan,
+            'fakultas' => $data->fakultas,
+            'nidn_dekan' => $data->nidn_dekan,
+            'kopBase64' => $kopBase64,
+            'stempel' => $stempelBase64,
+            'ttd' => $tddBase64,
+        ];
     }
 
     public function getProdi()

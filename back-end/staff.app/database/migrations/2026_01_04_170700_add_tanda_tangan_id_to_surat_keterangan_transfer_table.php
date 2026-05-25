@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('surat_keterangan_transfer', function (Blueprint $table) {
             if (!Schema::hasColumn('surat_keterangan_transfer', 'tanda_tangan_id')) {
-                $table->integer('tanda_tangan_id')->nullable()->after('dekan');
+                $table->integer('tanda_tangan_id')->nullable()->after('prodi_id');
             }
         });
     }

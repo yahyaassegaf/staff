@@ -38,8 +38,6 @@ const handleScroll = () => {
 onMounted(() => {
   window.addEventListener("scroll", handleScroll);
   switcher.retrieveFromLocalStorage();
-  // Force horizontal navigation style
-  switcher.navigationStylesFn("horizontal");
 });
 
 onBeforeUnmount(() => {
@@ -49,7 +47,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="progressRef" class="progress-top-bar"></div>
-  <!-- <Switcher /> -->
+  <Switcher />
   <div class="page">
     <Header />
     <Sidebar />

@@ -40,6 +40,7 @@ class SuratKeteranganQismulAmanController extends Controller
             'surat_keterangan_qismul_aman.tanggal_berlaku_sampai',
             'surat_keterangan_qismul_aman.tanggal',
             'surat_keterangan_qismul_aman.drive_file_id',
+            'surat_keterangan_qismul_aman.drive_link',
             'surat_keterangan_qismul_aman.status',
             'surat_keterangan_qismul_aman.created_at',
             'surat_keterangan_qismul_aman.updated_at',
@@ -96,12 +97,13 @@ class SuratKeteranganQismulAmanController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'nullable|exists:prodi,id',
+                'no_surat' => 'required|string|max:255',
                 'ketua' => 'nullable|string|max:255',
                 'nama_mhs' => 'required|string|max:255',
                 'tempat_lahir' => 'required|string|max:100',
                 'tanggal_lahir' => 'required|date',
                 'nim' => 'required|string|max:255',
-                'jenis_kelamin' => 'required|string|max:50',
+                'jenis_kelamin' => 'nullable|string|max:50',
                 'prodi_mhs' => 'required|string|max:255',
                 'alamat_rumah' => 'required|string',
                 'kelas_pondok' => 'required|string|max:255',
@@ -121,16 +123,14 @@ class SuratKeteranganQismulAmanController extends Controller
             $validate = $validator->validated();
 
             $login = Auth::user()->prodi ? Auth::user()->prodi->alias : 'UMUM';
-            $no = NoSurat::orderByDesc('id')->value('nomor') ?? 0;
-            $no_surat = str_pad($no + 1, 3, '0', STR_PAD_LEFT);
+            $no_surat = $validate['no_surat'];
 
-            $unit = 'K.' . strtoupper($login);
-
-            $noSurat = SuratService::NoSuratKeteranganQismulAman($no_surat, $unit);
+            $noSurat = \App\Services\SuratService::formatNomorSurat('SKQA', $no_surat, $validate['tanggal'], $validate['prodi_id'] ?? null);
 
             $skqa = new SuratKeteranganQismulAman();
             $skqa->nomor_surat = $noSurat;
-            $skqa->ketua = $validate['ketua'] ?? null;
+            $settingJabatan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_qismul_aman')->first();
+            $skqa->ketua = $settingJabatan && $settingJabatan->tandaTangan ? $settingJabatan->tandaTangan->nama : null;
             $skqa->nama_lengkap = $validate['nama_mhs'];
             $skqa->tempat_lahir = $validate['tempat_lahir'];
             $skqa->tanggal_lahir = $validate['tanggal_lahir'];
@@ -148,12 +148,12 @@ class SuratKeteranganQismulAmanController extends Controller
             $skqa->save();
 
             $Nomor              = new NoSurat();
-            $Nomor->nomor       = $no_surat;
+            $Nomor->nomor = $no_surat;
             $Nomor->user_id     = Auth::user()->id;
             $Nomor->save();
 
             $log                = new LogSurat();
-            $log->nomor         = $no_surat;
+            $log->nomor = $no_surat;
             $log->nomor_surat   = $noSurat;
             $log->nama_surat    = 'Surat Keterangan Qismul Aman';
             $log->user_id       = Auth::user()->id;
@@ -191,6 +191,17 @@ class SuratKeteranganQismulAmanController extends Controller
             ], 404);
         }
 
+        
+        $nomorStr = $skqa->nomor_surat ?? $skqa->nomor ?? null;
+        if ($nomorStr) {
+            $parts = explode('/', $nomorStr);
+            $firstPart = $parts[0];
+            if (strpos($firstPart, '-') !== false) {
+                $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+            }
+            $skqa->no_surat = trim($firstPart);
+        }
+
         return response()->json([
             'status' => true,
             'data' => $skqa,
@@ -204,12 +215,13 @@ class SuratKeteranganQismulAmanController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'nullable|exists:prodi,id',
+                'no_surat' => 'required|string|max:255',
                 'ketua' => 'nullable|string|max:255',
                 'nama_mhs' => 'required|string|max:255',
                 'tempat_lahir' => 'required|string|max:100',
                 'tanggal_lahir' => 'required|date',
                 'nim' => 'required|string|max:255',
-                'jenis_kelamin' => 'required|string|max:50',
+                'jenis_kelamin' => 'nullable|string|max:50',
                 'prodi_mhs' => 'required|string|max:255',
                 'alamat_rumah' => 'required|string',
                 'kelas_pondok' => 'required|string|max:255',
@@ -236,8 +248,14 @@ class SuratKeteranganQismulAmanController extends Controller
                 ]);
             }
 
+            $oldDriveFileId = $skqa->drive_file_id;
+
+            $noSurat = \App\Services\SuratService::formatNomorSurat('SKQA', $validate['no_surat'], $validate['tanggal'], $validate['prodi_id'] ?? null);
+            $skqa->nomor_surat = $noSurat;
+
             $skqa->prodi_id = $validate['prodi_id'] ?? $skqa->prodi_id;
-            $skqa->ketua = $validate['ketua'] ?? null;
+            $settingJabatan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_qismul_aman')->first();
+            $skqa->ketua = $settingJabatan && $settingJabatan->tandaTangan ? $settingJabatan->tandaTangan->nama : null;
             $skqa->nama_lengkap = $validate['nama_mhs'];
             $skqa->tempat_lahir = $validate['tempat_lahir'];
             $skqa->tanggal_lahir = $validate['tanggal_lahir'];
@@ -249,9 +267,48 @@ class SuratKeteranganQismulAmanController extends Controller
             $skqa->tanggal_berlaku_dari = $validate['tanggal_berlaku_dari'];
             $skqa->tanggal_berlaku_sampai = $validate['tanggal_berlaku_sampai'];
             $skqa->tanggal = $validate['tanggal'];
-            // $skqa->drive_file_id = $validate['drive_file_id'] ?? $skqa->drive_file_id;
-            // $skqa->status = $validate['status'] ?? $skqa->status;
+
+            // Delete old file from Google Drive if exists
+            if (!empty($oldDriveFileId)) {
+                \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
+            }
+
+            $skqa->drive_file_id = null;
+            $skqa->drive_link = null;
+            $skqa->status = 'pending';
             $skqa->save();
+
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratKeteranganQismulAman::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_qismul_aman.prodi_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
+                ->select(
+                    'surat_keterangan_qismul_aman.*',
+                    'prodi.nama as nama_prodi',
+                    'prodi.alias as alias_prodi',
+                    'tanda_tangan.gambar as ttd',
+                )
+                ->where('surat_keterangan_qismul_aman.id', $skqa->id)
+                ->first();
+
+            if ($data) {
+                $pdfData = $this->buildPdfData($data);
+                $pdf = Pdf::loadView('pdf.surat_qismul_aman', $pdfData)->setPaper('a4', 'portrait');
+
+                $fileName = 'surat_keterangan_qismul_aman_' . $data->nim . '.pdf';
+                $directory = base_path('../public_html/pdf');
+
+                if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+                }
+
+                $path = $directory . '/' . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan Qismul Aman';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->nama_prodi, SuratKeteranganQismulAman::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -294,6 +351,9 @@ class SuratKeteranganQismulAmanController extends Controller
 
     public function downloadPdf($id)
     {
+        ini_set('memory_limit', '512M');
+        ini_set('max_execution_time', '300');
+
         try {
             $data = SuratKeteranganQismulAman::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_qismul_aman.prodi_id')
                 ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
@@ -312,50 +372,24 @@ class SuratKeteranganQismulAmanController extends Controller
                     'message' => 'Data tidak ditemukan'
                 ], 404);
             }
-            $tddPath = base_path('../public_html/' . $data->ttd);
 
-            $tddBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tddPath));
-            $kopPath = base_path('../public_html/img/kop.jpg');
-            $kopBase64 = '';
-            if (file_exists($kopPath)) {
-                $kopBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($kopPath));
-            }
+            $pdfData = $this->buildPdfData($data);
 
-            $pdfData = [
-                'nomor_surat' => $data->nomor_surat,
-                'ketua' => $data->ketua,
-                'nama' => $data->nama_lengkap,
-                'tempat_lahir' => $data->tempat_lahir,
-                'tanggal_lahir' => Carbon::parse($data->tanggal_lahir)->translatedFormat('d F Y'),
-                'nim' => $data->nim,
-                'prodi' => $data->prodi_mhs,
-                'alamat' => $data->alamat_rumah,
-                'kelas' => $data->kelas_pondok,
-                'jenis_kelamin' => $data->jenis_kelamin,
-                'tanggal_berlaku_dari' => Carbon::parse($data->tanggal_berlaku_dari)->translatedFormat('d F Y'),
-                'tanggal_berlaku_sampai' => Carbon::parse($data->tanggal_berlaku_sampai)->translatedFormat('d F Y'),
-                'tanggal_surat' => Carbon::parse($data->tanggal)->translatedFormat('d F Y'),
-                'kopBase64' => $kopBase64,
-                'ttd' => $tddBase64,
-            ];
-
-            $pdf = Pdf::loadView('pdf.surat_qismul_aman', $pdfData)
-                ->setPaper('a4', 'portrait');
+            $pdf = Pdf::loadView('pdf.surat_qismul_aman', $pdfData)->setPaper('a4', 'portrait');
 
             $fileName = 'surat_keterangan_qismul_aman_' . $data->nim . '.pdf';
-            $directory = base_path('../public_html/pdf/');
+            $directory = base_path('../public_html/pdf');
 
-            if (!file_exists($directory)) {
-                mkdir($directory, 0755, true);
+            if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
             }
 
-            $path = $directory . $fileName;
+            $path = $directory . '/' . $fileName;
             $pdf->save($path);
 
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Keterangan Qismul Aman';
-
             $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
 
             if (!Storage::disk('google')->exists($googlePath)) {
@@ -367,12 +401,45 @@ class SuratKeteranganQismulAmanController extends Controller
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
-            Log::error($th->getMessage());
+            Log::error((string) $th);
             return response()->json([
                 'status' => false,
-                'message' => 'Data gagal diunduh: ' . $th->getMessage()
-            ]);
+                'message' => 'Gagal mengunduh PDF: Terjadi kesalahan pada server'
+            ], 500);
         }
+    }
+
+    private function buildPdfData($data)
+    {
+        $settingJabatan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_qismul_aman')->first();
+        $tddBase64 = '';
+        if ($settingJabatan && $settingJabatan->tandaTangan && $settingJabatan->tandaTangan->gambar) {
+            $tddPath = base_path('../public_html/' . $settingJabatan->tandaTangan->gambar);
+            if (file_exists($tddPath)) {
+                $tddBase64 = SuratService::getBase64Image($tddPath);
+            }
+        }
+
+        $kopPath = base_path('../public_html/img/kop.jpg');
+        $kopBase64 = SuratService::getBase64Image($kopPath);
+
+        return [
+            'nomor_surat' => $data->nomor_surat,
+            'ketua' => $data->ketua ?? ($settingJabatan && $settingJabatan->tandaTangan ? $settingJabatan->tandaTangan->nama : null),
+            'nama' => $data->nama_lengkap,
+            'tempat_lahir' => $data->tempat_lahir,
+            'tanggal_lahir' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_lahir),
+            'nim' => $data->nim,
+            'prodi' => $data->prodi_mhs,
+            'alamat' => $data->alamat_rumah,
+            'kelas' => $data->kelas_pondok,
+            'jenis_kelamin' => $data->jenis_kelamin,
+            'tanggal_berlaku_dari' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_berlaku_dari),
+            'tanggal_berlaku_sampai' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_berlaku_sampai),
+            'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+            'kopBase64' => $kopBase64,
+            'ttd' => $tddBase64,
+        ];
     }
 
     public function getProdi()

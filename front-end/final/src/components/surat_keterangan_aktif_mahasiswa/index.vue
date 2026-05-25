@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { reactive, ref, watch, onMounted, nextTick } from "vue";
+import { computed } from "vue";
 import Multiselect from "vue-multiselect";
 import "vue-multiselect/dist/vue-multiselect.min.css";
 import { apiGet } from "../../services/api/request";
@@ -16,9 +17,9 @@ const props = defineProps({
 
 const defaultForm = {
   id: "",
+  no_surat: "",
   nomor_surat: "",
   prodi_id: 0,
-  th_akademik_id: null as null | number,
   nama_mhs: "",
   nim: "",
   nik: "",
@@ -29,7 +30,6 @@ const defaultForm = {
   tahun_akademik: "",
   nama_ortu: "",
   nik_ortu: "",
-  nip_ortu: "",
   alamat_ortu: "",
   hp_ortu: "",
   tanggal: "",
@@ -77,7 +77,6 @@ watch(listMhs, async (val) => {
 });
 
 const listProdi = ref<any[]>([]);
-const listThAkademik = ref<any[]>([]);
 
 async function getProdi() {
   try {
@@ -90,25 +89,75 @@ async function getProdi() {
       }
     }
   } catch (error) {
-    console.log(error);
   }
 }
 
-async function getThAkademik() {
+
+const listJenisSurat = ref<any[]>([]);
+
+async function getJenisSurat() {
   try {
-    const response = await apiGet(`/get-th-akademik`);
+    const response = await apiGet(`/jenis-surat`);
     if (response.success) {
-      const data = response.data?.data;
-      listThAkademik.value = Array.isArray(data) ? data : [data];
+      const data = response.data?.data || response.data;
+      listJenisSurat.value = Array.isArray(data) ? data : [data];
     }
   } catch (error) {
-    console.log(error);
   }
+}
+
+function getRoman(num: number) {
+  const roman: any = { 1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "VIII", 9: "IX", 10: "X", 11: "XI", 12: "XII" };
+  return roman[num] || "";
+}
+
+const formatParts = computed(() => {
+  const getFormat = (id: number) => {
+    const js = listJenisSurat.value.find((x: any) => Number(x.id) === id);
+    if (!js) return "";
+    let str = js.format_surat;
+    
+    const dateObj = form.tanggal ? new Date(form.tanggal) : new Date();
+    const dd = String(dateObj.getDate()).padStart(2, "0");
+    const romanBulan = getRoman(dateObj.getMonth() + 1);
+    const yyyy = dateObj.getFullYear();
+    
+    let aliasProdi = "";
+    if (typeof listProdi !== 'undefined' && listProdi.value) {
+        const prodiItem = listProdi.value.find((p: any) => Number(p.id) === Number(form.prodi_id));
+        aliasProdi = prodiItem ? prodiItem.alias : "";
+    }
+    
+    str = str.replace(/{TGL}/g, dd)
+             .replace(/{BULAN}/g, romanBulan)
+             .replace(/{TAHUN}/g, String(yyyy))
+             .replace(/{PRODI}/g, aliasProdi);
+             
+    return str;
+  };
+
+  const parseToParts = (str: string) => {
+    if(!str) return { prefix: "SU-", suffix: "" };
+    const splitted = str.split("{NO}");
+    return {
+      prefix: splitted[0] || "",
+      suffix: splitted[1] || ""
+    };
+  };
+
+  return parseToParts(getFormat(8));
+});
+
+
+function extractNo(fullStr: string) {
+  if (!fullStr) return "";
+  const firstPart = fullStr.split("/")[0];
+  return firstPart.replace("SU-", "").trim();
 }
 
 onMounted(() => {
+  getJenisSurat();
   getProdi();
-  getThAkademik();
 });
 
 function customName(params: any) {
@@ -136,6 +185,7 @@ watch(
     Object.assign(form, val);
 
     form.id = val.id ?? "";
+    form.no_surat = extractNo(val.no_surat ?? val.nomor_surat ?? "");
     form.nomor_surat = val.nomor_surat ?? "";
     form.prodi_id = val.prodi_id ?? 0;
     form.nama_mhs = val.nama_mhs || val.nama_lengkap || "";
@@ -150,15 +200,9 @@ watch(
     form.tahun_akademik = val.tahun_akademik ?? "";
     form.nama_ortu = val.nama_ortu ?? "";
     form.nik_ortu = val.nik_ortu ?? "";
-    form.nip_ortu = val.nip_ortu ?? "";
     form.alamat_ortu = val.alamat_ortu ?? "";
     form.hp_ortu = val.hp_ortu ?? "";
     form.tanggal = val.tanggal ? val.tanggal.slice(0, 10) : "";
-
-    // Set th_akademik_id jika ada
-    form.th_akademik_id = val.th_akademik_id
-      ? Number(val.th_akademik_id)
-      : null;
 
     if (form.nim) {
       listMhs.value = {
@@ -199,7 +243,6 @@ const getMhs = debounce(async (params: string) => {
       }
     }
   } catch (error) {
-    console.log(error);
   } finally {
     loading.value = false;
   }
@@ -224,6 +267,24 @@ function submitForm() {
           </div>
           <div class="card-body">
             <div class="row gy-3">
+              <div class="col-xl-12">
+                <label class="form-label">Nomor Surat:</label>
+                
+                <div class="input-group">
+                  <span class="input-group-text" v-if="formatParts.prefix">{{ formatParts.prefix }}</span>
+                  <input
+                    type="text"
+                    v-model="form.no_surat"
+                    class="form-control"
+                    :class="{ 'is-invalid': errors?.no_surat }"
+                    placeholder="No"
+                  />
+                  <span class="input-group-text" v-if="formatParts.suffix">{{ formatParts.suffix }}</span>
+                  <div v-if="errors?.no_surat" class="invalid-feedback">
+                    {{ errors.no_surat[0] }}
+                  </div>
+                </div>
+              </div>
               <div class="col-xl-6">
                 <label class="form-label">Program Studi Unit:</label>
                 <select
@@ -380,23 +441,16 @@ function submitForm() {
               <div class="col-xl-4">
                 <label class="form-label">Tahun Akademik:</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
-                <select
+                <input
                   v-else
-                  v-model="form.th_akademik_id"
-                  class="form-select"
-                  :class="{ 'is-invalid': errors?.th_akademik_id }"
-                >
-                  <option :value="null">-- Pilih Tahun Akademik --</option>
-                  <option
-                    v-for="thAkademik in listThAkademik"
-                    :key="thAkademik.id"
-                    :value="Number(thAkademik.id)"
-                  >
-                    {{ thAkademik.nama }} - {{ thAkademik.semester }}
-                  </option>
-                </select>
-                <div v-if="errors?.th_akademik_id" class="invalid-feedback">
-                  {{ errors.th_akademik_id[0] }}
+                  type="text"
+                  v-model="form.tahun_akademik"
+                  class="form-control"
+                  :class="{ 'is-invalid': errors?.tahun_akademik }"
+                  placeholder="Misal: 2024/2025"
+                />
+                <div v-if="errors?.tahun_akademik" class="invalid-feedback">
+                  {{ errors.tahun_akademik[0] }}
                 </div>
               </div>
 
@@ -432,22 +486,6 @@ function submitForm() {
                 />
                 <div v-if="errors?.nik_ortu" class="invalid-feedback">
                   {{ errors.nik_ortu[0] }}
-                </div>
-              </div>
-
-              <div class="col-xl-4">
-                <label class="form-label">NIP Orang Tua (Opsional):</label>
-                <div v-if="isLoadingData" class="skeleton-input"></div>
-                <input
-                  v-else
-                  type="text"
-                  v-model="form.nip_ortu"
-                  class="form-control"
-                  :class="{ 'is-invalid': errors?.nip_ortu }"
-                  placeholder="Isikan NIP (Jika PNS)"
-                />
-                <div v-if="errors?.nip_ortu" class="invalid-feedback">
-                  {{ errors.nip_ortu[0] }}
                 </div>
               </div>
 

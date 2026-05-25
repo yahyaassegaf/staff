@@ -38,6 +38,8 @@ export default defineComponent({
           const data = response.data.data;
           suratData.value = {
             id: data.id,
+            no_surat: data.no_surat || data.nomor_surat || data.nomor || "",
+            tanda_tangan_id: data.tanda_tangan_id ? Number(data.tanda_tangan_id) : null,
             nomor: data.nomor || "",
             nama_mhs: data.nama_mahasiswa || "",
             nim: data.nim || "",
