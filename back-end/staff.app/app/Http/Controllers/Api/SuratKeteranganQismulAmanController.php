@@ -97,7 +97,7 @@ class SuratKeteranganQismulAmanController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'nullable|exists:prodi,id',
-                'no_surat' => 'required|string|max:255',
+                'no_surat' => 'required|string|max:255|unique:nomor,nomor',
                 'ketua' => 'nullable|string|max:255',
                 'nama_mhs' => 'required|string|max:255',
                 'tempat_lahir' => 'required|string|max:100',
@@ -110,6 +110,8 @@ class SuratKeteranganQismulAmanController extends Controller
                 'tanggal_berlaku_dari' => 'required|date',
                 'tanggal_berlaku_sampai' => 'required|date',
                 'tanggal' => 'required|date',
+            ], [
+                'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
 
             if ($validator->fails()) {
@@ -122,7 +124,7 @@ class SuratKeteranganQismulAmanController extends Controller
 
             $validate = $validator->validated();
 
-            $login = Auth::user()->prodi ? Auth::user()->prodi->alias : 'UMUM';
+            $login = Auth::user()?->prodi ? Auth::user()->prodi->alias : 'UMUM';
             $no_surat = $validate['no_surat'];
 
             $noSurat = \App\Services\SuratService::formatNomorSurat('SKQA', $no_surat, $validate['tanggal'], $validate['prodi_id'] ?? null);
@@ -158,6 +160,39 @@ class SuratKeteranganQismulAmanController extends Controller
             $log->nama_surat    = 'Surat Keterangan Qismul Aman';
             $log->user_id       = Auth::user()->id;
             $log->save();
+
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratKeteranganQismulAman::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_qismul_aman.prodi_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
+                ->select(
+                    'surat_keterangan_qismul_aman.*',
+                    'prodi.nama as nama_prodi',
+                    'prodi.alias as alias_prodi',
+                    'tanda_tangan.gambar as ttd',
+                )
+                ->where('surat_keterangan_qismul_aman.id', $skqa->id)
+                ->first();
+
+            if ($data) {
+                $pdfData = $this->buildPdfData($data);
+                $pdf = Pdf::loadView('pdf.surat_qismul_aman', $pdfData)->setPaper('a4', 'portrait');
+
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganQismulAmanController');
+                $fileName = 'surat_keterangan_qismul_aman_' . $data->nim . '_' . uniqid() . '.pdf';
+
+                if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+                }
+
+                $path = $directory . '/' . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan Qismul Aman';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->nama_prodi, SuratKeteranganQismulAman::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -214,8 +249,32 @@ class SuratKeteranganQismulAmanController extends Controller
         Log::info($request->all());
         try {
             $validator = Validator::make($request->all(), [
+                'no_surat' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    function ($attribute, $value, $fail) use ($id) {
+                        $skqa = \App\Models\SuratKeteranganQismulAman::find($id);
+                        if ($skqa) {
+                            $originalNoSurat = '';
+                            $nomorStr = $skqa->nomor_surat ?? $skqa->nomor ?? null;
+                            if ($nomorStr) {
+                                $parts = explode('/', $nomorStr);
+                                $firstPart = $parts[0];
+                                if (strpos($firstPart, '-') !== false) {
+                                    $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+                                }
+                                $originalNoSurat = trim($firstPart);
+                            }
+                            if ($value !== $originalNoSurat) {
+                                if (\App\Models\NoSurat::where('nomor', $value)->exists()) {
+                                    $fail('Nomor surat sudah terpakai.');
+                                }
+                            }
+                        }
+                    }
+                ],
                 'prodi_id' => 'nullable|exists:prodi,id',
-                'no_surat' => 'required|string|max:255',
                 'ketua' => 'nullable|string|max:255',
                 'nama_mhs' => 'required|string|max:255',
                 'tempat_lahir' => 'required|string|max:100',
@@ -249,6 +308,7 @@ class SuratKeteranganQismulAmanController extends Controller
             }
 
             $oldDriveFileId = $skqa->drive_file_id;
+            $oldLocalPath = $skqa->local_path;
 
             $noSurat = \App\Services\SuratService::formatNomorSurat('SKQA', $validate['no_surat'], $validate['tanggal'], $validate['prodi_id'] ?? null);
             $skqa->nomor_surat = $noSurat;
@@ -272,6 +332,9 @@ class SuratKeteranganQismulAmanController extends Controller
             if (!empty($oldDriveFileId)) {
                 \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
             }
+            if (!empty($oldLocalPath) && file_exists($oldLocalPath)) {
+                @unlink($oldLocalPath);
+            }
 
             $skqa->drive_file_id = null;
             $skqa->drive_link = null;
@@ -294,8 +357,9 @@ class SuratKeteranganQismulAmanController extends Controller
                 $pdfData = $this->buildPdfData($data);
                 $pdf = Pdf::loadView('pdf.surat_qismul_aman', $pdfData)->setPaper('a4', 'portrait');
 
-                $fileName = 'surat_keterangan_qismul_aman_' . $data->nim . '.pdf';
-                $directory = base_path('../public_html/pdf');
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganQismulAmanController');
+                $fileName = 'surat_keterangan_qismul_aman_' . $data->nim . '_' . uniqid() . '.pdf';
 
                 if (!\Illuminate\Support\Facades\File::exists($directory)) {
                     \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
@@ -377,8 +441,9 @@ class SuratKeteranganQismulAmanController extends Controller
 
             $pdf = Pdf::loadView('pdf.surat_qismul_aman', $pdfData)->setPaper('a4', 'portrait');
 
-            $fileName = 'surat_keterangan_qismul_aman_' . $data->nim . '.pdf';
-            $directory = base_path('../public_html/pdf');
+            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganQismulAmanController');
+            $fileName = 'surat_keterangan_qismul_aman_' . $data->nim . '_' . uniqid() . '.pdf';
 
             if (!\Illuminate\Support\Facades\File::exists($directory)) {
                 \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
@@ -392,7 +457,7 @@ class SuratKeteranganQismulAmanController extends Controller
             $nameTable = 'Surat Keterangan Qismul Aman';
             $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
 
-            if (!Storage::disk('google')->exists($googlePath)) {
+            if (empty($data->drive_file_id)) {
                 UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganQismulAman::class);
             }
 

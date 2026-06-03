@@ -15,6 +15,7 @@ export default defineComponent({
     const errors = ref<any>({});
     async function submit(params: any) {
       try {
+        loading.value = true;
         errors.value = {};
         const response = await apiPost("/sktkp", params);
 
@@ -30,7 +31,7 @@ export default defineComponent({
         } else {
           if ((response.error as any)?.response?.status === 422) {
             errors.value = (response.error as any).response.data.errors;
-            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+            
           } else {
             toast.error("Surat gagal Ditambahkan", {
               theme: "auto",
@@ -42,6 +43,8 @@ export default defineComponent({
           }
         }
       } catch (error) {
+      } finally {
+        loading.value = false;
       }
     }
 
@@ -58,5 +61,6 @@ export default defineComponent({
     @submit="submit"
     :isEdit="false"
     :errors="errors"
+    :btnLoading="loading"
   />
 </template>

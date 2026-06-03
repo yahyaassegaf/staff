@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-export const BASE_URL = 'http://staff.test:8081/api';
-// export const BASE_URL = 'https://staffapp.uiidalwa.web.id/api';
+// export const BASE_URL = 'http://staff.test:8081/api';
+export const BASE_URL = 'https://staffapp.uiidalwa.web.id/api';
 
 const http = axios.create({
     baseURL: BASE_URL,

@@ -46,13 +46,7 @@ export default defineComponent({
           const errorData = (response.error as any)?.response?.data;
           if (errorData?.status === 422 || errorData?.errors) {
             errors.value = errorData.errors || errorData;
-            toast.error("Validasi gagal, mohon periksa kembali inputan Anda", {
-              theme: "auto",
-              icon: true,
-              hideProgressBar: true,
-              autoClose: true,
-              position: "top-right",
-            });
+            
           } else {
             toast.error(response.message || "Mahasiswa gagal ditambahkan", {
               theme: "auto",
@@ -70,13 +64,7 @@ export default defineComponent({
           
           if (error.response.status === 422 && errorData.errors) {
             errors.value = errorData.errors;
-            toast.error("Validasi gagal, mohon periksa kembali inputan Anda", {
-              theme: "auto",
-              icon: true,
-              hideProgressBar: true,
-              autoClose: true,
-              position: "top-right",
-            });
+            
           } else {
             toast.error(errorData.message || "Terjadi kesalahan saat menambahkan data", {
               theme: "auto",

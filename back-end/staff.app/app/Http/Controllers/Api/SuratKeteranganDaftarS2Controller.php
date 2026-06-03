@@ -79,11 +79,13 @@ class SuratKeteranganDaftarS2Controller extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required|exists:prodi,id',
-                'no_surat' => 'required|string|max:255',
+                'no_surat' => 'required|string|max:255|unique:nomor,nomor',
                 'nama_lengkap' => 'required|string|max:255',
                 'nim' => 'required|string|max:255',
                 'prodi' => 'required|string|max:255',
                 'tanggal' => 'required|date',
+            ], [
+                'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
 
             if ($validator->fails()) {
@@ -124,6 +126,44 @@ class SuratKeteranganDaftarS2Controller extends Controller
             $log->user_id       = Auth::user()->id;
             $log->save();
 
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratKeteranganDaftarS2::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_daftar_s2.prodi_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
+                ->select(
+                    'surat_keterangan_daftar_s2.*',
+                    'prodi.nama as nama_prodi',
+                    'prodi.alias as alias_prodi',
+                    'prodi.nama_kepala as nama_kepala_prodi',
+                    'prodi.nidn_kepala as nidn_kepala_prodi',
+                    'tanda_tangan.gambar as ttd'
+                )
+                ->where('surat_keterangan_daftar_s2.id', $s2->id)
+                ->first();
+
+            if ($data) {
+                $staff = 'staff_' . $data->alias_prodi;
+                $key = strtolower($staff);
+                $jabatan = SettingJabatan::with('tandaTangan')->where('kunci_jabatan', $key)->first();
+
+                $pdfData = $this->buildPdfData($data, $jabatan);
+                $prodiFolder = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganDaftarS2Controller');
+                $pdf = Pdf::loadView('pdf.surat_keterangan_daftar_s2', $pdfData)->setPaper('a4', 'portrait');
+                $fileName = 'surat_keterangan_daftar_s2_' . $data->nim . '_' . uniqid() . '.pdf';
+
+                if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+                }
+
+                $path = $directory . '/' . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan Daftar S2';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->nama_prodi, SuratKeteranganDaftarS2::class);
+            }
+
             return response()->json([
                 'status' => true,
                 'message' => 'Data berhasil ditambahkan'
@@ -156,7 +196,7 @@ class SuratKeteranganDaftarS2Controller extends Controller
             ], 404);
         }
 
-        
+
         $nomorStr = $s2->nomor_surat ?? $s2->nomor ?? null;
         if ($nomorStr) {
             $parts = explode('/', $nomorStr);
@@ -180,7 +220,31 @@ class SuratKeteranganDaftarS2Controller extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required|exists:prodi,id',
-                'no_surat' => 'required|string|max:255',
+                'no_surat' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    function ($attribute, $value, $fail) use ($id) {
+                        $s2 = \App\Models\SuratKeteranganDaftarS2::find($id);
+                        if ($s2) {
+                            $originalNoSurat = '';
+                            $nomorStr = $s2->nomor_surat ?? $s2->nomor ?? null;
+                            if ($nomorStr) {
+                                $parts = explode('/', $nomorStr);
+                                $firstPart = $parts[0];
+                                if (strpos($firstPart, '-') !== false) {
+                                    $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+                                }
+                                $originalNoSurat = trim($firstPart);
+                            }
+                            if ($value !== $originalNoSurat) {
+                                if (\App\Models\NoSurat::where('nomor', $value)->exists()) {
+                                    $fail('Nomor surat sudah terpakai.');
+                                }
+                            }
+                        }
+                    }
+                ],
                 'nama_lengkap' => 'required|string|max:255',
                 'nim' => 'required|string|max:255',
                 'prodi' => 'required|string|max:255',
@@ -206,6 +270,7 @@ class SuratKeteranganDaftarS2Controller extends Controller
             }
 
             $oldDriveFileId = $s2->drive_file_id;
+            $oldLocalPath = $s2->local_path;
 
             $noSurat = SuratService::formatNomorSurat('SKMS', $validate['no_surat'], $validate['tanggal'], $validate['prodi_id']);
 
@@ -223,6 +288,9 @@ class SuratKeteranganDaftarS2Controller extends Controller
             // Delete old file from Google Drive if exists
             if (!empty($oldDriveFileId)) {
                 \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
+            }
+            if (!empty($oldLocalPath) && file_exists($oldLocalPath)) {
+                @unlink($oldLocalPath);
             }
 
             $s2->drive_file_id = null;
@@ -245,19 +313,23 @@ class SuratKeteranganDaftarS2Controller extends Controller
                 ->first();
 
             if ($data) {
-                $pdfData = $this->buildPdfData($data);
+                $staff = 'staff_' . $data->alias_prodi;
+                $key = strtolower($staff);
+                $jabatan = SettingJabatan::with('tandaTangan')->where('kunci_jabatan', $key)->first();
+
+                $pdfData = $this->buildPdfData($data, $jabatan);
+                $prodiFolder = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganDaftarS2Controller');
                 $pdf = Pdf::loadView('pdf.surat_keterangan_daftar_s2', $pdfData)->setPaper('a4', 'portrait');
-
-                $fileName = 'surat_keterangan_daftar_s2_' . $data->nim . '.pdf';
-                $directory = base_path('../public_html/pdf');
-
+                $fileName = 'surat_keterangan_daftar_s2_' . $data->nim . '_' . uniqid() . '.pdf';
+ 
                 if (!\Illuminate\Support\Facades\File::exists($directory)) {
                     \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
                 }
-
+ 
                 $path = $directory . '/' . $fileName;
                 $pdf->save($path);
-
+ 
                 $data->update(['local_path' => $path]);
 
                 $nameTable = 'Surat Keterangan Daftar S2';
@@ -329,26 +401,33 @@ class SuratKeteranganDaftarS2Controller extends Controller
                 ], 404);
             }
 
-            $pdfData = $this->buildPdfData($data);
+            $staff = 'staff_' . $data->alias_prodi;
 
+            $key = strtolower($staff);
+
+            $jabatan = SettingJabatan::with('tandaTangan')->where('kunci_jabatan', $key)->first();
+
+            $pdfData = $this->buildPdfData($data, $jabatan);
+
+            $prodiFolder = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganDaftarS2Controller');
             $pdf = Pdf::loadView('pdf.surat_keterangan_daftar_s2', $pdfData)->setPaper('a4', 'portrait');
-
-            $fileName = 'surat_keterangan_daftar_s2_' . $data->nim . '.pdf';
-            $directory = base_path('../public_html/pdf');
-
+ 
+            $fileName = 'surat_keterangan_daftar_s2_' . $data->nim . '_' . uniqid() . '.pdf';
+ 
             if (!\Illuminate\Support\Facades\File::exists($directory)) {
                 \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
             }
-
+ 
             $path = $directory . '/' . $fileName;
             $pdf->save($path);
-
+ 
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Keterangan Daftar S2';
             $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
 
-            if (!Storage::disk('google')->exists($googlePath)) {
+            if (empty($data->drive_file_id)) {
                 UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganDaftarS2::class);
             }
 
@@ -365,12 +444,13 @@ class SuratKeteranganDaftarS2Controller extends Controller
         }
     }
 
-    private function buildPdfData($data)
+    private function buildPdfData($data, $jabatan)
     {
         $stempelPath = base_path('../public_html/img/stempel.png');
         $stempelBase64 = SuratService::getBase64Image($stempelPath);
 
-        $tddPath = base_path('../public_html/' . $data->ttd);
+        $ttdImage = ($jabatan && $jabatan->tandaTangan) ? $jabatan->tandaTangan->gambar : $data->ttd;
+        $tddPath = base_path('../public_html/' . $ttdImage);
         $tddBase64 = SuratService::getBase64Image($tddPath);
 
         $kopPath = base_path('../public_html/img/kop.jpg');
@@ -385,8 +465,8 @@ class SuratKeteranganDaftarS2Controller extends Controller
             'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
             'nama_prodi' => $data->nama_prodi,
             'alias_prodi' => $data->alias_prodi,
-            'nama_kepala_prodi' => $data->nama_kepala_prodi,
-            'nidn_kepala_prodi' => $data->nidn_kepala_prodi,
+            'nama_kepala_prodi' => ($jabatan && $jabatan->tandaTangan) ? $jabatan->tandaTangan->nama : $data->nama_kepala_prodi,
+            'nidn_kepala_prodi' => $jabatan ? $jabatan->nidn : $data->nidn_kepala_prodi,
             'kopBase64' => $kopBase64,
             'stempel' => $stempelBase64,
             'ttd' => $tddBase64

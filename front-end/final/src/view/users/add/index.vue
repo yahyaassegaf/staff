@@ -47,7 +47,7 @@ export default defineComponent({
       } else {
         if (response.error?.response?.status === 422) {
           errors.value = response.error.response.data.errors;
-          toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+          
         } else {
           toast.error("User gagal ditambahkan", {
             theme: "auto",

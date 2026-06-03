@@ -24,7 +24,6 @@ export default defineComponent({
       { text: "Nama Mahasiswa", value: "nama", sortable: true },
       { text: "NIM", value: "nim", sortable: true },
       { text: "Mulai Tanggal", value: "dari_tanggal", sortable: true },
-      { text: "Tanggal Surat", value: "tanggal", sortable: true },
       { text: "URL", value: "drive_link", sortable: false },
       { text: "Action", value: "action", sortable: false },
     ];
@@ -118,6 +117,16 @@ export default defineComponent({
     }
 
     async function download(params: any) {
+      Swal.fire({
+        title: "Sedang menyiapkan PDF...",
+        text: "Mohon tunggu sejenak, dokumen sedang digenerate.",
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
       try {
         const res = await apiPdf(
           `/surat-izin-penelitian/download-pdf/${params.id}`,
@@ -125,7 +134,9 @@ export default defineComponent({
           { responseType: "blob" }
         );
         openFileExport(res.data);
+        Swal.close();
       } catch (error) {
+        Swal.close();
         toast.error("Gagal mengunduh file PDF");
       }
     }

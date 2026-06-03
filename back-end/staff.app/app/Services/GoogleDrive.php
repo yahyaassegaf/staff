@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Storage;
-use Yaza\LaravelGoogleDriveStorage\Gdrive;
 
 class GoogleDrive
 {
@@ -69,27 +68,13 @@ class GoogleDrive
      */
     public static function ensureFolder(string $path): string
     {
-        // Cek apakah folder sudah ada
-        $exists = false;
         try {
-            $contents = Gdrive::all('/', true);
-            foreach ($contents as $item) {
-                if ($item->isDir() && $item->path() === $path) {
-                    $exists = true;
-                    break;
-                }
+            $disk = Storage::disk('google');
+            if (!$disk->exists($path)) {
+                $disk->makeDirectory($path);
             }
         } catch (\Exception $e) {
-            // Folder mungkin belum ada, lanjutkan ke pembuatan
-        }
-
-        // Jika belum ada, buat folder
-        if (!$exists) {
-            try {
-                Gdrive::makeDir($path);
-            } catch (\Exception $e) {
-                // Mungkin folder sudah ada, abaikan error
-            }
+            \Illuminate\Support\Facades\Log::error("Failed to ensure folder {$path} exists: " . $e->getMessage());
         }
 
         return $path;
@@ -104,13 +89,13 @@ class GoogleDrive
     {
         $fullPath = rtrim($folderPath, '/') . '/' . $fileName;
 
-        // Upload file
-        Gdrive::put($fullPath, $localFilePath);
+        // Upload file menggunakan Laravel Storage disk 'google' (Flysystem)
+        $disk = Storage::disk('google');
+        $disk->put($fullPath, fopen($localFilePath, 'r'));
 
         // Cari file yang baru diupload untuk mendapatkan ID
         $fileId = null;
         try {
-            $disk = Storage::disk('google');
             $contents = $disk->listContents($folderPath);
             foreach ($contents as $item) {
                 if ($item['type'] === 'file' && $item['path'] === $fullPath) {
@@ -119,7 +104,7 @@ class GoogleDrive
                 }
             }
         } catch (\Exception $e) {
-            // Gagal mendapatkan file ID, tapi file mungkin sudah terupload
+            \Illuminate\Support\Facades\Log::error("Failed to fetch file ID for {$fullPath}: " . $e->getMessage());
         }
 
         return [

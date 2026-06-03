@@ -930,6 +930,7 @@
         <!-- End::header-element -->
 
         <!-- Start::header-element -->
+        <!-- Switcher button disabled temporarily
         <li class="header-element">
           <a
             href="javascript:void(0);"
@@ -968,6 +969,7 @@
             </svg>
           </a>
         </li>
+        -->
       </ul>
       <!-- End::header-content-right -->
     </div>
@@ -1018,7 +1020,7 @@
                         <router-link
                           :to="`${e.path}/`"
                           class="search-result-item"
-                          @click="handleSuggestionClick(suggestion.title)"
+                          @click="handleSuggestionClick(e.title)"
                         >
                           {{ e.title }}
                         </router-link>

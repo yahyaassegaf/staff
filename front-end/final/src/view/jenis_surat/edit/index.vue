@@ -60,13 +60,7 @@ export default defineComponent({
             (response.error as any)?.response?.status === 422
           ) {
             errors.value = (response.error as any).response.data.errors;
-            toast.error("Validasi gagal, mohon periksa kembali inputan Anda", {
-              theme: "auto",
-              icon: true,
-              hideProgressBar: true,
-              autoClose: true,
-              position: "top-right",
-            });
+            
           } else {
             toast.error("Jenis surat gagal diupdate", {
               theme: "auto",

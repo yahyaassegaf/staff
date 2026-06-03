@@ -160,6 +160,7 @@ class HasilRapatController extends Controller
             if (!$hasilRapat) return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
 
             $oldDriveFileId = $hasilRapat->drive_file_id;
+            $oldLocalPath = $hasilRapat->local_path;
 
             $validator = Validator::make($request->all(), [
                 'agenda' => 'required|string|max:255',
@@ -201,6 +202,9 @@ class HasilRapatController extends Controller
             if (!empty($oldDriveFileId)) {
                 \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
             }
+            if (!empty($oldLocalPath) && file_exists($oldLocalPath)) {
+                @unlink($oldLocalPath);
+            }
 
             $hasilRapat->drive_file_id = null;
             $hasilRapat->drive_link = null;
@@ -227,14 +231,15 @@ class HasilRapatController extends Controller
                     'kopBase64' => $kopBase64,
                 ];
 
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi->nama ?? 'Umum');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/HasilRapatController/');
                 $pdf = Pdf::loadView('pdf.v_hasil_rapat', $pdfData)->setPaper('a4', 'portrait');
-                $fileName = 'hasil_rapat_' . str_replace('/', '_', $data->nomor_surat) . '.pdf';
-                $directory = base_path('../public_html/pdf/');
+                $fileName = 'hasil_rapat_' . str_replace('/', '_', $data->nomor_surat) . '_' . uniqid() . '.pdf';
                 if (!file_exists($directory)) mkdir($directory, 0755, true);
-
+ 
                 $path = $directory . $fileName;
                 $pdf->save($path);
-
+ 
                 $data->update(['local_path' => $path]);
 
                 $nameTable = 'Hasil Rapat';
@@ -277,22 +282,22 @@ class HasilRapatController extends Controller
                 'kopBase64' => $kopBase64,
             ];
 
+            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi->nama ?? 'Umum');
+            $directory = base_path('../public_html/pdf/' . $prodiName . '/HasilRapatController/');
             $pdf = Pdf::loadView('pdf.v_hasil_rapat', $pdfData)->setPaper('a4', 'portrait');
-            $fileName = 'hasil_rapat_' . str_replace('/', '_', $data->nomor_surat) . '.pdf';
-            $directory = base_path('../public_html/pdf/');
+            $fileName = 'hasil_rapat_' . str_replace('/', '_', $data->nomor_surat) . '_' . uniqid() . '.pdf';
             if (!file_exists($directory)) mkdir($directory, 0755, true);
-
+ 
             $path = $directory . $fileName;
             $pdf->save($path);
-
+ 
             $data->update(['local_path' => $path]);
 
             // Upload ke Google Drive hanya jika file belum ada
             $nameTable = 'Hasil Rapat';
             $prodiName = $data->prodi->nama ?? 'Umum';
-            $googlePath = $prodiName . '/' . $nameTable . '/' . $fileName;
 
-            if (!Storage::disk('google')->exists($googlePath)) {
+            if (empty($data->drive_file_id)) {
                 UploudSuratToDrive::dispatch($id, $nameTable, $prodiName, HasilRapat::class);
             }
 

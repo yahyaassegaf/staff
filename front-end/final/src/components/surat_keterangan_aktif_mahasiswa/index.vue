@@ -13,6 +13,10 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  btnLoading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const defaultForm = {
@@ -38,10 +42,8 @@ const defaultForm = {
 const disableListMhsWatcher = ref(false);
 
 const readonlyField = ref({
-  nama_mhs: false,
   tanggal_lahir: false,
   tempat_lahir: false,
-  prodi_mhs: false,
 });
 
 const form = reactive({ ...defaultForm });
@@ -68,10 +70,8 @@ watch(listMhs, async (val) => {
 
   if (val.alias_prodi) {
     form.prodi_mhs = val.alias_prodi;
-    readonlyField.value.prodi_mhs = true;
   } else {
     form.prodi_mhs = val.prodi_mhs;
-    readonlyField.value.prodi_mhs = false;
   }
   isLoadingData.value = false;
 });
@@ -276,12 +276,12 @@ function submitForm() {
                     type="text"
                     v-model="form.no_surat"
                     class="form-control"
-                    :class="{ 'is-invalid': errors?.no_surat }"
+                    :class="{ 'is-invalid': errors?.nomor_surat || errors?.no_surat }"
                     placeholder="No"
                   />
                   <span class="input-group-text" v-if="formatParts.suffix">{{ formatParts.suffix }}</span>
-                  <div v-if="errors?.no_surat" class="invalid-feedback">
-                    {{ errors.no_surat[0] }}
+                  <div v-if="errors?.nomor_surat || errors?.no_surat" class="invalid-feedback">
+                    {{ errors?.nomor_surat ? errors.nomor_surat[0] : errors?.no_surat[0] }}
                   </div>
                 </div>
               </div>
@@ -334,7 +334,7 @@ function submitForm() {
                   v-model="form.nama_mhs"
                   class="form-control"
                   :class="{ 'is-invalid': errors?.nama_mhs }"
-                  :readonly="readonlyField.nama_mhs"
+                  readonly
                   placeholder="Isikan Nama Mahasiswa"
                 />
                 <div v-if="errors?.nama_mhs" class="invalid-feedback">
@@ -414,7 +414,7 @@ function submitForm() {
                   v-model="form.prodi_mhs"
                   class="form-control"
                   :class="{ 'is-invalid': errors?.prodi_mhs }"
-                  :readonly="readonlyField.prodi_mhs"
+                  readonly
                   placeholder="Isikan Program Studi"
                 />
                 <div v-if="errors?.prodi_mhs" class="invalid-feedback">
@@ -457,7 +457,7 @@ function submitForm() {
               <hr />
               <div class="card-title mb-0">Data Orang Tua</div>
 
-              <div class="col-xl-4">
+              <div class="col-xl-6">
                 <label class="form-label">Nama Orang Tua:</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
@@ -473,7 +473,7 @@ function submitForm() {
                 </div>
               </div>
 
-              <div class="col-xl-4">
+              <div class="col-xl-6">
                 <label class="form-label">NIK Orang Tua:</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
@@ -489,7 +489,7 @@ function submitForm() {
                 </div>
               </div>
 
-              <div class="col-xl-8">
+              <div class="col-xl-6">
                 <label class="form-label">Alamat Orang Tua:</label>
                 <div
                   v-if="isLoadingData"
@@ -509,7 +509,7 @@ function submitForm() {
                 </div>
               </div>
 
-              <div class="col-xl-4">
+              <div class="col-xl-6">
                 <label class="form-label">No. HP / Kontak Ortu:</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
@@ -525,7 +525,7 @@ function submitForm() {
                 </div>
               </div>
 
-              <div class="col-xl-4">
+              <div class="col-xl-12">
                 <label class="form-label">Tanggal Surat:</label>
                 <input
                   type="date"
@@ -539,9 +539,10 @@ function submitForm() {
               </div>
             </div>
           </div>
-          <div class="card-footer text-end">
-            <button class="btn btn-primary btn-wave shadow-sm">
-              {{ isEdit ? "Update Data" : "Simpan Data" }}
+          <div class="card-footer">
+            <button class="btn btn-primary-light btn-wave ms-auto float-end" :disabled="btnLoading">
+              <span v-if="btnLoading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              {{ btnLoading ? (isEdit ? "Mengupdate..." : "Menyimpan...") : (isEdit ? "Update" : "Simpan") }}
             </button>
           </div>
         </div>

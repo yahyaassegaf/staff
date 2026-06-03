@@ -1634,6 +1634,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import("../view/dashboard/index.vue"),
       },
       {
+        path: `file-manager`,
+        name: "file-manager",
+        component: () => import("../view/file_manager/index.vue"),
+      },
+      {
         path: `tanda-tangan`,
         name: "tanda-tangan",
         component: () => import("../view/tanda_tangan/index.vue"),

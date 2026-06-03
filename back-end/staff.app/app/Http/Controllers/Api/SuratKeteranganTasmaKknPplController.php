@@ -96,7 +96,7 @@ class SuratKeteranganTasmaKknPplController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'nullable|exists:prodi,id',
-                'no_surat' => 'required|string|max:255',
+                'no_surat' => 'required|string|max:255|unique:nomor,nomor',
                 'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
                 'nama_mhs' => 'required|string|max:255',
                 'tempat_lahir' => 'required|string|max:100',
@@ -106,6 +106,8 @@ class SuratKeteranganTasmaKknPplController extends Controller
                 'alamat_rumah' => 'required|string',
                 'kelas_pondok' => 'required|string|max:255',
                 'tanggal' => 'required|date',
+            ], [
+                'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
 
             if ($validator->fails()) {
@@ -155,6 +157,43 @@ class SuratKeteranganTasmaKknPplController extends Controller
             $log->nama_surat    = 'Surat Keterangan TASMA, KKN, PPL';
             $log->user_id       = Auth::user()->id;
             $log->save();
+
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratKeteranganTasmaKknPpl::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_tasma_kkn_ppl.prodi_id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_keterangan_tasma_kkn_ppl.tanda_tangan_id')
+                ->select(
+                    'fakultas.nama as fakultas',
+                    'surat_keterangan_tasma_kkn_ppl.*',
+                    'prodi.nama as nama_prodi',
+                    'prodi.alias as alias_prodi',
+                    'tanda_tangan.nama as nama_ttd',
+                    'tanda_tangan.gambar as ttd',
+                )
+                ->where('surat_keterangan_tasma_kkn_ppl.id', $sktkp->id)
+                ->first();
+
+            if ($data) {
+                $pdfData = $this->buildPdfData($data);
+                $pdf = Pdf::loadView('pdf.surat_tasma_kkn_ppl', $pdfData)->setPaper('a4', 'portrait');
+
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganTasmaKknPplController');
+                $fileName = 'surat_keterangan_tasma_kkn_ppl_' . $data->nim . '_' . uniqid() . '.pdf';
+
+                if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+                }
+
+                $path = $directory . '/' . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan TASMA, KKN, PPL';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->nama_prodi, SuratKeteranganTasmaKknPpl::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -211,7 +250,31 @@ class SuratKeteranganTasmaKknPplController extends Controller
         Log::info($request->all());
         try {
             $validator = Validator::make($request->all(), [
-                'no_surat' => 'required|string|max:255',
+                'no_surat' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    function ($attribute, $value, $fail) use ($id) {
+                        $sktkp = \App\Models\SuratKeteranganTasmaKknPpl::find($id);
+                        if ($sktkp) {
+                            $originalNoSurat = '';
+                            $nomorStr = $sktkp->nomor_surat ?? $sktkp->nomor ?? null;
+                            if ($nomorStr) {
+                                $parts = explode('/', $nomorStr);
+                                $firstPart = $parts[0];
+                                if (strpos($firstPart, '-') !== false) {
+                                    $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+                                }
+                                $originalNoSurat = trim($firstPart);
+                            }
+                            if ($value !== $originalNoSurat) {
+                                if (\App\Models\NoSurat::where('nomor', $value)->exists()) {
+                                    $fail('Nomor surat sudah terpakai.');
+                                }
+                            }
+                        }
+                    }
+                ],
                 'prodi_id' => 'nullable|exists:prodi,id',
                 'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
                 'nama_mhs' => 'required|string|max:255',
@@ -246,6 +309,7 @@ class SuratKeteranganTasmaKknPplController extends Controller
             }
 
             $oldDriveFileId = $sktkp->drive_file_id;
+            $oldLocalPath = $sktkp->local_path;
 
             $noSurat = \App\Services\SuratService::formatNomorSurat('STTKP', $validate['no_surat'], $validate['tanggal'], $validate['prodi_id'] ?? null);
             $sktkp->nomor_surat = $noSurat;
@@ -271,6 +335,9 @@ class SuratKeteranganTasmaKknPplController extends Controller
             // Delete old file from Google Drive if exists
             if (!empty($oldDriveFileId)) {
                 \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
+            }
+            if (!empty($oldLocalPath) && file_exists($oldLocalPath)) {
+                @unlink($oldLocalPath);
             }
 
             $sktkp->drive_file_id = null;
@@ -298,8 +365,9 @@ class SuratKeteranganTasmaKknPplController extends Controller
                 $pdfData = $this->buildPdfData($data);
                 $pdf = Pdf::loadView('pdf.surat_tasma_kkn_ppl', $pdfData)->setPaper('a4', 'portrait');
 
-                $fileName = 'surat_keterangan_tasma_kkn_ppl_' . $data->nim . '.pdf';
-                $directory = base_path('../public_html/pdf');
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganTasmaKknPplController');
+                $fileName = 'surat_keterangan_tasma_kkn_ppl_' . $data->nim . '_' . uniqid() . '.pdf';
 
                 if (!\Illuminate\Support\Facades\File::exists($directory)) {
                     \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
@@ -385,8 +453,9 @@ class SuratKeteranganTasmaKknPplController extends Controller
 
             $pdf = Pdf::loadView('pdf.surat_tasma_kkn_ppl', $pdfData)->setPaper('a4', 'portrait');
 
-            $fileName = 'surat_keterangan_tasma_kkn_ppl_' . $data->nim . '.pdf';
-            $directory = base_path('../public_html/pdf');
+            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganTasmaKknPplController');
+            $fileName = 'surat_keterangan_tasma_kkn_ppl_' . $data->nim . '_' . uniqid() . '.pdf';
 
             if (!\Illuminate\Support\Facades\File::exists($directory)) {
                 \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
@@ -400,7 +469,7 @@ class SuratKeteranganTasmaKknPplController extends Controller
             $nameTable = 'Surat Keterangan TASMA, KKN, PPL';
             $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
 
-            if (!Storage::disk('google')->exists($googlePath)) {
+            if (empty($data->drive_file_id)) {
                 UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganTasmaKknPpl::class);
             }
 

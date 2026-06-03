@@ -80,7 +80,7 @@ class SuratKeteranganSpmController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required|exists:prodi,id',
-                'no_surat' => 'required|string|max:255',
+                'no_surat' => 'required|string|max:255|unique:nomor,nomor',
                 'nama_lengkap' => 'required|string|max:255',
                 'nim' => 'required|string|max:255',
                 'tempat_lahir' => 'required|string|max:100',
@@ -93,6 +93,8 @@ class SuratKeteranganSpmController extends Controller
                 'tahun' => 'required|string|max:100',
                 'semester' => 'required|string|max:50',
                 'tanggal' => 'required|date',
+            ], [
+                'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
 
             if ($validator->fails()) {
@@ -140,6 +142,41 @@ class SuratKeteranganSpmController extends Controller
             $log->nama_surat    = 'Surat Keterangan SPM';
             $log->user_id       = Auth::user()->id;
             $log->save();
+
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratKeteranganSpm::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_spm.prodi_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
+                ->select(
+                    'surat_keterangan_spm.*',
+                    'prodi.nama as nama_prodi',
+                    'prodi.alias as alias_prodi',
+                    'prodi.nama_kepala as nama_kepala_prodi',
+                    'prodi.nidn_kepala as nidn_kepala_prodi',
+                    'tanda_tangan.gambar as ttd'
+                )
+                ->where('surat_keterangan_spm.id', $spm->id)
+                ->first();
+
+            if ($data) {
+                $pdfData = $this->buildPdfData($data);
+                $pdf = Pdf::loadView('pdf.surat_keterangan_spm', $pdfData)->setPaper('a4', 'portrait');
+
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganSpmController');
+                $fileName = 'surat_keterangan_spm_' . $data->nim . '_' . uniqid() . '.pdf';
+
+                if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+                }
+
+                $path = $directory . '/' . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan SPM';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->nama_prodi, SuratKeteranganSpm::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -196,8 +233,32 @@ class SuratKeteranganSpmController extends Controller
         Log::info($request->all());
         try {
             $validator = Validator::make($request->all(), [
+                'no_surat' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    function ($attribute, $value, $fail) use ($id) {
+                        $spm = \App\Models\SuratKeteranganSpm::find($id);
+                        if ($spm) {
+                            $originalNoSurat = '';
+                            $nomorStr = $spm->nomor_surat ?? $spm->nomor ?? null;
+                            if ($nomorStr) {
+                                $parts = explode('/', $nomorStr);
+                                $firstPart = $parts[0];
+                                if (strpos($firstPart, '-') !== false) {
+                                    $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+                                }
+                                $originalNoSurat = trim($firstPart);
+                            }
+                            if ($value !== $originalNoSurat) {
+                                if (\App\Models\NoSurat::where('nomor', $value)->exists()) {
+                                    $fail('Nomor surat sudah terpakai.');
+                                }
+                            }
+                        }
+                    }
+                ],
                 'prodi_id' => 'required|exists:prodi,id',
-                'no_surat' => 'required|string|max:255',
                 'nama_lengkap' => 'required|string|max:255',
                 'nim' => 'required|string|max:255',
                 'tempat_lahir' => 'required|string|max:100',
@@ -231,6 +292,7 @@ class SuratKeteranganSpmController extends Controller
             }
 
             $oldDriveFileId = $spm->drive_file_id;
+            $oldLocalPath = $spm->local_path;
 
             $noSurat = SuratService::formatNomorSurat('STSPM', $validate['no_surat'], $validate['tanggal'], $validate['prodi_id']);
 
@@ -258,6 +320,9 @@ class SuratKeteranganSpmController extends Controller
             if (!empty($oldDriveFileId)) {
                 \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
             }
+            if (!empty($oldLocalPath) && file_exists($oldLocalPath)) {
+                @unlink($oldLocalPath);
+            }
 
             $spm->update([
                 'drive_file_id' => null,
@@ -283,8 +348,9 @@ class SuratKeteranganSpmController extends Controller
                 $pdfData = $this->buildPdfData($data);
                 $pdf = Pdf::loadView('pdf.surat_keterangan_spm', $pdfData)->setPaper('a4', 'portrait');
 
-                $fileName = 'surat_keterangan_spm_' . $data->nim . '.pdf';
-                $directory = base_path('../public_html/pdf');
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganSpmController');
+                $fileName = 'surat_keterangan_spm_' . $data->nim . '_' . uniqid() . '.pdf';
 
                 if (!\Illuminate\Support\Facades\File::exists($directory)) {
                     \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
@@ -368,8 +434,9 @@ class SuratKeteranganSpmController extends Controller
 
             $pdf = Pdf::loadView('pdf.surat_keterangan_spm', $pdfData)->setPaper('a4', 'portrait');
 
-            $fileName = 'surat_keterangan_spm_' . $data->nim . '.pdf';
-            $directory = base_path('../public_html/pdf');
+            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganSpmController');
+            $fileName = 'surat_keterangan_spm_' . $data->nim . '_' . uniqid() . '.pdf';
 
             if (!\Illuminate\Support\Facades\File::exists($directory)) {
                 \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
@@ -383,7 +450,7 @@ class SuratKeteranganSpmController extends Controller
             $nameTable = 'Surat Keterangan SPM';
             $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
 
-            if (!Storage::disk('google')->exists($googlePath)) {
+            if (empty($data->drive_file_id)) {
                 UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganSpm::class);
             }
 

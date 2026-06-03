@@ -17,12 +17,13 @@ export default defineComponent({
     const errors = ref<any>({});
     const suratData = ref({
       id: "",
+      no_surat: "",
       nomor: "",
       nama_mhs: "",
       nim: "",
       prodi: "",
       periode_bulan: "",
-      tanda_tangan_id: 0,
+      tanda_tangan_id: null as null | number,
       alasan: "",
       tanggal: "",
       prodi_id: "",
@@ -39,13 +40,12 @@ export default defineComponent({
           suratData.value = {
             id: data.id,
             no_surat: data.no_surat || data.nomor_surat || data.nomor || "",
-            tanda_tangan_id: data.tanda_tangan_id ? Number(data.tanda_tangan_id) : null,
             nomor: data.nomor || "",
             nama_mhs: data.nama_mahasiswa || "",
             nim: data.nim || "",
             prodi: data.prodi || "",
             periode_bulan: data.periode_bulan || "",
-            tanda_tangan_id: data.tanda_tangan_id || 0,
+            tanda_tangan_id: data.tanda_tangan_id ? Number(data.tanda_tangan_id) : null,
             alasan: data.alasan || "",
             tanggal: data.tanggal ? data.tanggal.slice(0, 10) : "",
             prodi_id: data.prodi_id || "",
@@ -77,7 +77,7 @@ export default defineComponent({
         } else {
           if ((response.error as any)?.response?.status === 422) {
             errors.value = (response.error as any).response.data.errors;
-            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+            
           } else {
             toast.error("Surat gagal diupdate", {
               theme: "auto",
@@ -123,5 +123,6 @@ export default defineComponent({
     :modelValue="suratData"
     :isEdit="true"
     :errors="errors"
+    :btnLoading="loading"
   />
 </template>

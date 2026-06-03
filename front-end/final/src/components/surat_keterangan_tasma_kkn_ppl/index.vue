@@ -13,6 +13,10 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  btnLoading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const defaultForm = {
@@ -36,13 +40,11 @@ const defaultForm = {
 const disableListMhsWatcher = ref(false);
 
 const readonlyField = ref({
-  nama_mhs: false,
   tanggal_lahir: false,
   tempat_lahir: false,
   jenis_kelamin: false,
   kelas_pondok: false,
   alamat_rumah: false,
-  prodi_mhs: false,
 });
 
 const form = reactive({ ...defaultForm });
@@ -70,10 +72,8 @@ watch(listMhs, async (val) => {
 
   if (val.alias_prodi) {
     form.prodi_mhs = val.alias_prodi;
-    readonlyField.value.prodi_mhs = true;
   } else {
     form.prodi_mhs = val.prodi_mhs;
-    readonlyField.value.prodi_mhs = false;
   }
 
   form.alamat_rumah = val.alamat;
@@ -282,12 +282,12 @@ function submitForm() {
                     type="text"
                     v-model="form.no_surat"
                     class="form-control"
-                    :class="{ 'is-invalid': errors?.no_surat }"
+                    :class="{ 'is-invalid': errors?.nomor_surat || errors?.no_surat }"
                     placeholder="No"
                   />
                   <span class="input-group-text" v-if="formatParts.suffix">{{ formatParts.suffix }}</span>
-                  <div v-if="errors?.no_surat" class="invalid-feedback">
-                    {{ errors.no_surat[0] }}
+                  <div v-if="errors?.nomor_surat || errors?.no_surat" class="invalid-feedback">
+                    {{ errors?.nomor_surat ? errors.nomor_surat[0] : errors?.no_surat[0] }}
                   </div>
                 </div>
               </div>
@@ -344,7 +344,7 @@ function submitForm() {
                   v-model="form.nama_mhs"
                   class="form-control"
                   :class="{ 'is-invalid': errors?.nama_mhs }"
-                  :readonly="readonlyField.nama_mhs"
+                  readonly
                   id="input-nama-mhs"
                   placeholder="Isikan Nama Mahasiswa"
                 />
@@ -412,7 +412,7 @@ function submitForm() {
                   class="form-control"
                   :class="{ 'is-invalid': errors?.prodi_mhs }"
                   id="input-prodi-mhs"
-                  :readonly="readonlyField.prodi_mhs"
+                  readonly
                   placeholder="Isikan Prodi Mahasiswa"
                 />
                 <div v-if="errors?.prodi_mhs" class="invalid-feedback">
@@ -476,8 +476,9 @@ function submitForm() {
             </div>
           </div>
           <div class="card-footer">
-            <button class="btn btn-primary-light btn-wave ms-auto float-end">
-              {{ isEdit ? "Update" : "Simpan" }}
+            <button class="btn btn-primary-light btn-wave ms-auto float-end" :disabled="btnLoading">
+              <span v-if="btnLoading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              {{ btnLoading ? (isEdit ? "Mengupdate..." : "Menyimpan...") : (isEdit ? "Update" : "Simpan") }}
             </button>
           </div>
         </div>

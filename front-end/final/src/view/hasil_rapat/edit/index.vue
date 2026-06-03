@@ -51,7 +51,7 @@ export default defineComponent({
         } else {
           if ((response.error as any)?.response?.status === 422) {
             errors.value = (response.error as any).response.data.errors;
-            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+            
           } else {
             toast.error("Hasil Rapat gagal diupdate", {
               theme: "auto",
@@ -109,6 +109,7 @@ export default defineComponent({
       :modelValue="formData"
       :isEdit="true"
       :errors="errors"
+      :btnLoading="loading"
     />
   </div>
 </template>

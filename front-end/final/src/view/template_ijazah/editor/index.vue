@@ -97,7 +97,7 @@ export default defineComponent({
         } else {
           if ((response.error as any)?.response?.data?.status === 422) {
             errors.value = (response.error as any).response.data.errors;
-            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+            
           } else {
             toast.error("Template ijazah gagal diupdate", {
               theme: "auto",

@@ -78,7 +78,7 @@
         }
 
         .kop img {
-            margin-top: 5px;
+            margin-top: 0;
             width: 100%;
             max-height: 155px;
             object-fit: contain;
@@ -91,8 +91,8 @@
         }
 
         .kop {
-            margin-top: -2.1cm;
-            /* naik ke atas */
+            margin-top: -1cm;
+            /* mentok ke atas batas margin kertas (1cm) */
             margin-left: -1.5cm;
             /* tembus margin kiri */
             margin-right: -1.5cm;

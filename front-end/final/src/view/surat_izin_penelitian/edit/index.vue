@@ -1,6 +1,5 @@
 <script lang="ts">
-import { defineComponent } from "vue";
-import { onMounted, ref } from "vue";
+import { defineComponent, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import SuratComponent from "../../../components/surat_izin_penelitian/index.vue";
 import { toast } from "vue3-toastify";
@@ -18,6 +17,7 @@ export default defineComponent({
     const errors = ref<any>({});
     const suratData = ref({
       id: "",
+      no_surat: "",
       nomor: "",
       prodi_id: 0,
       nama: "",
@@ -28,6 +28,7 @@ export default defineComponent({
       dari_tanggal: "",
       tanggal: "",
       jenis_kelamin: "",
+      tanda_tangan_id: null as null | number,
     });
 
     async function getSurat() {
@@ -83,7 +84,7 @@ export default defineComponent({
         } else {
           if ((response.error as any)?.response?.status === 422) {
             errors.value = (response.error as any).response.data.errors;
-            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+            
           } else {
             toast.error("Surat gagal diupdate", {
               theme: "auto",
@@ -128,5 +129,6 @@ export default defineComponent({
     :modelValue="suratData"
     :isEdit="true"
     :errors="errors"
+    :btnLoading="loading"
   />
 </template>

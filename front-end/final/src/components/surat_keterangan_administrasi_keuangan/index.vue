@@ -13,6 +13,10 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  btnLoading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const defaultForm = {
@@ -33,12 +37,10 @@ const defaultForm = {
 };
 
 const readonlyField = ref({
-  nama_mhs: false,
   tanggal_lahir: false,
   tempat_lahir: false,
   kelas_pondok: false,
   alamat_rumah: false,
-  prodi_mhs: false,
   kepala_biro: false,
 });
 
@@ -59,12 +61,7 @@ watch(listMhs, async (val) => {
   isLoadingData.value = true;
   await new Promise((resolve) => setTimeout(resolve, 500));
 
-  if (val.nama) {
-    form.nama_mhs = val.nama;
-    readonlyField.value.nama_mhs = true;
-  } else {
-    readonlyField.value.nama_mhs = false;
-  }
+  form.nama_mhs = val.nama || "";
   form.nim = val.nim;
 
   if (val.tanggal_lahir) {
@@ -83,9 +80,8 @@ watch(listMhs, async (val) => {
 
   if (val.alias_prodi) {
     form.prodi_mhs = val.alias_prodi;
-    readonlyField.value.prodi_mhs = true;
   } else {
-    readonlyField.value.prodi_mhs = false;
+    form.prodi_mhs = val.prodi_mhs;
   }
 
   if (val.alamat) {
@@ -98,7 +94,6 @@ watch(listMhs, async (val) => {
 });
 
 const listProdi = ref<any[]>([]);
-const listTandaTangan = ref<any[]>([]);
 
 async function getProdi() {
   try {
@@ -118,17 +113,7 @@ async function getProdi() {
   }
 }
 
-async function getTandaTangan() {
-  try {
-    const response = await apiGet(`/tanda-tangan`);
-    if (response.success) {
-      const data =
-        response.data?.data?.data || response.data?.data || response.data;
-      listTandaTangan.value = Array.isArray(data) ? data : [data];
-    }
-  } catch (error) {
-  }
-}
+
 
 
 const listJenisSurat = ref<any[]>([]);
@@ -196,7 +181,6 @@ function extractNo(fullStr: string) {
 onMounted(() => {
   getJenisSurat();
   getProdi();
-  getTandaTangan();
 });
 
 function customName(params: any) {
@@ -218,10 +202,7 @@ watch(
     disableListMhsWatcher.value = true;
     isLoadingData.value = true;
 
-    // Pastikan listTandaTangan sudah terisi sebelum set form
-    if (listTandaTangan.value.length === 0) {
-      await getTandaTangan();
-    }
+
 
     // Simulasi loading untuk efek skeleton
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -313,12 +294,12 @@ function submitForm() {
                     type="text"
                     v-model="form.no_surat"
                     class="form-control"
-                    :class="{ 'is-invalid': errors?.no_surat }"
+                    :class="{ 'is-invalid': errors?.nomor_surat || errors?.no_surat }"
                     placeholder="No"
                   />
                   <span class="input-group-text" v-if="formatParts.suffix">{{ formatParts.suffix }}</span>
-                  <div v-if="errors?.no_surat" class="invalid-feedback">
-                    {{ errors.no_surat[0] }}
+                  <div v-if="errors?.nomor_surat || errors?.no_surat" class="invalid-feedback">
+                    {{ errors?.nomor_surat ? errors.nomor_surat[0] : errors?.no_surat[0] }}
                   </div>
                 </div>
               </div>
@@ -344,31 +325,7 @@ function submitForm() {
                   {{ errors.prodi_id[0] }}
                 </div>
               </div>
-              <div class="col-xl-12">
-                <label for="input-tanda-tangan" class="form-label"
-                  >Kepala Biro (Penandatangan):</label
-                >
-                <div v-show="isLoadingData" class="skeleton-input"></div>
-                <select
-                  v-show="!isLoadingData"
-                  v-model="form.tanda_tangan_id"
-                  class="form-select"
-                  :class="{ 'is-invalid': errors?.tanda_tangan_id }"
-                  id="input-tanda-tangan"
-                >
-                  <option :value="null">-- Pilih Kepala Biro --</option>
-                  <option
-                    v-for="ttd in listTandaTangan"
-                    :key="ttd.id"
-                    :value="Number(ttd.id)"
-                  >
-                    {{ ttd.nama }}
-                  </option>
-                </select>
-                <div v-if="errors?.tanda_tangan_id" class="invalid-feedback">
-                  {{ errors.tanda_tangan_id[0] }}
-                </div>
-              </div>
+
               <div class="col-xl-12">
                 <label for="input-nama" class="form-label"
                   >Nim Mahasiswa :</label
@@ -404,7 +361,7 @@ function submitForm() {
                   v-model="form.nama_mhs"
                   class="form-control"
                   :class="{ 'is-invalid': errors?.nama_mhs }"
-                  :readonly="readonlyField.nama_mhs"
+                  readonly
                   id="input-kode"
                   placeholder="Isikan nama mahasiswa"
                 />
@@ -459,7 +416,7 @@ function submitForm() {
                   v-else
                   type="text"
                   v-model="form.prodi_mhs"
-                  :readonly="readonlyField.prodi_mhs"
+                  readonly
                   class="form-control"
                   :class="{ 'is-invalid': errors?.prodi_mhs }"
                   id="input-nama-kepala"
@@ -530,8 +487,9 @@ function submitForm() {
             </div>
           </div>
           <div class="card-footer">
-            <button class="btn btn-primary-light btn-wave ms-auto float-end">
-              {{ isEdit ? "Update" : "Simpan" }}
+            <button class="btn btn-primary-light btn-wave ms-auto float-end" :disabled="btnLoading">
+              <span v-if="btnLoading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              {{ btnLoading ? (isEdit ? "Mengupdate..." : "Menyimpan...") : (isEdit ? "Update" : "Simpan") }}
             </button>
           </div>
         </div>

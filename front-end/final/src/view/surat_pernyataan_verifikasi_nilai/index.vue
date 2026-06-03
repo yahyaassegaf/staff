@@ -23,9 +23,6 @@ export default defineComponent({
       { text: "Nomor Surat", value: "nomor", sortable: true },
       { text: "NIM", value: "nim", sortable: true },
       { text: "Nama Mahasiswa", value: "nama_mahasiswa", sortable: true },
-      { text: "Prodi", value: "prodi_mhs", sortable: true },
-      { text: "Fakultas", value: "fakultas", sortable: true },
-      { text: "Tanggal", value: "tanggal", sortable: true },
       { text: "URL", value: "drive_link", sortable: false },
       { text: "Action", value: "action", sortable: false },
     ];
@@ -131,6 +128,16 @@ export default defineComponent({
     }
 
     async function download(params: any) {
+      Swal.fire({
+        title: "Sedang menyiapkan PDF...",
+        text: "Mohon tunggu sejenak, dokumen sedang digenerate.",
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
       try {
         const res = await apiPdf(
           `/spvn/download-pdf/${params.id}`,
@@ -138,7 +145,9 @@ export default defineComponent({
           { responseType: "blob" }
         );
         openFileExport(res.data);
+        Swal.close();
       } catch (error) {
+        Swal.close();
         toast.error("Gagal mengunduh file PDF");
       }
     }

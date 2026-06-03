@@ -90,17 +90,17 @@
             <tr>
                 <td width="30%">Nama</td>
                 <td width="5%">:</td>
-                <td>{{ $nama_kepala_prodi }}</td>
+                <td>{{ $dekan }}</td>
             </tr>
             <tr>
                 <td>NIY</td>
                 <td>:</td>
-                <td>{{ $nidn_kepala_prodi }}</td>
+                <td>{{ $nidn_dekan }}</td>
             </tr>
             <tr>
                 <td>Jabatan</td>
                 <td>:</td>
-                <td>Kepala Prodi Pendidikan Bahasa Arab</td>
+                <td>Dekan Fakultas {{ $fakultas }}</td>
             </tr>
             <tr>
                 <td>Pada</td>
@@ -150,7 +150,7 @@
         <!-- KALIMAT TAMBAHAN -->
         <p class="text-justify">
             Merupakan mahasiswa/i pada Program Studi Pendidikan Bahasa Arab Fakultas Tarbiyah
-            Institut Agama Islam Darullughah Wadda’wah Bangil, dan orang tua dari mahasiswa/i tersebut adalah:
+            Universitas Islam Internasional Darullughah Wadda’wah Bangil, dan orang tua dari mahasiswa/i tersebut adalah:
         </p>
 
         <!-- DATA ORANG TUA -->

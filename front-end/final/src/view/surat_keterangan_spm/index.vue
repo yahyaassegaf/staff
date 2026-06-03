@@ -146,6 +146,16 @@ export default defineComponent({
     });
 
     async function download(params: any) {
+      Swal.fire({
+        title: "Sedang menyiapkan PDF...",
+        text: "Mohon tunggu sejenak, dokumen sedang digenerate.",
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
       try {
         const res = await apiPdf(
           `/spm/download-pdf/${params.id}`,
@@ -154,7 +164,9 @@ export default defineComponent({
         );
 
         openFileExport(res.data);
+        Swal.close();
       } catch (error) {
+        Swal.close();
         toast.error("Gagal mengunduh file PDF", {
           theme: "auto",
           icon: true,

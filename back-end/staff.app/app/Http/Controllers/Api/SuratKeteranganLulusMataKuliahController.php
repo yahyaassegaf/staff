@@ -94,7 +94,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required',
-                'no_surat' => 'required|string|max:255',
+                'no_surat' => 'required|string|max:255|unique:nomor,nomor',
                 'nama_mhs' => 'required|string|max:255',
                 'tempat_lahir' => 'required|string|max:100',
                 'tanggal_lahir' => 'required|date',
@@ -103,6 +103,8 @@ class SuratKeteranganLulusMataKuliahController extends Controller
                 'alamat_rumah' => 'required|string',
                 'kelas_pondok' => 'required|string|max:255',
                 'tanggal' => 'nullable|date',
+            ], [
+                'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
 
             if ($validator->fails()) {
@@ -115,7 +117,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
 
             $validate = $validator->validated();
 
-            $login = Auth::user()->prodi->alias;
+            $login = Auth::user()?->prodi?->alias ?? 'UMUM';
             $no_surat = $validate['no_surat'];
 
             $tanggal = $validate['tanggal'] ?? date('Y-m-d');
@@ -148,6 +150,46 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             $log->nama_surat = 'Surat Keterangan Lulus Mata Kuliah';
             $log->user_id = Auth::user()->id;
             $log->save();
+
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratKeteranganLulusMataKuliah::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_lulus_mata_kuliah.prodi_id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'fakultas.tanda_tangan_id')
+                ->select(
+                    'surat_keterangan_lulus_mata_kuliah.*',
+                    'prodi.nama as nama_prodi',
+                    'fakultas.nama as fakultas',
+                    'fakultas.dekan as dekan',
+                    'fakultas.nidn_dekan as nidn_dekan',
+                    'prodi.alias as alias_prodi',
+                    'prodi.nidn_kepala as nidn_kepala_prodi',
+                    'prodi.nama_kepala as nama_kepala_prodi',
+                    'tanda_tangan.gambar as ttd',
+                )
+                ->where('surat_keterangan_lulus_mata_kuliah.id', $sklmk->id)
+                ->first();
+
+            if ($data) {
+                $pdfData = $this->buildPdfData($data);
+                $pdf = Pdf::loadView('pdf.v_surat_keterangan_lulus_mata_kuliah', $pdfData)->setPaper('a4', 'portrait');
+
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganLulusMataKuliahController');
+                $fileName = 'surat_keterangan_lulus_mata_kuliah_' . $data->nim . '_' . $data->prodi_mahasiswa . '_' . uniqid() . '.pdf';
+
+                if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+                }
+
+                $path = $directory . '/' . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan Lulus Mata Kuliah';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->nama_prodi, SuratKeteranganLulusMataKuliah::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -206,7 +248,31 @@ class SuratKeteranganLulusMataKuliahController extends Controller
         Log::info($request->all());
         try {
             $validator = Validator::make($request->all(), [
-                'no_surat' => 'required|string|max:255',
+                'no_surat' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    function ($attribute, $value, $fail) use ($id) {
+                        $sklmk = \App\Models\SuratKeteranganLulusMataKuliah::find($id);
+                        if ($sklmk) {
+                            $originalNoSurat = '';
+                            $nomorStr = $sklmk->nomor_surat ?? $sklmk->nomor ?? null;
+                            if ($nomorStr) {
+                                $parts = explode('/', $nomorStr);
+                                $firstPart = $parts[0];
+                                if (strpos($firstPart, '-') !== false) {
+                                    $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+                                }
+                                $originalNoSurat = trim($firstPart);
+                            }
+                            if ($value !== $originalNoSurat) {
+                                if (\App\Models\NoSurat::where('nomor', $value)->exists()) {
+                                    $fail('Nomor surat sudah terpakai.');
+                                }
+                            }
+                        }
+                    }
+                ],
                 'prodi_id' => 'sometimes|exists:prodi,id',
                 'nama_mhs' => 'required|string|max:255',
                 'tempat_lahir' => 'required|string|max:100',
@@ -239,6 +305,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             }
 
             $oldDriveFileId = $sklmk->drive_file_id;
+            $oldLocalPath = $sklmk->local_path;
 
             $noSurat = \App\Services\SuratService::formatNomorSurat('SKLM', $validate['no_surat'], $validate['tanggal'] ?? date('Y-m-d'), $validate['prodi_id'] ?? null);
             $sklmk->nomor_surat = $noSurat;
@@ -258,6 +325,9 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             if (!empty($oldDriveFileId)) {
                 \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
             }
+            if (!empty($oldLocalPath) && file_exists($oldLocalPath)) {
+                @unlink($oldLocalPath);
+            }
 
             $sklmk->drive_file_id = null;
             $sklmk->drive_link = null;
@@ -274,7 +344,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
                     'prodi.nama as nama_prodi',
                     'fakultas.nama as fakultas',
                     'fakultas.dekan as dekan',
-                    'fakultas.nidn as nidn_dekan',
+                    'fakultas.nidn_dekan as nidn_dekan',
                     'prodi.alias as alias_prodi',
                     'prodi.nidn_kepala as nidn_kepala_prodi',
                     'prodi.nama_kepala as nama_kepala_prodi',
@@ -287,8 +357,9 @@ class SuratKeteranganLulusMataKuliahController extends Controller
                 $pdfData = $this->buildPdfData($data);
                 $pdf = Pdf::loadView('pdf.v_surat_keterangan_lulus_mata_kuliah', $pdfData)->setPaper('a4', 'portrait');
 
-                $fileName = 'surat_keterangan_lulus_mata_kuliah_' . $data->nim . '_' . $data->prodi_mahasiswa . '.pdf';
-                $directory = base_path('../public_html/pdf');
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganLulusMataKuliahController');
+                $fileName = 'surat_keterangan_lulus_mata_kuliah_' . $data->nim . '_' . $data->prodi_mahasiswa . '_' . uniqid() . '.pdf';
 
                 if (!\Illuminate\Support\Facades\File::exists($directory)) {
                     \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
@@ -356,7 +427,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
                     'prodi.nama as nama_prodi',
                     'fakultas.nama as fakultas',
                     'fakultas.dekan as dekan',
-                    'fakultas.nidn as nidn_dekan',
+                    'fakultas.nidn_dekan as nidn_dekan',
                     'prodi.alias as alias_prodi',
                     'prodi.nidn_kepala as nidn_kepala_prodi',
                     'prodi.nama_kepala as nama_kepala_prodi',
@@ -376,8 +447,9 @@ class SuratKeteranganLulusMataKuliahController extends Controller
 
             $pdf = Pdf::loadView('pdf.v_surat_keterangan_lulus_mata_kuliah', $pdfData)->setPaper('a4', 'portrait');
 
-            $fileName = 'surat_keterangan_lulus_mata_kuliah_' . $data->nim . '_' . $data->prodi_mahasiswa . '.pdf';
-            $directory = base_path('../public_html/pdf');
+            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganLulusMataKuliahController');
+            $fileName = 'surat_keterangan_lulus_mata_kuliah_' . $data->nim . '_' . $data->prodi_mahasiswa . '_' . uniqid() . '.pdf';
 
             if (!\Illuminate\Support\Facades\File::exists($directory)) {
                 \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
@@ -391,7 +463,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             $nameTable = 'Surat Keterangan Lulus Mata Kuliah';
             $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
 
-            if (!Storage::disk('google')->exists($googlePath)) {
+            if (empty($data->drive_file_id)) {
                 UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganLulusMataKuliah::class);
             }
 

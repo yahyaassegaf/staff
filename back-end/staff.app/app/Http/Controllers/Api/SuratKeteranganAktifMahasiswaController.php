@@ -78,7 +78,7 @@ class SuratKeteranganAktifMahasiswaController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required|exists:prodi,id',
-                'no_surat' => 'required|string|max:255',
+                'no_surat' => 'required|string|max:255|unique:nomor,nomor',
                 'nama_mhs' => 'required|string|max:255',
                 'nim' => 'required|string|max:255',
                 'nik' => 'nullable|string|max:255',
@@ -92,6 +92,8 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 'alamat_ortu' => 'required|string',
                 'hp_ortu' => 'nullable|string|max:50',
                 'tanggal' => 'required|date',
+            ], [
+                'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
 
             if ($validator->fails()) {
@@ -136,12 +138,42 @@ class SuratKeteranganAktifMahasiswaController extends Controller
             $Nomor->user_id     = Auth::user()->id;
             $Nomor->save();
 
-            $log                = new LogSurat();
-            $log->nomor = $no_surat;
-            $log->nomor_surat   = $noSurat;
-            $log->nama_surat    = 'Surat Keterangan Aktif Mahasiswa';
-            $log->user_id       = Auth::user()->id;
-            $log->save();
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratKeteranganAktifMahasiswa::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_aktif_mahasiswa.prodi_id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'fakultas.tanda_tangan_id')
+                ->select(
+                    'surat_keterangan_aktif_mahasiswa.*',
+                    'prodi.nama as nama_prodi',
+                    'prodi.alias as alias_prodi',
+                    'fakultas.nama as fakultas',
+                    'fakultas.dekan as dekan',
+                    'fakultas.nidn_dekan as nidn_dekan',
+                    'tanda_tangan.gambar as ttd'
+                )
+                ->where('surat_keterangan_aktif_mahasiswa.id', $skam->id)
+                ->first();
+
+            if ($data) {
+                $pdfData = $this->buildPdfData($data);
+                $prodiFolder = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganAktifMahasiswaController');
+                $pdf = Pdf::loadView('pdf.surat_aktif', $pdfData)->setPaper('a4', 'portrait');
+                $fileName = 'surat_keterangan_aktif_mahasiswa_' . $data->nim . '_' . uniqid() . '.pdf';
+
+                if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+                }
+
+                $path = $directory . '/' . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan Aktif Mahasiswa';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->nama_prodi, SuratKeteranganAktifMahasiswa::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -198,7 +230,31 @@ class SuratKeteranganAktifMahasiswaController extends Controller
         Log::info($request->all());
         try {
             $validator = Validator::make($request->all(), [
-                'no_surat' => 'required|string|max:255',
+                'no_surat' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    function ($attribute, $value, $fail) use ($id) {
+                        $skam = \App\Models\SuratKeteranganAktifMahasiswa::find($id);
+                        if ($skam) {
+                            $originalNoSurat = '';
+                            $nomorStr = $skam->nomor_surat ?? $skam->nomor ?? null;
+                            if ($nomorStr) {
+                                $parts = explode('/', $nomorStr);
+                                $firstPart = $parts[0];
+                                if (strpos($firstPart, '-') !== false) {
+                                    $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+                                }
+                                $originalNoSurat = trim($firstPart);
+                            }
+                            if ($value !== $originalNoSurat) {
+                                if (\App\Models\NoSurat::where('nomor', $value)->exists()) {
+                                    $fail('Nomor surat sudah terpakai.');
+                                }
+                            }
+                        }
+                    }
+                ],
                 'prodi_id' => 'required|exists:prodi,id',
                 'nama_mhs' => 'required|string|max:255',
                 'nim' => 'required|string|max:255',
@@ -234,6 +290,7 @@ class SuratKeteranganAktifMahasiswaController extends Controller
             }
 
             $oldDriveFileId = $skam->drive_file_id;
+            $oldLocalPath = $skam->local_path;
 
             // Map frontend fields (if different) to database fields
             $dataToUpdate = [
@@ -266,6 +323,9 @@ class SuratKeteranganAktifMahasiswaController extends Controller
             if (!empty($oldDriveFileId)) {
                 \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
             }
+            if (!empty($oldLocalPath) && file_exists($oldLocalPath)) {
+                @unlink($oldLocalPath);
+            }
 
             $skam->drive_file_id = null;
             $skam->drive_link = null;
@@ -283,7 +343,7 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                     'prodi.alias as alias_prodi',
                     'fakultas.nama as fakultas',
                     'fakultas.dekan as dekan',
-                    'fakultas.nidn as nidn_dekan',
+                    'fakultas.nidn_dekan as nidn_dekan',
                     'tanda_tangan.gambar as ttd'
                 )
                 ->where('surat_keterangan_aktif_mahasiswa.id', $skam->id)
@@ -291,18 +351,18 @@ class SuratKeteranganAktifMahasiswaController extends Controller
 
             if ($data) {
                 $pdfData = $this->buildPdfData($data);
+                $prodiFolder = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganAktifMahasiswaController');
                 $pdf = Pdf::loadView('pdf.surat_aktif', $pdfData)->setPaper('a4', 'portrait');
-
-                $fileName = 'surat_keterangan_aktif_mahasiswa_' . $data->nim . '.pdf';
-                $directory = base_path('../public_html/pdf');
-
+                $fileName = 'surat_keterangan_aktif_mahasiswa_' . $data->nim . '_' . uniqid() . '.pdf';
+ 
                 if (!\Illuminate\Support\Facades\File::exists($directory)) {
                     \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
                 }
-
+ 
                 $path = $directory . '/' . $fileName;
                 $pdf->save($path);
-
+ 
                 $data->update(['local_path' => $path]);
 
                 $nameTable = 'Surat Keterangan Aktif Mahasiswa';
@@ -369,7 +429,7 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                     'prodi.alias as alias_prodi',
                     'fakultas.nama as fakultas',
                     'fakultas.dekan as dekan',
-                    'fakultas.nidn as nidn_dekan',
+                    'fakultas.nidn_dekan as nidn_dekan',
                     'tanda_tangan.gambar as ttd'
                 )
                 ->where('surat_keterangan_aktif_mahasiswa.id', $id)
@@ -384,24 +444,25 @@ class SuratKeteranganAktifMahasiswaController extends Controller
 
             $pdfData = $this->buildPdfData($data);
 
+            $prodiFolder = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganAktifMahasiswaController');
             $pdf = Pdf::loadView('pdf.surat_aktif', $pdfData)->setPaper('a4', 'portrait');
-
-            $fileName = 'surat_keterangan_aktif_mahasiswa_' . $data->nim . '.pdf';
-            $directory = base_path('../public_html/pdf');
-
+ 
+            $fileName = 'surat_keterangan_aktif_mahasiswa_' . $data->nim . '_' . uniqid() . '.pdf';
+ 
             if (!\Illuminate\Support\Facades\File::exists($directory)) {
                 \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
             }
-
+ 
             $path = $directory . '/' . $fileName;
             $pdf->save($path);
-
+ 
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Keterangan Aktif Mahasiswa';
             $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
 
-            if (!Storage::disk('google')->exists($googlePath)) {
+            if (empty($data->drive_file_id)) {
                 UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganAktifMahasiswa::class);
             }
 

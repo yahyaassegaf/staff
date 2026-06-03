@@ -34,6 +34,7 @@ export default defineComponent({
 
     async function submit(params: any) {
       try {
+        loading.value = true;
         errors.value = {};
         const id = route.params.id;
         const response = await apiPut(`/sk6/${id}`, params);
@@ -50,12 +51,14 @@ export default defineComponent({
         } else {
           if ((response.error as any)?.response?.status === 422) {
             errors.value = (response.error as any).response.data.errors;
-            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+            
           } else {
             toast.error("Gagal mengupdate SK 6");
           }
         }
       } catch (error) {
+      } finally {
+        loading.value = false;
       }
     }
 
@@ -75,5 +78,6 @@ export default defineComponent({
     @submit="submit"
     :isEdit="true"
     :errors="errors"
+    :btnLoading="loading"
   />
 </template>

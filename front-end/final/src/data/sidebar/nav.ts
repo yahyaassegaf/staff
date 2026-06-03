@@ -41,6 +41,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     menutitle: 'MAIN'
   },
   { path: "/dashboard", icon: Svgicons.Dashboardicon, type: "link", active: false, selected: false, dirchange: false, title: "Dashboard" },
+  { path: "/file-manager", icon: Svgicons.Fileicon, type: "link", active: false, selected: false, dirchange: false, title: "File Manager" },
   // {
   //   title: "Dashboards", icon: Svgicons.Dashboardicon, type: "sub", active: false, dirchange: false, children: [
 
@@ -136,14 +137,14 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   },
 
   {
-    title: "Data", icon: Svgicons.Applicationicon, type: "sub", active: false, selected: false, dirchange: false, children: [
+    title: "Data", icon: Svgicons.Applicationicon, type: "sub", active: false, selected: false, dirchange: false, allowedLevels: ['admin'], children: [
 
       { path: "/prodi", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Prodi" },
       { path: "/fakultas", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Fakultas" },
 
       { path: "/tanda-tangan", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Tanda Tangan" },
-      { path: "/setting-jabatan", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Setting Jabatan" },
-      { path: "/jenis-surat", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Jenis Surat" },
+      { path: "/setting-jabatan", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Setting Jabatan", allowedLevels: ['admin'] },
+      { path: "/jenis-surat", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Jenis Surat", allowedLevels: ['admin'] },
       // {
       //   title: "Email", type: "sub", icon: Svgicons.Emailicon, active: false, children: [
 
@@ -319,7 +320,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
       { path: "/spm", type: "link", icon: Svgicons.Teamicon, active: false, selected: false, dirchange: false, title: "Surat Keterangan SPM" },
       // { path: "/sk", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Keterangan" },
       // { path: "/st", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Tugas" },
-      { path: "/hasil-rapat", type: "link", icon: Svgicons.Formsicon, active: false, selected: false, dirchange: false, title: "Hasil Rapat" },
+      // { path: "/hasil-rapat", type: "link", icon: Svgicons.Formsicon, active: false, selected: false, dirchange: false, title: "Hasil Rapat" },
     ]
   },
   {

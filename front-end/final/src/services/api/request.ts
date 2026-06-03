@@ -8,16 +8,16 @@ export async function apiGet(
   try {
     const response = await http.get(url, {
       params,
-// 🔥 penting
+      // 🔥 penting
     });
 
     return {
-            success : true,
-            data : response.data
-        } 
+      success: true,
+      data: response.data
+    }
   } catch (error: any) {
     if (error.response?.status === 401) {
-        return { success: false, error: 'Unauthorized' };
+      return { success: false, error: 'Unauthorized' };
     }
     return { success: false, error };
   }
@@ -42,41 +42,41 @@ export async function apiPdf(
 
 
 
-export async function apiPost(url: string, params?:Object) {
-    try {
-        const response = await http.post(url, params);
-        return {
-            success : true,
-            data : response.data
-        }
-    } catch (error: any) {
-        if (error.response?.status === 401) {
-            return { success: false, error: 'Unauthorized' };
-        }
-        return { success: false, error };
+export async function apiPost(url: string, params?: Object) {
+  try {
+    const response = await http.post(url, params);
+    return {
+      success: true,
+      data: response.data
     }
+  } catch (error: any) {
+    if (error.response?.status === 401) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    return { success: false, error };
+  }
 }
 
-export async function apiPut(url: string, params?:Object) {
-    try {
-        const response = await http.put(url, params);
-        return {
-            success : true,
-            data : response.data
-        }
-    } catch (error) {
-        return { success: false, error };
+export async function apiPut(url: string, params?: Object) {
+  try {
+    const response = await http.put(url, params);
+    return {
+      success: true,
+      data: response.data
     }
+  } catch (error) {
+    return { success: false, error };
+  }
 }
 
-export async function apiDelete(url: string, params?:Object) {
-    try {
-        const response = await http.delete(url, {params});
-        return {
-            success : true,
-            data : response.data
-        }
-    } catch (error) {
-        return { success: false, error };
+export async function apiDelete(url: string, params?: Object) {
+  try {
+    const response = await http.delete(url, { params });
+    return {
+      success: true,
+      data: response.data
     }
+  } catch (error) {
+    return { success: false, error };
+  }
 }

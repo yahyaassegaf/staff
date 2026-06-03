@@ -108,6 +108,10 @@ const props = defineProps({
 });
 
 function handleLinkClick() {
+  // Close the submenu/dropdown after navigation
+  if (props.closeMenuOnNavigate) {
+    props.closeMenuOnNavigate();
+  }
   // Close sidebar on mobile
   if (window.innerWidth < 992) {
     document.documentElement.setAttribute("data-toggled", "close");

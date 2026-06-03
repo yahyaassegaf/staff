@@ -77,7 +77,7 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id'      => 'required',
-                'no_surat'      => 'required|string|max:255',
+                'no_surat'      => 'required|string|max:255|unique:nomor,nomor',
                 'nama_mhs'      => 'required|string|max:255',
                 'tempat_lahir'  => 'required|string|max:100',
                 'tanggal_lahir' => 'required|date',
@@ -88,6 +88,8 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
                 'tanggal'       => 'required|date',
                 'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
                 'ttd'           => 'nullable|string',
+            ], [
+                'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
 
             if ($validator->fails()) {
@@ -100,7 +102,7 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
 
             $validate = $validator->validated();
 
-            $login = Auth::user()->prodi->alias;
+            $login = Auth::user()?->prodi?->alias ?? 'UMUM';
             $no_surat = $validate['no_surat'];
 
             $noSurat = SuratService::formatNomorSurat('SKUKD', $no_surat, $validate['tanggal'], $validate['prodi_id']);
@@ -144,6 +146,78 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
             $log->nama_surat = 'Surat Keterangan Ujian Komprehensif Diniyah';
             $log->user_id = Auth::user()->id;
             $log->save();
+
+            // Re-fetch record with joins to build the new PDF
+            $refetched = SuratKeteranganUjianKomprehensifDiniyah::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_ujian_komprehensif_diniyah.prodi_id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_keterangan_ujian_komprehensif_diniyah.tanda_tangan_id')
+                ->select(
+                    'surat_keterangan_ujian_komprehensif_diniyah.*',
+                    'prodi.nama as nama_prodi',
+                    'prodi.alias as alias_prodi',
+                    'fakultas.nama as fakultas',
+                    'tanda_tangan.nama as nama_ttd',
+                    'tanda_tangan.gambar as ttd'
+                )
+                ->where('surat_keterangan_ujian_komprehensif_diniyah.id', $data->id)
+                ->first();
+
+            if ($refetched) {
+                $settingKompre = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_komprehensif')->first();
+                $namaKetua = $settingKompre && $settingKompre->tandaTangan ? $settingKompre->tandaTangan->nama : ($refetched->nama_ttd ?? $refetched->koor_komprehensif);
+                $ttdKetua = $settingKompre && $settingKompre->tandaTangan ? $settingKompre->tandaTangan->gambar : $refetched->ttd;
+
+                $kopPath = base_path('../public_html/img/kop.jpg');
+                $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
+                
+                $tddBase64 = '';
+                if (!empty($ttdKetua)) {
+                    $tddPath = base_path('../public_html/' . $ttdKetua);
+                    if (file_exists($tddPath)) {
+                        $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                    }
+                }
+                
+                $stempelPath = base_path('../public_html/img/stempel.png');
+                $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+
+                $jabatan = 'Ketua / Koordinator Komprehensip';
+                $pdfData = [
+                    'nomor_surat' => $refetched->nomor_surat,
+                    'nama' => $refetched->nama_lengkap,
+                    'tempat_lahir' => $refetched->tempat_lahir,
+                    'tanggal_lahir' => \App\Services\SuratService::formatTanggalIndonesian($refetched->tanggal_lahir),
+                    'nim' => $refetched->nim,
+                    'fakultas' => $refetched->fakultas,
+                    'prodi' => $refetched->nama_prodi,
+                    'alamat' => $refetched->alamat_rumah,
+                    'kelas' => $refetched->kelas_pondok,
+                    'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($refetched->tanggal),
+                    'nama_penandatangan' => $namaKetua,
+                    'jabatan_penandatangan' => $jabatan,
+                    'kopBase64' => $kopBase64,
+                    'ttd' => $tddBase64,
+                    'stempel' => $stempelBase64
+                ];
+
+                $pdf = Pdf::loadView('pdf.komprehensif', $pdfData)->setPaper('a4', 'portrait');
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($refetched->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganUjianKomprehensifDiniyahController/');
+                $fileName = 'surat_keterangan_ujian_komprehensif_diniyah_' . $refetched->nim . '_' . $refetched->alias_prodi . '_' . uniqid() . '.pdf';
+
+                if (!file_exists($directory)) {
+                    mkdir($directory, 0755, true);
+                }
+
+                $path = $directory . $fileName;
+                $pdf->save($path);
+
+                $refetched->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan Ujian Komprehensif Diniyah';
+                UploudSuratToDrive::dispatch($refetched->id, $nameTable, $refetched->nama_prodi, SuratKeteranganUjianKomprehensifDiniyah::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -198,7 +272,31 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
         Log::info($request->all());
         try {
             $validator = Validator::make($request->all(), [
-                'no_surat' => 'required|string|max:255',
+                'no_surat' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    function ($attribute, $value, $fail) use ($id) {
+                        $data = \App\Models\SuratKeteranganUjianKomprehensifDiniyah::find($id);
+                        if ($data) {
+                            $originalNoSurat = '';
+                            $nomorStr = $data->nomor_surat ?? $data->nomor ?? null;
+                            if ($nomorStr) {
+                                $parts = explode('/', $nomorStr);
+                                $firstPart = $parts[0];
+                                if (strpos($firstPart, '-') !== false) {
+                                    $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+                                }
+                                $originalNoSurat = trim($firstPart);
+                            }
+                            if ($value !== $originalNoSurat) {
+                                if (\App\Models\NoSurat::where('nomor', $value)->exists()) {
+                                    $fail('Nomor surat sudah terpakai.');
+                                }
+                            }
+                        }
+                    }
+                ],
                 'prodi_id' => 'sometimes|exists:prodi,id',
                 'nama_mhs' => 'sometimes|string|max:255',
                 'tempat_lahir' => 'sometimes|string|max:100',
@@ -234,6 +332,7 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
             }
 
             $oldDriveFileId = $data->drive_file_id;
+            $oldLocalPath = $data->local_path;
 
             $noSurat = \App\Services\SuratService::formatNomorSurat('SKUKD', $validate['no_surat'], $validate['tanggal'], $validate['prodi_id'] ?? null);
             $data->nomor_surat = $noSurat;
@@ -285,6 +384,9 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
             // Delete old file from Google Drive if exists
             if (!empty($oldDriveFileId)) {
                 \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
+            }
+            if (!empty($oldLocalPath) && file_exists($oldLocalPath)) {
+                @unlink($oldLocalPath);
             }
 
             $data->drive_file_id = null;
@@ -342,8 +444,9 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
                 ];
 
                 $pdf = Pdf::loadView('pdf.komprehensif', $pdfData)->setPaper('a4', 'portrait');
-                $fileName = 'surat_keterangan_ujian_komprehensif_diniyah_' . $refetched->nim . '_' . $refetched->alias_prodi . '.pdf';
-                $directory = base_path('../public_html/pdf/');
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($refetched->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganUjianKomprehensifDiniyahController/');
+                $fileName = 'surat_keterangan_ujian_komprehensif_diniyah_' . $refetched->nim . '_' . $refetched->alias_prodi . '_' . uniqid() . '.pdf';
 
                 if (!file_exists($directory)) {
                     mkdir($directory, 0755, true);
@@ -460,8 +563,9 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
             Log::info('pdf');
             $fileName = 'surat_keterangan_ukd_' . $data->nim . '.pdf';
 
-            $fileName = 'surat_keterangan_ujian_komprehensif_diniyah_' . $data->nim . '_' . $data->alias_prodi . '.pdf';
-            $directory = base_path('../public_html/pdf/');
+            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganUjianKomprehensifDiniyahController/');
+            $fileName = 'surat_keterangan_ujian_komprehensif_diniyah_' . $data->nim . '_' . $data->alias_prodi . '_' . uniqid() . '.pdf';
 
             if (!file_exists($directory)) {
                 mkdir($directory, 0755, true);
@@ -476,7 +580,7 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
 
             $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
 
-            if (!Storage::disk('google')->exists($googlePath)) {
+            if (empty($data->drive_file_id)) {
                 UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganUjianKomprehensifDiniyah::class);
             }
 

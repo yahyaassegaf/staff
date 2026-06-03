@@ -12,6 +12,10 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  btnLoading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const defaultForm = {
@@ -26,10 +30,7 @@ const defaultForm = {
 
 const disableListMhsWatcher = ref(false);
 
-const readonlyField = ref({
-  nama_lengkap: false,
-  prodi: false,
-});
+
 
 const form = reactive({ ...defaultForm });
 
@@ -53,10 +54,8 @@ watch(listMhs, async (val) => {
 
   if (val.alias_prodi) {
     form.prodi = val.alias_prodi;
-    readonlyField.value.prodi = true;
   } else {
     form.prodi = val.prodi_mhs || "";
-    readonlyField.value.prodi = false;
   }
 
   isLoadingData.value = false;
@@ -302,7 +301,7 @@ function submitForm() {
                   v-model="form.nama_lengkap"
                   class="form-control"
                   :class="{ 'is-invalid': errors?.nama_lengkap }"
-                  :readonly="readonlyField.nama_lengkap"
+                  readonly
                   placeholder="Isikan Nama Mahasiswa"
                 />
                 <div v-if="errors?.nama_lengkap" class="invalid-feedback">
@@ -319,6 +318,7 @@ function submitForm() {
                   v-model="form.nim"
                   class="form-control"
                   :class="{ 'is-invalid': errors?.nim }"
+                  readonly
                   placeholder="Isikan NIM"
                 />
                 <div v-if="errors?.nim" class="invalid-feedback">
@@ -335,7 +335,7 @@ function submitForm() {
                   v-model="form.prodi"
                   class="form-control"
                   :class="{ 'is-invalid': errors?.prodi }"
-                  :readonly="readonlyField.prodi"
+                  readonly
                   placeholder="Isikan Program Studi"
                 />
                 <div v-if="errors?.prodi" class="invalid-feedback">
@@ -351,21 +351,17 @@ function submitForm() {
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <div class="input-group" v-else>
                   <span class="input-group-text" v-if="formatParts.s2.prefix">{{ formatParts.s2.prefix }}</span>
-                  
-                <div class="input-group">
-                  <span class="input-group-text" v-if="formatParts.prefix">{{ formatParts.prefix }}</span>
                   <input
                     type="text"
                     v-model="form.no_surat"
                     class="form-control"
-                    :class="{ 'is-invalid': errors?.no_surat }"
+                    :class="{ 'is-invalid': errors?.nomor_surat || errors?.no_surat }"
                     placeholder="No"
                   />
-                  <span class="input-group-text" v-if="formatParts.suffix">{{ formatParts.suffix }}</span>
-                  <div v-if="errors?.no_surat" class="invalid-feedback">
-                    {{ errors.no_surat[0] }}
+                  <span class="input-group-text" v-if="formatParts.s2.suffix">{{ formatParts.s2.suffix }}</span>
+                  <div v-if="errors?.nomor_surat || errors?.no_surat" class="invalid-feedback">
+                    {{ errors?.nomor_surat ? errors.nomor_surat[0] : errors?.no_surat[0] }}
                   </div>
-                </div>
                 </div>
               </div>
 
@@ -387,9 +383,10 @@ function submitForm() {
 
             </div>
           </div>
-          <div class="card-footer text-end">
-            <button class="btn btn-primary btn-wave shadow-sm">
-              {{ isEdit ? "Update Data" : "Simpan Data" }}
+          <div class="card-footer">
+            <button class="btn btn-primary-light btn-wave ms-auto float-end" :disabled="btnLoading">
+              <span v-if="btnLoading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              {{ btnLoading ? (isEdit ? "Mengupdate..." : "Menyimpan...") : (isEdit ? "Update" : "Simpan") }}
             </button>
           </div>
         </div>

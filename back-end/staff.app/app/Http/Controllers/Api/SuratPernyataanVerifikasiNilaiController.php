@@ -76,11 +76,13 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required|exists:prodi,id',
-                'no_surat' => 'required|string|max:255',
+                'no_surat' => 'required|string|max:255|unique:nomor,nomor',
                 'nama_mhs' => 'required|string|max:255',
                 'nim' => 'required|string|max:255',
                 'prodi' => 'required|string|max:255',
                 'tanggal' => 'required|date',
+            ], [
+                'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
 
             if ($validator->fails()) {
@@ -107,7 +109,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 ->where('prodi.alias', $prodi->alias)
                 ->value('fakultas.nama');
 
-            $login = Auth::user()->prodi ? Auth::user()->prodi->alias : 'UMUM';
+            $login = Auth::user()?->prodi ? Auth::user()->prodi->alias : 'UMUM';
             $no_surat = $validate['no_surat'];
 
             $noSurat = SuratService::formatNomorSurat('SPMVN', $no_surat, $validate['tanggal'], $validate['prodi_id']);
@@ -139,6 +141,80 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
             $log->nama_surat    = 'Surat Pernyataan Verifikasi Nilai';
             $log->user_id       = Auth::user()->id;
             $log->save();
+
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratPernyataanVerifikasiNilai::leftJoin('prodi', 'prodi.id', '=', 'surat_pernyataan_verifikasi_nilai.prodi_id')
+                ->leftJoin('users', 'users.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_pernyataan_verifikasi_nilai.tanda_tangan_id')
+                ->select(
+                    'surat_pernyataan_verifikasi_nilai.*',
+                    'users.name as nama_staff',
+                    'prodi.nama as nama_prodi',
+                    'tanda_tangan.gambar as ttd',
+                    'tanda_tangan.nama as nama_penandatangan',
+                    'fakultas.nama as nama_fakultas'
+                )
+                ->where('surat_pernyataan_verifikasi_nilai.id', $surat->id)
+                ->first();
+
+            if ($data) {
+                $kopPath = base_path('../public_html/img/kop.jpg');
+                $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
+
+                $tddBase64 = '';
+                if (!empty($data->ttd)) {
+                    $tddPath = base_path('../public_html/' . $data->ttd);
+                    if (file_exists($tddPath)) {
+                        $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                    }
+                }
+
+                $stempelPath = base_path('../public_html/img/stempel.png');
+                $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+
+                $nama = strtolower($data->nama_mahasiswa);
+                $nim = strtolower($data->nim);
+
+                $jabatan = 'Staff Program Studi ' . ucwords($data->nama_prodi) . ' Fakultas ' . ucwords($data->nama_fakultas);
+                $staff = 'Staff Prodi ' . ucwords($data->nama_prodi);
+                $pdfData = [
+                    'nomor' => $data->nomor,
+                    'nama_penandatangan' => $data->nama_penandatangan,
+                    'niy' => $data->niy,
+                    'jabatan' => $jabatan,
+                    'staff' => $staff,
+                    'nama_mahasiswa' => $nama,
+                    'nim' => $nim,
+                    'prodi' => $data->nama_prodi,
+                    'fakultas' => $data->nama_fakultas,
+                    'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+                    'jenis_kelamin' => $data->jenis_kelamin,
+                    'kopBase64' => $kopBase64,
+                    'ttd' => $tddBase64,
+                    'stempel' => $stempelBase64,
+                ];
+
+                $pdf = Pdf::loadView('pdf.surat_pernyataan_verifikasi_nilai', $pdfData)
+                    ->setPaper('a4', 'portrait');
+
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratPernyataanVerifikasiNilaiController/');
+                $fileName = 'surat_pernyataan_verifikasi_nilai_' . $data->nim . '_' . uniqid() . '.pdf';
+
+                if (!file_exists($directory)) {
+                    mkdir($directory, 0755, true);
+                }
+
+                $path = $directory . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Pernyataan Verifikasi Nilai';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->nama_prodi, SuratPernyataanVerifikasiNilai::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -172,7 +248,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
             ], 404);
         }
 
-        
+
         $nomorStr = $data->nomor_surat ?? $data->nomor ?? null;
         if ($nomorStr) {
             $parts = explode('/', $nomorStr);
@@ -195,8 +271,32 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
         try {
 
             $validator = Validator::make($request->all(), [
-                'no_surat' => 'required|string|max:255',
-'prodi_id' => 'required|exists:prodi,id',
+                'no_surat' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    function ($attribute, $value, $fail) use ($id) {
+                        $surat = \App\Models\SuratPernyataanVerifikasiNilai::find($id);
+                        if ($surat) {
+                            $originalNoSurat = '';
+                            $nomorStr = $surat->nomor_surat ?? $surat->nomor ?? null;
+                            if ($nomorStr) {
+                                $parts = explode('/', $nomorStr);
+                                $firstPart = $parts[0];
+                                if (strpos($firstPart, '-') !== false) {
+                                    $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+                                }
+                                $originalNoSurat = trim($firstPart);
+                            }
+                            if ($value !== $originalNoSurat) {
+                                if (\App\Models\NoSurat::where('nomor', $value)->exists()) {
+                                    $fail('Nomor surat sudah terpakai.');
+                                }
+                            }
+                        }
+                    }
+                ],
+                'prodi_id' => 'required|exists:prodi,id',
                 'nama_mhs' => 'required|string|max:255',
                 'nim' => 'required|string|max:255',
                 'prodi' => 'required|string|max:255',
@@ -222,6 +322,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
             }
 
             $oldDriveFileId = $surat->drive_file_id;
+            $oldLocalPath = $surat->local_path;
 
             $prodi = Prodi::find($validate['prodi_id']);
             if (!$prodi) {
@@ -235,8 +336,8 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
             $surat->nomor = $noSurat;
 
             $fakultas = \DB::table('fakultas')
-                ->join('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
-                ->join('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->join('fakultas_prodi', 'fakultas_prodi.fakultas_id', '=', 'fakultas.id')
+                ->join('prodi', 'prodi.id', '=', 'fakultas_prodi.prodi_id')
                 ->where('prodi.alias', $prodi->alias)
                 ->value('fakultas.nama');
 
@@ -254,6 +355,9 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
             // Delete old file from Google Drive if exists
             if (!empty($oldDriveFileId)) {
                 \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
+            }
+            if (!empty($oldLocalPath) && file_exists($oldLocalPath)) {
+                @unlink($oldLocalPath);
             }
 
             $surat->drive_file_id = null;
@@ -314,8 +418,9 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 $pdf = Pdf::loadView('pdf.surat_pernyataan_verifikasi_nilai', $pdfData)
                     ->setPaper('a4', 'portrait');
 
-                $fileName = 'surat_pernyataan_verifikasi_nilai_' . $data->nim . '.pdf';
-                $directory = base_path('../public_html/pdf/');
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratPernyataanVerifikasiNilaiController/');
+                $fileName = 'surat_pernyataan_verifikasi_nilai_' . $data->nim . '_' . uniqid() . '.pdf';
 
                 if (!file_exists($directory)) {
                     mkdir($directory, 0755, true);
@@ -430,8 +535,9 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
             $pdf = Pdf::loadView('pdf.surat_pernyataan_verifikasi_nilai', $pdfData)
                 ->setPaper('a4', 'portrait');
 
-            $fileName = 'surat_pernyataan_verifikasi_nilai_' . $data->nim . '.pdf';
-            $directory = base_path('../public_html/pdf/');
+            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratPernyataanVerifikasiNilaiController/');
+            $fileName = 'surat_pernyataan_verifikasi_nilai_' . $data->nim . '_' . uniqid() . '.pdf';
 
             if (!file_exists($directory)) {
                 mkdir($directory, 0755, true);
@@ -446,7 +552,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
 
             $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
 
-            if (!Storage::disk('google')->exists($googlePath)) {
+            if (empty($data->drive_file_id)) {
                 UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratPernyataanVerifikasiNilai::class);
             }
 

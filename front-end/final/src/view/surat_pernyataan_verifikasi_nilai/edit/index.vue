@@ -17,6 +17,7 @@ export default defineComponent({
     const errors = ref<any>({});
     const suratData = ref({
       id: "",
+      no_surat: "",
       nomor: "",
       tanda_tangan_id: null as null | number,
       nama_penandatangan: "",
@@ -41,7 +42,6 @@ export default defineComponent({
           suratData.value = {
             id: data.id,
             no_surat: data.no_surat || data.nomor_surat || data.nomor || "",
-            tanda_tangan_id: data.tanda_tangan_id ? Number(data.tanda_tangan_id) : null,
             nomor: data.nomor || "",
             tanda_tangan_id: data.tanda_tangan_id
               ? Number(data.tanda_tangan_id)
@@ -83,7 +83,7 @@ export default defineComponent({
         } else {
           if ((response.error as any)?.response?.status === 422) {
             errors.value = (response.error as any).response.data.errors;
-            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+            
           } else {
             toast.error("Surat gagal diupdate", {
               theme: "auto",
@@ -128,5 +128,6 @@ export default defineComponent({
     :modelValue="suratData"
     :isEdit="true"
     :errors="errors"
+    :btnLoading="loading"
   />
 </template>

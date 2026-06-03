@@ -77,7 +77,7 @@ class SuratKeteranganTransferController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required',
-                'no_surat' => 'required|string',
+                'no_surat' => 'required|string|unique:nomor,nomor',
                 'tahun_akademik' => 'nullable|string|max:255',
                 'nama' => 'required|string|max:255',
                 'tanggal_lahir' => 'required|date',
@@ -88,6 +88,8 @@ class SuratKeteranganTransferController extends Controller
                 'alamat' => 'nullable|string',
                 'universitas_tujuan' => 'nullable|string|max:255',
                 'tanggal' => 'required|date',
+            ], [
+                'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
 
             if ($validator->fails()) {
@@ -153,6 +155,48 @@ class SuratKeteranganTransferController extends Controller
             $log->user_id = Auth::user()->id;
             $log->save();
 
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratKeteranganTransfer::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_transfer.prodi_id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'fakultas.tanda_tangan_id')
+                ->leftJoin('th_akademik', 'th_akademik.id', '=', 'surat_keterangan_transfer.tahun_akademik')
+                ->select(
+                    'surat_keterangan_transfer.*',
+                    'prodi.nama as prodi_name',
+                    'prodi.nama_kepala',
+                    'prodi.nidn_kepala',
+                    'fakultas.nama as fakultas_name',
+                    'fakultas.dekan as dekan',
+                    'fakultas.nidn_dekan as nidn_dekan',
+                    'tanda_tangan.gambar as ttd',
+                    'th_akademik.nama as th_akademik_nama',
+                    'th_akademik.semester as th_akademik_semester'
+                )
+                ->where('surat_keterangan_transfer.id', $skt->id)
+                ->first();
+
+            if ($data) {
+                $pdfData = $this->buildPdfData($data);
+                $pdf = Pdf::loadView('pdf.surat_keterangan_transfer', $pdfData)->setPaper('a4', 'portrait');
+
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi_name ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganTransferController');
+                $fileName = 'surat_keterangan_transfer_' . $data->nim . '_' . uniqid() . '.pdf';
+
+                if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+                }
+
+                $path = $directory . '/' . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan Transfer';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->prodi_name, SuratKeteranganTransfer::class);
+            }
+
             return response()->json([
                 'status' => true,
                 'message' => 'Data berhasil ditambahkan'
@@ -204,8 +248,31 @@ class SuratKeteranganTransferController extends Controller
         try {
 
             $validator = Validator::make($request->all(), [
+                'no_surat' => [
+                    'required',
+                    'string',
+                    function ($attribute, $value, $fail) use ($id) {
+                        $skt = \App\Models\SuratKeteranganTransfer::find($id);
+                        if ($skt) {
+                            $originalNoSurat = '';
+                            $nomorStr = $skt->nomor_surat ?? $skt->nomor ?? null;
+                            if ($nomorStr) {
+                                $parts = explode('/', $nomorStr);
+                                $firstPart = $parts[0];
+                                if (strpos($firstPart, '-') !== false) {
+                                    $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+                                }
+                                $originalNoSurat = trim($firstPart);
+                            }
+                            if ($value !== $originalNoSurat) {
+                                if (\App\Models\NoSurat::where('nomor', $value)->exists()) {
+                                    $fail('Nomor surat sudah terpakai.');
+                                }
+                            }
+                        }
+                    }
+                ],
                 'prodi_id' => 'required',
-                'no_surat' => 'required|string',
                 'nama' => 'required|string|max:255',
                 'tanggal_lahir' => 'required|date',
                 'tempat_lahir' => 'nullable|string|max:100',
@@ -237,6 +304,7 @@ class SuratKeteranganTransferController extends Controller
             }
 
             $oldDriveFileId = $skt->drive_file_id;
+            $oldLocalPath = $skt->local_path;
 
             $skt->nama = $validate['nama'];
             $skt->tanggal_lahir = $validate['tanggal_lahir'];
@@ -271,6 +339,9 @@ class SuratKeteranganTransferController extends Controller
             if (!empty($oldDriveFileId)) {
                 \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
             }
+            if (!empty($oldLocalPath) && file_exists($oldLocalPath)) {
+                @unlink($oldLocalPath);
+            }
 
             $skt->drive_file_id = null;
             $skt->drive_link = null;
@@ -290,7 +361,7 @@ class SuratKeteranganTransferController extends Controller
                     'prodi.nidn_kepala',
                     'fakultas.nama as fakultas_name',
                     'fakultas.dekan as dekan',
-                    'fakultas.nidn as nidn_dekan',
+                    'fakultas.nidn_dekan as nidn_dekan',
                     'tanda_tangan.gambar as ttd',
                     'th_akademik.nama as th_akademik_nama',
                     'th_akademik.semester as th_akademik_semester'
@@ -302,8 +373,9 @@ class SuratKeteranganTransferController extends Controller
                 $pdfData = $this->buildPdfData($data);
                 $pdf = Pdf::loadView('pdf.surat_keterangan_transfer', $pdfData)->setPaper('a4', 'portrait');
 
-                $fileName = 'surat_keterangan_transfer_' . $data->nim . '.pdf';
-                $directory = base_path('../public_html/pdf');
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi_name ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganTransferController');
+                $fileName = 'surat_keterangan_transfer_' . $data->nim . '_' . uniqid() . '.pdf';
 
                 if (!\Illuminate\Support\Facades\File::exists($directory)) {
                     \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
@@ -374,7 +446,7 @@ class SuratKeteranganTransferController extends Controller
                     'prodi.nidn_kepala',
                     'fakultas.nama as fakultas_name',
                     'fakultas.dekan as dekan',
-                    'fakultas.nidn as nidn_dekan',
+                    'fakultas.nidn_dekan as nidn_dekan',
                     'tanda_tangan.gambar as ttd',
                     'th_akademik.nama as th_akademik_nama',
                     'th_akademik.semester as th_akademik_semester'
@@ -389,9 +461,10 @@ class SuratKeteranganTransferController extends Controller
             $pdfData = $this->buildPdfData($data);
 
             $pdf = Pdf::loadView('pdf.surat_keterangan_transfer', $pdfData)->setPaper('a4', 'portrait');
-            $fileName = 'surat_keterangan_transfer_' . $data->nim . '.pdf';
+            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi_name ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganTransferController');
+            $fileName = 'surat_keterangan_transfer_' . $data->nim . '_' . uniqid() . '.pdf';
 
-            $directory = base_path('../public_html/pdf');
             if (!\Illuminate\Support\Facades\File::exists($directory)) {
                 \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
             }
@@ -403,7 +476,7 @@ class SuratKeteranganTransferController extends Controller
             $nameTable = 'Surat Keterangan Transfer';
             $googlePath = $data->prodi_name . '/' . $nameTable . '/' . $fileName;
 
-            if (!Storage::disk('google')->exists($googlePath)) {
+            if (empty($data->drive_file_id)) {
                 UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi_name, SuratKeteranganTransfer::class);
             }
 

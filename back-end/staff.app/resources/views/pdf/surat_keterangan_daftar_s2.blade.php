@@ -128,7 +128,7 @@
     </table>
 
     <div class="paragraf">
-        Mahasiswa tersebut <strong>telah terdaftar sebagai peserta ujian skripsi</strong> pada priode bulan {{ strtolower(\Carbon\Carbon::parse($tanggal)->translatedFormat('F Y')) }}.
+        Mahasiswa tersebut <strong>telah terdaftar sebagai peserta ujian skripsi</strong> pada priode bulan {{ strtolower(\Carbon\Carbon::parse($tanggal)->locale('id')->translatedFormat('F Y')) }}.
     </div>
 
     <div class="paragraf">
@@ -140,7 +140,7 @@
             <td width="55%"></td>
             <td width="45%" style="text-align:left; padding-left: 20px;">
                 Pasuruan, {{ $tanggal_surat }}<br>
-                Kepala Prodi {{ $alias_prodi }}<br>
+                Staff Prodi {{ $alias_prodi }}<br>
 
                 <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -5px; margin-bottom: -15px;">
                     <tr>

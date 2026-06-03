@@ -142,7 +142,7 @@
         <tr>
             <td class="label">Nama</td>
             <td class="separator">:</td>
-            <td class="value"><strong>{{ strtoupper($nama ?? '') }}</strong></td>
+            <td class="value">{{ strtoupper($nama ?? '') }}</td>
         </tr>
         <tr>
             <td class="label">NIM</td>

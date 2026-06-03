@@ -50,10 +50,10 @@ class Sk6Controller extends Controller
             $search = $request->search;
             $data->where(function ($q) use ($search) {
                 $q->orWhere('nim', 'like', "%{$search}%")
-                  ->orWhere('nama_mhs', 'like', "%{$search}%")
-                  ->orWhereHas('prodi', function($qProdi) use ($search) {
-                      $qProdi->where('nama', 'like', "%{$search}%");
-                  });
+                    ->orWhere('nama_mhs', 'like', "%{$search}%")
+                    ->orWhereHas('prodi', function ($qProdi) use ($search) {
+                        $qProdi->where('nama', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -102,7 +102,7 @@ class Sk6Controller extends Controller
     public function store(Request $request)
     {
         Log::info($request->all());
-        
+
         $validator = Validator::make($request->all(), [
             'prodi_id' => 'required',
             'nama_mhs' => 'required|string|max:255',
@@ -113,13 +113,19 @@ class Sk6Controller extends Controller
             'alamat_rumah' => 'required|string',
             'kelas_pondok' => 'required|string|max:255',
             'tanggal' => 'nullable|date',
-            'no_sklmk' => 'required|string',
-            'no_skak' => 'required|string',
-            'no_sktkp' => 'required|string',
-            'no_skqa' => 'required|string',
-            'no_skukd' => 'required|string',
+            'no_sklmk' => 'required|string|unique:nomor,nomor',
+            'no_skak' => 'required|string|unique:nomor,nomor',
+            'no_sktkp' => 'required|string|unique:nomor,nomor',
+            'no_skqa' => 'required|string|unique:nomor,nomor',
+            'no_skukd' => 'required|string|unique:nomor,nomor',
             'tanggal_berlaku_dari' => 'nullable|date',
             'tanggal_berlaku_sampai' => 'nullable|date',
+        ], [
+            'no_sklmk.unique' => 'Nomor surat sudah terpakai',
+            'no_skak.unique' => 'Nomor surat sudah terpakai',
+            'no_sktkp.unique' => 'Nomor surat sudah terpakai',
+            'no_skqa.unique' => 'Nomor surat sudah terpakai',
+            'no_skukd.unique' => 'Nomor surat sudah terpakai',
         ]);
 
         if ($validator->fails()) {
@@ -205,7 +211,7 @@ class Sk6Controller extends Controller
             $sktkp = new SuratKeteranganTasmaKknPpl();
             $sktkp->nomor_surat = $nomorSktkp;
             $sktkp->prodi_id = $validate['prodi_id'];
-            
+
             $settingTasma = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_tasma')->first();
             if ($settingTasma && $settingTasma->tandaTangan) {
                 $sktkp->ketua = $settingTasma->tandaTangan->nama;
@@ -240,7 +246,7 @@ class Sk6Controller extends Controller
             $skqa = new SuratKeteranganQismulAman();
             $skqa->nomor_surat = $nomorSkqa;
             $skqa->prodi_id = $validate['prodi_id'];
-            
+
             $settingQa = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_qismul_aman')->first();
             if ($settingQa && $settingQa->tandaTangan) {
                 $skqa->ketua = $settingQa->tandaTangan->nama;
@@ -316,6 +322,31 @@ class Sk6Controller extends Controller
 
             DB::commit();
 
+            // Re-fetch record and details to build the new PDF
+            $sklmkRefetched = $this->getSklmkDetail($sk6->surat_keterangan_lulus_mata_kuliah_id);
+            if ($sklmkRefetched) {
+                $pdfData = $this->buildSk6PdfData($sk6, $sklmkRefetched);
+                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.sk_6', $pdfData)->setPaper('a4', 'portrait');
+
+                $fileName = 'SK6_' . $sklmkRefetched->nim . '_' . uniqid() . '.pdf';
+                $prodiFolder = \Illuminate\Support\Facades\Auth::user()?->prodi ? \Illuminate\Support\Facades\Auth::user()->prodi->nama : ($sklmkRefetched->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiFolder . '/Sk6Controller');
+
+                if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+                }
+
+                $path = $directory . '/' . $fileName;
+                $pdf->save($path);
+
+                $sk6->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan 6';
+                \App\Jobs\UploudSuratToDrive::dispatch($sk6->id, $nameTable, $sklmkRefetched->nama_prodi, SuratKeterangan6::class);
+
+                $this->dispatchGoogleDriveJobs($sk6, $sklmkRefetched->nama_prodi, $path);
+            }
+
             return response()->json([
                 'status' => true,
                 'message' => '5 Surat Keterangan berhasil ditambahkan'
@@ -340,7 +371,7 @@ class Sk6Controller extends Controller
             'skUjianKomprehensifDiniyah',
             'skQismulAman'
         ])->find($id);
-        
+
         if (!$sk6) {
             return response()->json([
                 'status' => false,
@@ -399,11 +430,141 @@ class Sk6Controller extends Controller
             'alamat_rumah' => 'required|string',
             'kelas_pondok' => 'required|string|max:255',
             'tanggal' => 'required|date',
-            'no_sklmk' => 'required|string',
-            'no_skak' => 'required|string',
-            'no_sktkp' => 'required|string',
-            'no_skqa' => 'required|string',
-            'no_skukd' => 'required|string',
+            'no_sklmk' => [
+                'required',
+                'string',
+                function ($attribute, $value, $fail) use ($id) {
+                    $sk6 = \App\Models\SuratKeterangan6::find($id);
+                    if ($sk6 && $sk6->surat_keterangan_lulus_mata_kuliah_id) {
+                        $model = \App\Models\SuratKeteranganLulusMataKuliah::find($sk6->surat_keterangan_lulus_mata_kuliah_id);
+                        if ($model) {
+                            $originalNoSurat = '';
+                            $nomorStr = $model->nomor_surat ?? $model->nomor ?? null;
+                            if ($nomorStr) {
+                                $parts = explode('/', $nomorStr);
+                                $firstPart = $parts[0];
+                                if (strpos($firstPart, '-') !== false) {
+                                    $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+                                }
+                                $originalNoSurat = trim($firstPart);
+                            }
+                            if ($value !== $originalNoSurat) {
+                                if (\App\Models\NoSurat::where('nomor', $value)->exists()) {
+                                    $fail('Nomor surat sudah terpakai.');
+                                }
+                            }
+                        }
+                    }
+                }
+            ],
+            'no_skak' => [
+                'required',
+                'string',
+                function ($attribute, $value, $fail) use ($id) {
+                    $sk6 = \App\Models\SuratKeterangan6::find($id);
+                    if ($sk6 && $sk6->surat_keterangan_administrasi_keuangan_id) {
+                        $model = \App\Models\SuratKeteranganAdministrasiKeuangan::find($sk6->surat_keterangan_administrasi_keuangan_id);
+                        if ($model) {
+                            $originalNoSurat = '';
+                            $nomorStr = $model->nomor_surat ?? $model->nomor ?? null;
+                            if ($nomorStr) {
+                                $parts = explode('/', $nomorStr);
+                                $firstPart = $parts[0];
+                                if (strpos($firstPart, '-') !== false) {
+                                    $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+                                }
+                                $originalNoSurat = trim($firstPart);
+                            }
+                            if ($value !== $originalNoSurat) {
+                                if (\App\Models\NoSurat::where('nomor', $value)->exists()) {
+                                    $fail('Nomor surat sudah terpakai.');
+                                }
+                            }
+                        }
+                    }
+                }
+            ],
+            'no_sktkp' => [
+                'required',
+                'string',
+                function ($attribute, $value, $fail) use ($id) {
+                    $sk6 = \App\Models\SuratKeterangan6::find($id);
+                    if ($sk6 && $sk6->surat_keterangan_tasma_kkn_ppl_id) {
+                        $model = \App\Models\SuratKeteranganTasmaKknPpl::find($sk6->surat_keterangan_tasma_kkn_ppl_id);
+                        if ($model) {
+                            $originalNoSurat = '';
+                            $nomorStr = $model->nomor_surat ?? $model->nomor ?? null;
+                            if ($nomorStr) {
+                                $parts = explode('/', $nomorStr);
+                                $firstPart = $parts[0];
+                                if (strpos($firstPart, '-') !== false) {
+                                    $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+                                }
+                                $originalNoSurat = trim($firstPart);
+                            }
+                            if ($value !== $originalNoSurat) {
+                                if (\App\Models\NoSurat::where('nomor', $value)->exists()) {
+                                    $fail('Nomor surat sudah terpakai.');
+                                }
+                            }
+                        }
+                    }
+                }
+            ],
+            'no_skqa' => [
+                'required',
+                'string',
+                function ($attribute, $value, $fail) use ($id) {
+                    $sk6 = \App\Models\SuratKeterangan6::find($id);
+                    if ($sk6 && $sk6->surat_keterangan_qismul_aman_id) {
+                        $model = \App\Models\SuratKeteranganQismulAman::find($sk6->surat_keterangan_qismul_aman_id);
+                        if ($model) {
+                            $originalNoSurat = '';
+                            $nomorStr = $model->nomor_surat ?? $model->nomor ?? null;
+                            if ($nomorStr) {
+                                $parts = explode('/', $nomorStr);
+                                $firstPart = $parts[0];
+                                if (strpos($firstPart, '-') !== false) {
+                                    $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+                                }
+                                $originalNoSurat = trim($firstPart);
+                            }
+                            if ($value !== $originalNoSurat) {
+                                if (\App\Models\NoSurat::where('nomor', $value)->exists()) {
+                                    $fail('Nomor surat sudah terpakai.');
+                                }
+                            }
+                        }
+                    }
+                }
+            ],
+            'no_skukd' => [
+                'required',
+                'string',
+                function ($attribute, $value, $fail) use ($id) {
+                    $sk6 = \App\Models\SuratKeterangan6::find($id);
+                    if ($sk6 && $sk6->surat_keterangan_ujian_komprehensif_diniyah_id) {
+                        $model = \App\Models\SuratKeteranganUjianKomprehensifDiniyah::find($sk6->surat_keterangan_ujian_komprehensif_diniyah_id);
+                        if ($model) {
+                            $originalNoSurat = '';
+                            $nomorStr = $model->nomor_surat ?? $model->nomor ?? null;
+                            if ($nomorStr) {
+                                $parts = explode('/', $nomorStr);
+                                $firstPart = $parts[0];
+                                if (strpos($firstPart, '-') !== false) {
+                                    $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+                                }
+                                $originalNoSurat = trim($firstPart);
+                            }
+                            if ($value !== $originalNoSurat) {
+                                if (\App\Models\NoSurat::where('nomor', $value)->exists()) {
+                                    $fail('Nomor surat sudah terpakai.');
+                                }
+                            }
+                        }
+                    }
+                }
+            ],
             'tanggal_berlaku_dari' => 'nullable|date',
             'tanggal_berlaku_sampai' => 'nullable|date',
         ]);
@@ -417,7 +578,7 @@ class Sk6Controller extends Controller
         }
 
         $validate = $validator->validated();
-        
+
         $sk6 = SuratKeterangan6::find($id);
         if (!$sk6) {
             return response()->json([
@@ -460,6 +621,7 @@ class Sk6Controller extends Controller
             $oldDriveFileIdSkukd = $skukd ? $skukd->drive_file_id : null;
 
             if ($sklmk) {
+
                 $sklmk->nomor_surat = $nomorSklmk;
                 $sklmk->prodi_id = $validate['prodi_id'];
                 $sklmk->nama_lengkap = $validate['nama_mhs'];
@@ -475,6 +637,7 @@ class Sk6Controller extends Controller
             }
 
             if ($skak) {
+
                 $skak->nomor_surat = $nomorSkak;
                 $skak->prodi_id = $validate['prodi_id'];
                 $skak->nama_lengkap = $validate['nama_mhs'];
@@ -490,6 +653,7 @@ class Sk6Controller extends Controller
             }
 
             if ($sktkp) {
+
                 $sktkp->nomor_surat = $nomorSktkp;
                 $sktkp->prodi_id = $validate['prodi_id'];
                 $sktkp->nama_lengkap = $validate['nama_mhs'];
@@ -507,12 +671,12 @@ class Sk6Controller extends Controller
             if ($skqa) {
                 $skqa->nomor_surat = $nomorSkqa;
                 $skqa->prodi_id = $validate['prodi_id'];
-                
+
                 $settingQa = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_qismul_aman')->first();
                 if ($settingQa && $settingQa->tandaTangan) {
                     $skqa->ketua = $settingQa->tandaTangan->nama;
                 }
-                
+
                 $skqa->nama_lengkap = $validate['nama_mhs'];
                 $skqa->tempat_lahir = $validate['tempat_lahir'];
                 $skqa->tanggal_lahir = $validate['tanggal_lahir'];
@@ -569,8 +733,9 @@ class Sk6Controller extends Controller
                 $pdfData = $this->buildSk6PdfData($sk6, $sklmkRefetched);
                 $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.sk_6', $pdfData)->setPaper('a4', 'portrait');
 
-                $fileName = 'SK6_' . $sklmkRefetched->nim . '.pdf';
-                $directory = base_path('../public_html/pdf');
+                $fileName = 'SK6_' . $sklmkRefetched->nim . '_' . uniqid() . '.pdf';
+                $prodiFolder = \Illuminate\Support\Facades\Auth::user()?->prodi ? \Illuminate\Support\Facades\Auth::user()->prodi->nama : ($sklmkRefetched->nama_prodi ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiFolder . '/Sk6Controller');
 
                 if (!\Illuminate\Support\Facades\File::exists($directory)) {
                     \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
@@ -591,7 +756,6 @@ class Sk6Controller extends Controller
                 'status' => true,
                 'message' => 'Data berhasil diupdate'
             ]);
-
         } catch (\Throwable $th) {
             DB::rollBack();
             Log::info($th);
@@ -624,37 +788,6 @@ class Sk6Controller extends Controller
 
             // Hapus headernya terlebih dahulu karena memegang Foreign Key
             $sk6->delete();
-
-            // Collect models before deleting to get their nomor_surat
-            $models = [
-                $id_sklmk ? SuratKeteranganLulusMataKuliah::find($id_sklmk) : null,
-                $id_skak ? SuratKeteranganAdministrasiKeuangan::find($id_skak) : null,
-                $id_sktkp ? SuratKeteranganTasmaKknPpl::find($id_sktkp) : null,
-                $id_skukd ? SuratKeteranganUjianKomprehensifDiniyah::find($id_skukd) : null,
-                $id_skqa ? SuratKeteranganQismulAman::find($id_skqa) : null,
-            ];
-
-            $nomorSurats = [];
-            foreach ($models as $model) {
-                if ($model && $model->nomor_surat) {
-                    $nomorSurats[] = $model->nomor_surat;
-                }
-            }
-
-            if (count($nomorSurats) > 0) {
-                $logs = LogSurat::whereIn('nomor_surat', $nomorSurats)->get();
-                $nomors = $logs->pluck('nomor')->toArray();
-                
-                LogSurat::whereIn('nomor_surat', $nomorSurats)->delete();
-
-                foreach ($nomors as $nomor) {
-                    // Hapus 1 row di NoSurat per nomor
-                    $noSuratObj = NoSurat::where('nomor', $nomor)->first();
-                    if ($noSuratObj) {
-                        $noSuratObj->delete();
-                    }
-                }
-            }
 
             // Hapus detailnya
             if ($id_sklmk) SuratKeteranganLulusMataKuliah::where('id', $id_sklmk)->delete();
@@ -711,21 +844,22 @@ class Sk6Controller extends Controller
             $pdfData = $this->buildSk6PdfData($sk6, $sklmk);
 
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.sk_6', $pdfData)->setPaper('a4', 'portrait');
-            $fileName = 'SK6_' . $sklmk->nim . '.pdf';
-            
-            $directory = base_path('../public_html/pdf');
+            $fileName = 'SK6_' . $sklmk->nim . '_' . uniqid() . '.pdf';
+
+            $prodiFolder = \Illuminate\Support\Facades\Auth::user()?->prodi ? \Illuminate\Support\Facades\Auth::user()->prodi->nama : ($sklmk->nama_prodi ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiFolder . '/Sk6Controller/');
             if (!\Illuminate\Support\Facades\File::exists($directory)) {
                 \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
             }
             $path = $directory . '/' . $fileName;
-            
+
             $pdf->save($path);
 
             $sk6->update(['local_path' => $path]);
 
             $nameTable = 'Surat Keterangan 6';
             $googlePath = $sklmk->nama_prodi . '/' . $nameTable . '/' . $fileName;
-            if (!\Illuminate\Support\Facades\Storage::disk('google')->exists($googlePath)) {
+            if (empty($sk6->drive_file_id)) {
                 \App\Jobs\UploudSuratToDrive::dispatch($id, $nameTable, $sklmk->nama_prodi, SuratKeterangan6::class);
             }
 
@@ -814,7 +948,7 @@ class Sk6Controller extends Controller
             'nomor_surat_sktkp' => $sktkp ? $sktkp->nomor_surat : '-',
             'nomor_surat_skukd' => $skukd ? $skukd->nomor_surat : '-',
             'nomor_surat_skqa' => $skqa ? $skqa->nomor_surat : '-',
-            
+
             'nama' => $sklmk->nama_lengkap,
             'tempat_lahir' => $sklmk->tempat_lahir,
             'tanggal_lahir' => \App\Services\SuratService::formatTanggalIndonesian($sklmk->tanggal_lahir),
@@ -829,20 +963,20 @@ class Sk6Controller extends Controller
             'kopBase64' => $kopBase64,
             'tanggal_awal' => $skqa && $skqa->tanggal_berlaku_dari ? \App\Services\SuratService::formatTanggalIndonesian($skqa->tanggal_berlaku_dari) : '-',
             'tanggal_akhir' => $skqa && $skqa->tanggal_berlaku_sampai ? \App\Services\SuratService::formatTanggalIndonesian($skqa->tanggal_berlaku_sampai) : '-',
-            
+
             // Signatures
             'kaprodi_nama' => $sklmk->kaprodi_nama ?: $sklmk->nama_kepala_prodi,
             'kaprodi_ttd' => $kaprodiTtdBase64,
-            
+
             'skak_nama' => $ttdSkak['nama'] ?: 'Dr. Musleh Harry, SH, M.Hum',
             'skak_ttd' => $ttdSkak['ttd'],
-            
+
             'sktkp_nama' => $ttdSktkp['nama'] ?: 'Achmad Djuaini, M,Pd',
             'sktkp_ttd' => $ttdSktkp['ttd'],
-            
+
             'skukd_nama' => $ttdSkukd['nama'] ?: 'Dr. Habib Zainal Abidin Bilfaqih, M.Pd.',
             'skukd_ttd' => $ttdSkukd['ttd'],
-            
+
             'skqa_nama' => $ttdSkqa['nama'] ?: 'Ust. Fathul Munif',
             'skqa_ttd' => $ttdSkqa['ttd'],
             'stempel' => $stempelBase64,
@@ -855,41 +989,393 @@ class Sk6Controller extends Controller
             [
                 'id' => $sk6->surat_keterangan_lulus_mata_kuliah_id,
                 'class' => \App\Models\SuratKeteranganLulusMataKuliah::class,
-                'name' => 'Surat Keterangan Lulus Mata Kuliah'
+                'name' => 'Surat Keterangan Lulus Mata Kuliah',
+                'generator' => 'generateSklmkPdf'
             ],
             [
                 'id' => $sk6->surat_keterangan_administrasi_keuangan_id,
                 'class' => \App\Models\SuratKeteranganAdministrasiKeuangan::class,
-                'name' => 'Surat Keterangan Administrasi Keuangan'
+                'name' => 'Surat Keterangan Administrasi Keuangan',
+                'generator' => 'generateSkakPdf'
             ],
             [
                 'id' => $sk6->surat_keterangan_tasma_kkn_ppl_id,
                 'class' => \App\Models\SuratKeteranganTasmaKknPpl::class,
-                'name' => 'Surat Keterangan Tasma Kkn Ppl'
+                'name' => 'Surat Keterangan TASMA, KKN, PPL',
+                'generator' => 'generateSktkpPdf'
             ],
             [
                 'id' => $sk6->surat_keterangan_ujian_komprehensif_diniyah_id,
                 'class' => \App\Models\SuratKeteranganUjianKomprehensifDiniyah::class,
-                'name' => 'Surat Keterangan Ujian Komprehensif Diniyah'
+                'name' => 'Surat Keterangan Ujian Komprehensif Diniyah',
+                'generator' => 'generateSkukdPdf'
             ],
             [
                 'id' => $sk6->surat_keterangan_qismul_aman_id,
                 'class' => \App\Models\SuratKeteranganQismulAman::class,
-                'name' => 'Surat Keterangan Qismul Aman'
+                'name' => 'Surat Keterangan Qismul Aman',
+                'generator' => 'generateSkqaPdf'
             ]
         ];
 
         foreach ($models as $item) {
             if (!$item['id']) continue;
 
-            $model = $item['class']::find($item['id']);
-            if ($model) {
-                $model->update(['local_path' => $localPath]);
-                $googlePath = $namaProdi . '/' . $item['name'] . '/' . basename($localPath);
-                if (!\Illuminate\Support\Facades\Storage::disk('google')->exists($googlePath)) {
+            $generator = $item['generator'];
+            $individualPath = $this->$generator($item['id']);
+
+            if ($individualPath) {
+                $googlePath = $namaProdi . '/' . $item['name'] . '/' . basename($individualPath);
+                $subModel = $item['class']::find($item['id']);
+                if ($subModel && empty($subModel->drive_file_id)) {
                     \App\Jobs\UploudSuratToDrive::dispatch($item['id'], $item['name'], $namaProdi, $item['class']);
                 }
             }
         }
+    }
+
+    private function generateSklmkPdf($id)
+    {
+        $data = SuratKeteranganLulusMataKuliah::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_lulus_mata_kuliah.prodi_id')
+            ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+            ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+            ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'fakultas.tanda_tangan_id')
+            ->select(
+                'surat_keterangan_lulus_mata_kuliah.*',
+                'prodi.nama as nama_prodi',
+                'fakultas.nama as fakultas',
+                'fakultas.dekan as dekan',
+                'fakultas.nidn_dekan as nidn_dekan',
+                'prodi.alias as alias_prodi',
+                'prodi.nidn_kepala as nidn_kepala_prodi',
+                'prodi.nama_kepala as nama_kepala_prodi',
+                'tanda_tangan.gambar as ttd'
+            )
+            ->where('surat_keterangan_lulus_mata_kuliah.id', $id)
+            ->first();
+
+        if ($data) {
+            $kopPath = base_path('../public_html/img/kop.jpg');
+            $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
+
+            $stempelPath = base_path('../public_html/img/stempel.png');
+            $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath);
+
+            $tddBase64 = '';
+            if ($data->ttd) {
+                $tddBase64 = \App\Services\SuratService::getBase64Image(base_path('../public_html/' . $data->ttd));
+            }
+
+            $pdfData = [
+                'nomor_surat' => $data->nomor_surat,
+                'nama' => $data->nama_lengkap,
+                'tempat_lahir' => $data->tempat_lahir,
+                'tanggal_lahir' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_lahir),
+                'nim' => $data->nim,
+                'fakultas' => $data->fakultas,
+                'prodi' => $data->nama_prodi,
+                'alamat' => $data->alamat_rumah,
+                'kelas' => $data->kelas_pondok,
+                'alias_prodi' => $data->alias_prodi,
+                'dekan' => $data->dekan,
+                'nidn_dekan' => $data->nidn_dekan,
+                'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+                'stempel' => $stempelBase64,
+                'ttd' => $tddBase64,
+                'kopBase64' => $kopBase64,
+            ];
+
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.v_surat_keterangan_lulus_mata_kuliah', $pdfData)->setPaper('a4', 'portrait');
+
+            $fileName = 'surat_keterangan_lulus_mata_kuliah_' . $data->nim . '_' . $data->prodi_mahasiswa . '_' . uniqid() . '.pdf';
+            $prodiFolder = \Illuminate\Support\Facades\Auth::user()?->prodi ? \Illuminate\Support\Facades\Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganLulusMataKuliahController');
+
+            if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+            }
+
+            $path = $directory . '/' . $fileName;
+            $pdf->save($path);
+
+            SuratKeteranganLulusMataKuliah::where('id', $id)->update(['local_path' => $path]);
+            return $path;
+        }
+        return null;
+    }
+
+    private function generateSkakPdf($id)
+    {
+        $data = SuratKeteranganAdministrasiKeuangan::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_administrasi_keuangan.prodi_id')
+            ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+            ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+            ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_keterangan_administrasi_keuangan.tanda_tangan_id')
+            ->select(
+                'surat_keterangan_administrasi_keuangan.*',
+                'prodi.nama as nama_prodi',
+                'prodi.alias as alias_prodi',
+                'fakultas.nama as fakultas',
+                'tanda_tangan.nama as nama_ttd',
+                'tanda_tangan.gambar as ttd'
+            )
+            ->where('surat_keterangan_administrasi_keuangan.id', $id)
+            ->first();
+
+        if ($data) {
+            $settingKeuangan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'kepala_biro_keuangan')->first();
+            $namaKetua = $settingKeuangan && $settingKeuangan->tandaTangan ? $settingKeuangan->tandaTangan->nama : ($data->nama_ttd ?? $data->kepala_biro);
+            $ttdKetua = $settingKeuangan && $settingKeuangan->tandaTangan ? $settingKeuangan->tandaTangan->gambar : $data->ttd;
+            $namaJabatan = $settingKeuangan ? $settingKeuangan->nama_jabatan : 'Kepala Biro Administrasi Keuangan';
+
+            $kopPath = base_path('../public_html/img/kop.jpg');
+            $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
+
+            $tddPath = base_path('../public_html/' . $ttdKetua);
+            $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+
+            $stempelPath = base_path('../public_html/img/stempel.png');
+            $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath);
+
+            $pdfData = [
+                'nomor_surat' => $data->nomor_surat,
+                'nama' => $data->nama_lengkap,
+                'tempat_lahir' => $data->tempat_lahir,
+                'tanggal_lahir' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_lahir),
+                'nim' => $data->nim,
+                'fakultas' => $data->fakultas ?? '-',
+                'prodi' => $data->prodi_mhs ?? '-',
+                'alamat' => $data->alamat_rumah,
+                'kelas' => $data->kelas_pondok,
+                'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+                'nama_penandatangan' => $namaKetua,
+                'jabatan_penandatangan' => $namaJabatan,
+                'kopBase64' => $kopBase64,
+                'ttd' => $tddBase64,
+                'stempel' => $stempelBase64,
+            ];
+
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.administrasi_keuangan', $pdfData)->setPaper('a4', 'portrait');
+
+            $fileName = 'surat_keterangan_administrasi_keuangan_' . $data->nim . '_' . uniqid() . '.pdf';
+            $prodiFolder = \Illuminate\Support\Facades\Auth::user()?->prodi ? \Illuminate\Support\Facades\Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganAdministrasiKeuanganController/');
+
+            if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+            }
+
+            $path = $directory . '/' . $fileName;
+            $pdf->save($path);
+
+            SuratKeteranganAdministrasiKeuangan::where('id', $id)->update(['local_path' => $path]);
+            return $path;
+        }
+        return null;
+    }
+
+    private function generateSktkpPdf($id)
+    {
+        $data = SuratKeteranganTasmaKknPpl::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_tasma_kkn_ppl.prodi_id')
+            ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+            ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+            ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_keterangan_tasma_kkn_ppl.tanda_tangan_id')
+            ->select(
+                'fakultas.nama as fakultas',
+                'surat_keterangan_tasma_kkn_ppl.*',
+                'prodi.nama as nama_prodi',
+                'prodi.alias as alias_prodi',
+                'tanda_tangan.nama as nama_ttd',
+                'tanda_tangan.gambar as ttd'
+            )
+            ->where('surat_keterangan_tasma_kkn_ppl.id', $id)
+            ->first();
+
+        if ($data) {
+            $kopPath = base_path('../public_html/img/kop.jpg');
+            $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
+
+            $settingTasma = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_tasma')->first();
+            $namaKetua = 'Ketua TASMA';
+            $tddBase64 = '';
+
+            if ($settingTasma && $settingTasma->tandaTangan) {
+                $namaKetua = $settingTasma->tandaTangan->nama;
+                if ($settingTasma->tandaTangan->gambar) {
+                    $tddBase64 = \App\Services\SuratService::getBase64Image(base_path('../public_html/' . $settingTasma->tandaTangan->gambar));
+                } elseif ($settingTasma->tandaTangan->tdd) {
+                    $tddBase64 = $settingTasma->tandaTangan->tdd;
+                }
+            }
+
+            $stempelPath = base_path('../public_html/img/stempel.png');
+            $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+
+            $pdfData = [
+                'nomor_surat' => $data->nomor_surat,
+                'ketua' => $namaKetua,
+                'nama' => $data->nama_lengkap,
+                'tempat_lahir' => $data->tempat_lahir,
+                'tanggal_lahir' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_lahir),
+                'nim' => $data->nim,
+                'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+                'fakultas' => $data->fakultas,
+                'prodi' => $data->prodi_mhs,
+                'alamat' => $data->alamat_rumah,
+                'kelas' => $data->kelas_pondok,
+                'jenis_kelamin' => $data->jenis_kelamin,
+                'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+                'kopBase64' => $kopBase64,
+                'ttd' => $tddBase64,
+                'stempel' => $stempelBase64,
+            ];
+
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.surat_tasma_kkn_ppl', $pdfData)->setPaper('a4', 'portrait');
+
+            $fileName = 'surat_keterangan_tasma_kkn_ppl_' . $data->nim . '_' . uniqid() . '.pdf';
+            $prodiFolder = \Illuminate\Support\Facades\Auth::user()?->prodi ? \Illuminate\Support\Facades\Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganTasmaKknPplController');
+
+            if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+            }
+
+            $path = $directory . '/' . $fileName;
+            $pdf->save($path);
+
+            SuratKeteranganTasmaKknPpl::where('id', $id)->update(['local_path' => $path]);
+            return $path;
+        }
+        return null;
+    }
+
+    private function generateSkukdPdf($id)
+    {
+        $data = SuratKeteranganUjianKomprehensifDiniyah::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_ujian_komprehensif_diniyah.prodi_id')
+            ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+            ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+            ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_keterangan_ujian_komprehensif_diniyah.tanda_tangan_id')
+            ->select(
+                'surat_keterangan_ujian_komprehensif_diniyah.*',
+                'prodi.nama as nama_prodi',
+                'prodi.alias as alias_prodi',
+                'fakultas.nama as fakultas',
+                'tanda_tangan.nama as nama_ttd',
+                'tanda_tangan.gambar as ttd'
+            )
+            ->where('surat_keterangan_ujian_komprehensif_diniyah.id', $id)
+            ->first();
+
+        if ($data) {
+            $settingKompre = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_komprehensif')->first();
+            $namaKetua = $settingKompre && $settingKompre->tandaTangan ? $settingKompre->tandaTangan->nama : ($data->nama_ttd ?? $data->koor_komprehensif);
+            $ttdKetua = $settingKompre && $settingKompre->tandaTangan ? $settingKompre->tandaTangan->gambar : $data->ttd;
+
+            $kopPath = base_path('../public_html/img/kop.jpg');
+            $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
+            
+            $tddPath = base_path('../public_html/' . $ttdKetua);
+            $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+            
+            $stempelPath = base_path('../public_html/img/stempel.png');
+            $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+
+            $pdfData = [
+                'nomor_surat' => $data->nomor_surat,
+                'nama' => $data->nama_lengkap,
+                'tempat_lahir' => $data->tempat_lahir,
+                'tanggal_lahir' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_lahir),
+                'nim' => $data->nim,
+                'fakultas' => $data->fakultas,
+                'prodi' => $data->nama_prodi,
+                'alamat' => $data->alamat_rumah,
+                'kelas' => $data->kelas_pondok,
+                'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+                'nama_penandatangan' => $namaKetua,
+                'jabatan_penandatangan' => 'Ketua / Koordinator Komprehensip',
+                'kopBase64' => $kopBase64,
+                'ttd' => $tddBase64,
+                'stempel' => $stempelBase64
+            ];
+
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.komprehensif', $pdfData)->setPaper('a4', 'portrait');
+
+            $prodiFolder = \Illuminate\Support\Facades\Auth::user()?->prodi ? \Illuminate\Support\Facades\Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganUjianKomprehensifDiniyahController/');
+            $fileName = 'surat_keterangan_ujian_komprehensif_diniyah_' . $data->nim . '_' . $data->alias_prodi . '_' . uniqid() . '.pdf';
+
+            if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+            }
+
+            $path = $directory . $fileName;
+            $pdf->save($path);
+
+            SuratKeteranganUjianKomprehensifDiniyah::where('id', $id)->update(['local_path' => $path]);
+            return $path;
+        }
+        return null;
+    }
+
+    private function generateSkqaPdf($id)
+    {
+        $data = SuratKeteranganQismulAman::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_qismul_aman.prodi_id')
+            ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
+            ->select(
+                'surat_keterangan_qismul_aman.*',
+                'prodi.nama as nama_prodi',
+                'prodi.alias as alias_prodi',
+                'tanda_tangan.gambar as ttd'
+            )
+            ->where('surat_keterangan_qismul_aman.id', $id)
+            ->first();
+
+        if ($data) {
+            $settingJabatan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_qismul_aman')->first();
+            $tddBase64 = '';
+            if ($settingJabatan && $settingJabatan->tandaTangan && $settingJabatan->tandaTangan->gambar) {
+                $tddPath = base_path('../public_html/' . $settingJabatan->tandaTangan->gambar);
+                if (file_exists($tddPath)) {
+                    $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                }
+            }
+
+            $kopPath = base_path('../public_html/img/kop.jpg');
+            $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
+
+            $pdfData = [
+                'nomor_surat' => $data->nomor_surat,
+                'ketua' => $data->ketua ?? ($settingJabatan && $settingJabatan->tandaTangan ? $settingJabatan->tandaTangan->nama : null),
+                'nama' => $data->nama_lengkap,
+                'tempat_lahir' => $data->tempat_lahir,
+                'tanggal_lahir' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_lahir),
+                'nim' => $data->nim,
+                'prodi' => $data->prodi_mhs,
+                'alamat' => $data->alamat_rumah,
+                'kelas' => $data->kelas_pondok,
+                'jenis_kelamin' => $data->jenis_kelamin,
+                'tanggal_berlaku_dari' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_berlaku_dari),
+                'tanggal_berlaku_sampai' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_berlaku_sampai),
+                'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+                'kopBase64' => $kopBase64,
+                'ttd' => $tddBase64,
+            ];
+
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.surat_qismul_aman', $pdfData)->setPaper('a4', 'portrait');
+
+            $fileName = 'surat_keterangan_qismul_aman_' . $data->nim . '_' . uniqid() . '.pdf';
+            $prodiFolder = \Illuminate\Support\Facades\Auth::user()?->prodi ? \Illuminate\Support\Facades\Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganQismulAmanController');
+
+            if (!\Illuminate\Support\Facades\File::exists($directory)) {
+                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+            }
+
+            $path = $directory . '/' . $fileName;
+            $pdf->save($path);
+
+            SuratKeteranganQismulAman::where('id', $id)->update(['local_path' => $path]);
+            return $path;
+        }
+        return null;
     }
 }

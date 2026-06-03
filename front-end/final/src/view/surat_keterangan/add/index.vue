@@ -30,7 +30,7 @@ export default defineComponent({
         } else {
           if ((response.error as any)?.response?.status === 422) {
             errors.value = (response.error as any).response.data.errors;
-            toast.error("Validasi gagal, mohon periksa kembali inputan Anda");
+            
           } else {
             toast.error("Surat gagal Ditambahkan", {
               theme: "auto",
@@ -58,5 +58,5 @@ export default defineComponent({
 </script>
 
 <template>
-  <FormComponent @submit="submit" :isEdit="false" :errors="errors" />
+  <FormComponent @submit="submit" :isEdit="false" :errors="errors" :btnLoading="loading" />
 </template>

@@ -9,6 +9,10 @@ import "@vueup/vue-quill/dist/vue-quill.snow.css";
 const props = defineProps({
   modelValue: Object,
   isEdit: Boolean,
+  btnLoading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const defaultForm = {
@@ -210,9 +214,10 @@ function submitForm() {
               </div>
             </div>
           </div>
-          <div class="card-footer text-end">
-            <button class="btn btn-primary btn-wave shadow-sm">
-              {{ isEdit ? "Update Data" : "Simpan Data" }}
+          <div class="card-footer">
+            <button class="btn btn-primary-light btn-wave ms-auto float-end" :disabled="btnLoading">
+              <span v-if="btnLoading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              {{ btnLoading ? (isEdit ? "Mengupdate..." : "Menyimpan...") : (isEdit ? "Update" : "Simpan") }}
             </button>
           </div>
         </div>

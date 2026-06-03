@@ -1,9 +1,9 @@
 <template>
 <footer class="footer mt-auto py-3 text-center">
     <div class="container">
-        <span class="text-muted"> Copyright © <span id="year">{{currentYear}}</span> <a href="javascript:void(0);" class="text-dark fw-medium">Vyzor</a>.
+        <span class="text-muted"> Copyright © <span id="year">{{currentYear}}</span> <a href="javascript:void(0);" class="text-dark fw-medium">Staff Manajemen System</a>.
             Designed with <span class="bi bi-heart-fill text-danger"></span> by <a href="javascript:void(0);">
-                <span class="fw-medium text-primary">Spruko</span>
+                <span class="fw-medium text-primary">Dalwa IT</span>
             </a> All
             rights
             reserved

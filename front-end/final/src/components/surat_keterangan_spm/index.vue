@@ -12,6 +12,10 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  btnLoading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const defaultForm = {
@@ -494,21 +498,17 @@ function submitForm() {
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <div class="input-group" v-else>
                   <span class="input-group-text" v-if="formatParts.spm.prefix">{{ formatParts.spm.prefix }}</span>
-                  
-                <div class="input-group">
-                  <span class="input-group-text" v-if="formatParts.prefix">{{ formatParts.prefix }}</span>
                   <input
                     type="text"
                     v-model="form.no_surat"
                     class="form-control"
-                    :class="{ 'is-invalid': errors?.no_surat }"
+                    :class="{ 'is-invalid': errors?.nomor_surat || errors?.no_surat }"
                     placeholder="No"
                   />
-                  <span class="input-group-text" v-if="formatParts.suffix">{{ formatParts.suffix }}</span>
-                  <div v-if="errors?.no_surat" class="invalid-feedback">
-                    {{ errors.no_surat[0] }}
+                  <span class="input-group-text" v-if="formatParts.spm.suffix">{{ formatParts.spm.suffix }}</span>
+                  <div v-if="errors?.nomor_surat || errors?.no_surat" class="invalid-feedback">
+                    {{ errors?.nomor_surat ? errors.nomor_surat[0] : errors?.no_surat[0] }}
                   </div>
-                </div>
                 </div>
               </div>
 
@@ -526,9 +526,10 @@ function submitForm() {
               </div>
             </div>
           </div>
-          <div class="card-footer text-end">
-            <button class="btn btn-primary btn-wave shadow-sm">
-              {{ isEdit ? "Update Data" : "Simpan Data" }}
+          <div class="card-footer">
+            <button class="btn btn-primary-light btn-wave ms-auto float-end" :disabled="btnLoading">
+              <span v-if="btnLoading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              {{ btnLoading ? (isEdit ? "Mengupdate..." : "Menyimpan...") : (isEdit ? "Update" : "Simpan") }}
             </button>
           </div>
         </div>

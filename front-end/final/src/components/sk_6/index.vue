@@ -13,6 +13,10 @@ const props = defineProps({
     default: () => ({}),
   },
   data: Object,
+  btnLoading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const defaultForm = {
@@ -42,14 +46,7 @@ const defaultForm = {
 
 const disableListMhsWatcher = ref(false);
 
-const readonlyField = ref({
-  nama_mhs: false,
-  tanggal_lahir: false,
-  tempat_lahir: false,
-  kelas_pondok: false,
-  alamat_rumah: false,
-  prodi_mhs: false,
-});
+
 
 const form = reactive({ ...defaultForm });
 
@@ -66,21 +63,25 @@ watch(listMhs, async (val) => {
   isLoadingData.value = true;
   await new Promise((resolve) => setTimeout(resolve, 500));
 
-  form.nama_mhs = val.nama;
-  form.nim = val.nim;
-  form.tanggal_lahir = val.tanggal_lahir;
-  form.tempat_lahir = val.tempat_lahir;
+  if (val.nama) form.nama_mhs = val.nama;
+  if (val.nim) form.nim = val.nim;
+  
+  if (val.tanggal_lahir) {
+    form.tanggal_lahir = val.tanggal_lahir.slice(0, 10);
+  }
+  
+  if (val.tempat_lahir !== undefined) form.tempat_lahir = val.tempat_lahir;
 
   if (val.alias_prodi) {
     form.prodi_mhs = val.alias_prodi;
-    readonlyField.value.prodi_mhs = true;
-  } else {
+  } else if (val.prodi_mhs !== undefined) {
     form.prodi_mhs = val.prodi_mhs;
-    readonlyField.value.prodi_mhs = false;
   }
 
-  form.alamat_rumah = val.alamat;
-  form.tanggal_lahir = val.tanggal_lahir ? val.tanggal_lahir.slice(0, 10) : "";
+  if (val.alamat !== undefined) {
+    form.alamat_rumah = val.alamat;
+  }
+  
   isLoadingData.value = false;
 });
 
@@ -345,12 +346,12 @@ function submitForm() {
                     type="text"
                     v-model="form.no_sklmk"
                     class="form-control"
-                    :class="{ 'is-invalid': errors?.nomor_surat_sklmk }"
+                    :class="{ 'is-invalid': errors?.nomor_surat_sklmk || errors?.no_sklmk }"
                     placeholder="No"
                   />
                   <span class="input-group-text" v-if="formatParts.sklmk.suffix">{{ formatParts.sklmk.suffix }}</span>
-                  <div v-if="errors?.nomor_surat_sklmk" class="invalid-feedback">
-                    {{ errors.nomor_surat_sklmk[0] }}
+                  <div v-if="errors?.nomor_surat_sklmk || errors?.no_sklmk" class="invalid-feedback">
+                    {{ errors.nomor_surat_sklmk ? errors.nomor_surat_sklmk[0] : errors.no_sklmk[0] }}
                   </div>
                 </div>
               </div>
@@ -363,12 +364,12 @@ function submitForm() {
                     type="text"
                     v-model="form.no_skak"
                     class="form-control"
-                    :class="{ 'is-invalid': errors?.nomor_surat_skak }"
+                    :class="{ 'is-invalid': errors?.nomor_surat_skak || errors?.no_skak }"
                     placeholder="No"
                   />
                   <span class="input-group-text" v-if="formatParts.skak.suffix">{{ formatParts.skak.suffix }}</span>
-                  <div v-if="errors?.nomor_surat_skak" class="invalid-feedback">
-                    {{ errors.nomor_surat_skak[0] }}
+                  <div v-if="errors?.nomor_surat_skak || errors?.no_skak" class="invalid-feedback">
+                    {{ errors.nomor_surat_skak ? errors.nomor_surat_skak[0] : errors.no_skak[0] }}
                   </div>
                 </div>
               </div>
@@ -381,12 +382,12 @@ function submitForm() {
                     type="text"
                     v-model="form.no_sktkp"
                     class="form-control"
-                    :class="{ 'is-invalid': errors?.nomor_surat_sktkp }"
+                    :class="{ 'is-invalid': errors?.nomor_surat_sktkp || errors?.no_sktkp }"
                     placeholder="No"
                   />
                   <span class="input-group-text" v-if="formatParts.sktkp.suffix">{{ formatParts.sktkp.suffix }}</span>
-                  <div v-if="errors?.nomor_surat_sktkp" class="invalid-feedback">
-                    {{ errors.nomor_surat_sktkp[0] }}
+                  <div v-if="errors?.nomor_surat_sktkp || errors?.no_sktkp" class="invalid-feedback">
+                    {{ errors.nomor_surat_sktkp ? errors.nomor_surat_sktkp[0] : errors.no_sktkp[0] }}
                   </div>
                 </div>
               </div>
@@ -399,12 +400,12 @@ function submitForm() {
                     type="text"
                     v-model="form.no_skukd"
                     class="form-control"
-                    :class="{ 'is-invalid': errors?.nomor_surat_skukd }"
+                    :class="{ 'is-invalid': errors?.nomor_surat_skukd || errors?.no_skukd }"
                     placeholder="No"
                   />
                   <span class="input-group-text" v-if="formatParts.skukd.suffix">{{ formatParts.skukd.suffix }}</span>
-                  <div v-if="errors?.nomor_surat_skukd" class="invalid-feedback">
-                    {{ errors.nomor_surat_skukd[0] }}
+                  <div v-if="errors?.nomor_surat_skukd || errors?.no_skukd" class="invalid-feedback">
+                    {{ errors.nomor_surat_skukd ? errors.nomor_surat_skukd[0] : errors.no_skukd[0] }}
                   </div>
                 </div>
               </div>
@@ -417,12 +418,12 @@ function submitForm() {
                     type="text"
                     v-model="form.no_skqa"
                     class="form-control"
-                    :class="{ 'is-invalid': errors?.nomor_surat_skqa }"
+                    :class="{ 'is-invalid': errors?.nomor_surat_skqa || errors?.no_skqa }"
                     placeholder="No"
                   />
                   <span class="input-group-text" v-if="formatParts.skqa.suffix">{{ formatParts.skqa.suffix }}</span>
-                  <div v-if="errors?.nomor_surat_skqa" class="invalid-feedback">
-                    {{ errors.nomor_surat_skqa[0] }}
+                  <div v-if="errors?.nomor_surat_skqa || errors?.no_skqa" class="invalid-feedback">
+                    {{ errors.nomor_surat_skqa ? errors.nomor_surat_skqa[0] : errors.no_skqa[0] }}
                   </div>
                 </div>
               </div>
@@ -481,7 +482,7 @@ function submitForm() {
                   v-model="form.nama_mhs"
                   class="form-control"
                   :class="{ 'is-invalid': errors?.nama_mhs }"
-                  :readonly="readonlyField.nama_mhs"
+                  readonly
                 />
                 <div v-if="errors?.nama_mhs" class="invalid-feedback">
                   {{ errors.nama_mhs[0] }}
@@ -527,7 +528,7 @@ function submitForm() {
                   v-model="form.prodi_mhs"
                   class="form-control"
                   :class="{ 'is-invalid': errors?.prodi_mhs }"
-                  :readonly="readonlyField.prodi_mhs"
+                  readonly
                 />
                 <div v-if="errors?.prodi_mhs" class="invalid-feedback">
                   {{ errors.prodi_mhs[0] }}
@@ -565,8 +566,9 @@ function submitForm() {
             </div>
           </div>
           <div class="card-footer">
-            <button class="btn btn-primary-light btn-wave ms-auto float-end">
-              {{ isEdit ? "Update" : "Simpan" }}
+            <button class="btn btn-primary-light btn-wave ms-auto float-end" :disabled="btnLoading">
+              <span v-if="btnLoading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              {{ btnLoading ? (isEdit ? "Mengupdate..." : "Menyimpan...") : (isEdit ? "Update" : "Simpan") }}
             </button>
           </div>
         </div>

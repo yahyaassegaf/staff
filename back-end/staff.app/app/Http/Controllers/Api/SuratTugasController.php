@@ -75,7 +75,7 @@ class SuratTugasController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'prodi_id' => 'required',
-                'no_surat' => 'required|string|max:255',
+                'no_surat' => 'required|string|max:255|unique:nomor,nomor',
                 'nama_dosen' => 'required|string|max:255',
                 'alamat_dosen' => 'required|string|max:255',
                 'tugas_dosen' => 'required|string|max:255',
@@ -86,6 +86,8 @@ class SuratTugasController extends Controller
                 'judul_skripsi' => 'required|string',
                 'masa_penugasan' => 'required|date',
                 'tanggal' => 'required|date',
+            ], [
+                'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
 
             if ($validator->fails()) {
@@ -98,55 +100,8 @@ class SuratTugasController extends Controller
 
             $validate = $validator->validated();
 
-            $login = Auth::user()->prodi->alias;
+            $login = Auth::user()?->prodi ? Auth::user()->prodi->alias : 'UMUM';
             $no_surat = $validate['no_surat'];
-
-            $st = SuratTugas::find($id);
-            if (!$st) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data tidak ditemukan'
-                ], 404);
-            }
-
-            $st->nama_dosen = $validate['nama_dosen'];
-            $st->alamat_dosen = $validate['alamat_dosen'];
-            $st->tugas_dosen = $validate['tugas_dosen'];
-            $st->tugasnya = $validate['tugasnya'];
-            $st->nama_mhs = $validate['nama_mhs'];
-            $st->nim_nik = $validate['nim_nik'];
-            $st->fakultas_prodi = $validate['fakultas_prodi'];
-            $st->judul_skripsi = $validate['judul_skripsi'];
-            $st->masa_penugasan = $validate['masa_penugasan'];
-            $st->tanggal = $validate['tanggal'];
-            $st->prodi_id = $validate['prodi_id'];
-            $st->jenis_kelamin = Auth::user()->jenis_kelamin;
-            $st->save();
-
-            return response()->json([
-                'status' => true,
-                'message' => 'Data berhasil diupdate'
-            ]);
-        } catch (\Throwable $th) {
-            Log::error($th);
-            return response()->json([
-                'status' => false,
-                'message' => 'Data gagal diupdate',
-                'error' => $th->getMessage()
-            ]);
-        }
-    }
-
-    public function destroy($id)
-    {
-        try {
-            $st = SuratTugas::find($id);
-            if (!$st) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data tidak ditemukan'
-                ], 404);
-            }
 
             $formattedNoSurat = \App\Services\SuratService::formatNomorSurat('ST', $no_surat, $validate['tanggal'], $validate['prodi_id']);
 
@@ -194,6 +149,33 @@ class SuratTugasController extends Controller
         }
     }
 
+    public function destroy($id)
+    {
+        try {
+            $st = SuratTugas::find($id);
+            if (!$st) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Data tidak ditemukan'
+                ], 404);
+            }
+
+            $st->delete();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Data berhasil dihapus'
+            ]);
+        } catch (\Throwable $th) {
+            Log::error($th);
+            return response()->json([
+                'status' => false,
+                'message' => 'Data gagal dihapus',
+                'error' => $th->getMessage()
+            ]);
+        }
+    }
+
     public function show($id)
     {
         $data = SuratTugas::join('prodi', 'prodi.id', '=', 'surat_tugas.prodi_id')
@@ -208,7 +190,7 @@ class SuratTugasController extends Controller
             ], 404);
         }
 
-        
+
         $nomorStr = $data->nomor_surat ?? $data->nomor ?? null;
         if ($nomorStr) {
             $parts = explode('/', $nomorStr);
@@ -230,7 +212,31 @@ class SuratTugasController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'no_surat' => 'required|string|max:255',
+                'no_surat' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    function ($attribute, $value, $fail) use ($id) {
+                        $st = \App\Models\SuratTugas::find($id);
+                        if ($st) {
+                            $originalNoSurat = '';
+                            $nomorStr = $st->nomor_surat ?? $st->nomor ?? null;
+                            if ($nomorStr) {
+                                $parts = explode('/', $nomorStr);
+                                $firstPart = $parts[0];
+                                if (strpos($firstPart, '-') !== false) {
+                                    $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+                                }
+                                $originalNoSurat = trim($firstPart);
+                            }
+                            if ($value !== $originalNoSurat) {
+                                if (\App\Models\NoSurat::where('nomor', $value)->exists()) {
+                                    $fail('Nomor surat sudah terpakai.');
+                                }
+                            }
+                        }
+                    }
+                ],
                 'prodi_id' => 'required',
                 'nama_dosen' => 'required|string|max:255',
                 'alamat_dosen' => 'required|string|max:255',
@@ -264,6 +270,7 @@ class SuratTugasController extends Controller
             }
 
             $oldDriveFileId = $st->drive_file_id;
+            $oldLocalPath = $st->local_path;
 
             $formattedNoSurat = \App\Services\SuratService::formatNomorSurat('ST', $validate['no_surat'], $validate['tanggal'], $validate['prodi_id'] ?? null);
             $st->nomor = $formattedNoSurat;
@@ -283,6 +290,9 @@ class SuratTugasController extends Controller
             // Delete old file from Google Drive if exists
             if (!empty($oldDriveFileId)) {
                 \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
+            }
+            if (!empty($oldLocalPath) && file_exists($oldLocalPath)) {
+                @unlink($oldLocalPath);
             }
 
             $st->drive_file_id = null;
@@ -334,17 +344,18 @@ class SuratTugasController extends Controller
                     'stempel' => $stempelBase64,
                 ];
 
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi_name ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratTugasController/');
                 $pdf = Pdf::loadView('pdf.surat_tugas', $pdfData)->setPaper('a4', 'portrait');
-                $fileName = 'surat_tugas_' . $data->nim_nik . '.pdf';
-                $directory = base_path('../public_html/pdf/');
-
+                $fileName = 'surat_tugas_' . $data->nim_nik . '_' . uniqid() . '.pdf';
+ 
                 if (!file_exists($directory)) {
                     mkdir($directory, 0755, true);
                 }
-
+ 
                 $path = $directory . $fileName;
                 $pdf->save($path);
-
+ 
                 $data->update(['local_path' => $path]);
 
                 $nameTable = 'Surat Tugas';
@@ -413,24 +424,25 @@ class SuratTugasController extends Controller
                 'stempel' => $stempelBase64,
             ];
 
+            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi_name ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratTugasController/');
             $pdf = Pdf::loadView('pdf.surat_tugas', $pdfData)->setPaper('a4', 'portrait');
-            $fileName = 'surat_tugas_' . $data->nim_nik . '.pdf';
-            $directory = base_path('../public_html/pdf/');
-
+            $fileName = 'surat_tugas_' . $data->nim_nik . '_' . uniqid() . '.pdf';
+ 
             if (!file_exists($directory)) {
                 mkdir($directory, 0755, true);
             }
-
+ 
             $path = $directory . $fileName;
             $pdf->save($path);
-
+ 
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Tugas';
 
             $googlePath = $data->prodi_name . '/' . $nameTable . '/' . $fileName;
 
-            if (!Storage::disk('google')->exists($googlePath)) {
+            if (empty($data->drive_file_id)) {
                 UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi_name, SuratTugas::class);
             }
 

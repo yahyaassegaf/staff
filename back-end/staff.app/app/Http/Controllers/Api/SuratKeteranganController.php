@@ -93,7 +93,7 @@ class SuratKeteranganController extends Controller
 
             $validate = $validator->validated();
 
-            $login = Auth::user()->prodi->alias;
+            $login = Auth::user()?->prodi?->alias ?? 'UMUM';
             $no = NoSurat::orderByDesc('id')->value('nomor') ?? 0;
             $no_surat = str_pad($no + 1, 3, '0', STR_PAD_LEFT);
 
@@ -126,6 +126,82 @@ class SuratKeteranganController extends Controller
             $log->nama_surat = 'Surat Keterangan';
             $log->user_id = Auth::user()->id;
             $log->save();
+
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratKeterangan::join('prodi', 'prodi.id', '=', 'surat_keterangan.prodi_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_keterangan.tanda_tangan_id')
+                ->select(
+                    'surat_keterangan.*',
+                    'prodi.nama as prodi_name',
+                    'prodi.alias as alias_prodi',
+                    'prodi.nama_kepala',
+                    'prodi.nidn_kepala',
+                    'tanda_tangan.gambar as ttd',
+                    'tanda_tangan.nama as nama_staff',
+                )
+                ->where('surat_keterangan.id', $sk->id)
+                ->first();
+
+            if ($data) {
+                $kunci_jabatan = 'staff_' . strtolower($data->alias_prodi);
+                $settingJabatan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', $kunci_jabatan)->first();
+
+                $nama_kepala = $data->nama_kepala;
+                $tddBase64 = '';
+
+                if ($settingJabatan && $settingJabatan->tandaTangan) {
+                    $nama_kepala = $settingJabatan->tandaTangan->nama;
+                    $tddPath = base_path('../public_html/' . $settingJabatan->tandaTangan->gambar);
+                    if (file_exists($tddPath)) {
+                        $tddBase64 = SuratService::getBase64Image($tddPath);
+                    }
+                } else {
+                    $tddPath = base_path('../public_html/' . $data->ttd);
+                    if (file_exists($tddPath) && !empty($data->ttd)) {
+                        $tddBase64 = SuratService::getBase64Image($tddPath);
+                    }
+                }
+
+                $kopPath = base_path('../public_html/img/kop.jpg');
+                $kopBase64 = SuratService::getBase64Image($kopPath);
+
+                $stempelPath = base_path('../public_html/img/stempel.png');
+                $stempelBase64 = SuratService::getBase64Image($stempelPath);
+
+                $pdfData = [
+                    'nomor' => $data->nomor,
+                    'nama_mahasiswa' => $data->nama_mahasiswa,
+                    'nim' => $data->nim,
+                    'prodi' => $data->prodi,
+                    'periode_bulan' => $data->periode_bulan,
+                    'nama_staff' => $data->nama_staff,
+                    'alasan' => $data->alasan,
+                    'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+                    'jenis_kelamin' => $data->jenis_kelamin,
+                    'nama_kepala' => $nama_kepala,
+                    'nidn_kepala' => $data->nidn_kepala,
+                    'kopBase64' => $kopBase64,
+                    'ttd' => $tddBase64,
+                    'stempel' => $stempelBase64
+                ];
+
+                $prodiFolder = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi_name ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganController/');
+                $pdf = Pdf::loadView('pdf.surat_keterangan', $pdfData)->setPaper('a4', 'portrait');
+                $fileName = 'surat_keterangan_' . $data->nim . '_' . uniqid() . '.pdf';
+
+                if (!file_exists($directory)) {
+                    mkdir($directory, 0755, true);
+                }
+
+                $path = $directory . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Keterangan';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->prodi_name, SuratKeterangan::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -236,6 +312,7 @@ class SuratKeteranganController extends Controller
             }
 
             $oldDriveFileId = $sk->drive_file_id;
+            $oldLocalPath = $sk->local_path;
 
             $sk->fill([
                 'nama_mahasiswa'   => $validate['nama_mhs'],
@@ -252,6 +329,9 @@ class SuratKeteranganController extends Controller
             // Delete old file from Google Drive if exists
             if (!empty($oldDriveFileId)) {
                 \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
+            }
+            if (!empty($oldLocalPath) && file_exists($oldLocalPath)) {
+                @unlink($oldLocalPath);
             }
 
             $sk->drive_file_id = null;
@@ -317,17 +397,18 @@ class SuratKeteranganController extends Controller
                     'stempel' => $stempelBase64
                 ];
 
+                $prodiFolder = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi_name ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganController/');
                 $pdf = Pdf::loadView('pdf.surat_keterangan', $pdfData)->setPaper('a4', 'portrait');
-                $fileName = 'surat_keterangan_' . $data->nim . '.pdf';
-                $directory = base_path('../public_html/pdf/');
-
+                $fileName = 'surat_keterangan_' . $data->nim . '_' . uniqid() . '.pdf';
+ 
                 if (!file_exists($directory)) {
                     mkdir($directory, 0755, true);
                 }
-
+ 
                 $path = $directory . $fileName;
                 $pdf->save($path);
-
+ 
                 $data->update(['local_path' => $path]);
 
                 $nameTable = 'Surat Keterangan';
@@ -413,24 +494,25 @@ class SuratKeteranganController extends Controller
                 'stempel' => $stempelBase64
             ];
 
+            $prodiFolder = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi_name ?? 'UMUM');
+            $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganController/');
             $pdf = Pdf::loadView('pdf.surat_keterangan', $pdfData)->setPaper('a4', 'portrait');
-            $fileName = 'surat_keterangan_' . $data->nim . '.pdf';
-            $directory = base_path('../public_html/pdf/');
-
+            $fileName = 'surat_keterangan_' . $data->nim . '_' . uniqid() . '.pdf';
+ 
             if (!file_exists($directory)) {
                 mkdir($directory, 0755, true);
             }
-
+ 
             $path = $directory . $fileName;
             $pdf->save($path);
-
+ 
             $data->update(['local_path' => $path]);
 
             $nameTable = 'Surat Keterangan';
 
             $googlePath = $data->prodi_name . '/' . $nameTable . '/' . $fileName;
 
-            if (!Storage::disk('google')->exists($googlePath)) {
+            if (empty($data->drive_file_id)) {
                 UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi_name, SuratKeterangan::class);
             }
 

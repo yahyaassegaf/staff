@@ -1,4 +1,5 @@
 <script lang="ts">
+import Swal from "sweetalert2";
 import { onMounted, ref, watch } from "vue";
 import { defineComponent } from "vue";
 import type { ServerOptions } from "vue3-easy-data-table";
@@ -133,6 +134,16 @@ export default defineComponent({
     });
 
     async function download(params: any) {
+      Swal.fire({
+        title: "Sedang menyiapkan PDF...",
+        text: "Mohon tunggu sejenak, dokumen sedang digenerate.",
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
       try {
         const res = await apiPdf(
           `/download-pdf/${params.id}`,
@@ -141,7 +152,9 @@ export default defineComponent({
         );
 
         openFileExport(res.data);
+        Swal.close();
       } catch (error) {
+        Swal.close();
         toast.error("Gagal mengunduh file PDF", {
           theme: "auto",
           icon: true,
