@@ -81,6 +81,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 'nim' => 'required|string|max:255',
                 'prodi' => 'required|string|max:255',
                 'tanggal' => 'required|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -128,6 +129,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
             $surat->jenis_kelamin = Auth::user()->jenis_kelamin;
             $surat->user_id = Auth::user()->id;
             $surat->status = 'pending';
+            $surat->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $surat->save();
 
             $Nomor              = new NoSurat();
@@ -152,7 +154,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                     'surat_pernyataan_verifikasi_nilai.*',
                     'users.name as nama_staff',
                     'prodi.nama as nama_prodi',
-                    'tanda_tangan.gambar as ttd',
+                    \DB::raw('COALESCE(tanda_tangan.tdd, tanda_tangan.gambar) as ttd'),
                     'tanda_tangan.nama as nama_penandatangan',
                     'fakultas.nama as nama_fakultas'
                 )
@@ -164,15 +166,25 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
 
                 $tddBase64 = '';
-                if (!empty($data->ttd)) {
-                    $tddPath = base_path('../public_html/' . $data->ttd);
-                    if (file_exists($tddPath)) {
-                        $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                $stempelBase64 = '';
+
+                if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
+                    if (!empty($data->ttd)) {
+                        if (str_starts_with($data->ttd, 'data:image')) {
+                            $tddBase64 = $data->ttd;
+                        } else {
+                            $tddPath = base_path('../public_html/' . $data->ttd);
+                            if (file_exists($tddPath)) {
+                                $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                            }
+                        }
+                    }
+
+                    $stempelPath = base_path('../public_html/img/stempel.png');
+                    if (file_exists($stempelPath)) {
+                        $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
                     }
                 }
-
-                $stempelPath = base_path('../public_html/img/stempel.png');
-                $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
 
                 $nama = strtolower($data->nama_mahasiswa);
                 $nim = strtolower($data->nim);
@@ -301,6 +313,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 'nim' => 'required|string|max:255',
                 'prodi' => 'required|string|max:255',
                 'tanggal' => 'required|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak',
             ]);
 
             if ($validator->fails()) {
@@ -351,6 +364,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
             $surat->tanggal = $validate['tanggal'];
             $surat->prodi_id = $validate['prodi_id'];
             $surat->jenis_kelamin = Auth::user()->jenis_kelamin;
+            $surat->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
 
             // Delete old file from Google Drive if exists
             if (!empty($oldDriveFileId)) {
@@ -375,7 +389,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                     'surat_pernyataan_verifikasi_nilai.*',
                     'users.name as nama_staff',
                     'prodi.nama as nama_prodi',
-                    'tanda_tangan.gambar as ttd',
+                    \DB::raw('COALESCE(tanda_tangan.tdd, tanda_tangan.gambar) as ttd'),
                     'tanda_tangan.nama as nama_penandatangan',
                     'fakultas.nama as nama_fakultas'
                 )
@@ -386,15 +400,25 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 $kopPath = base_path('../public_html/img/kop.jpg');
                 $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
 
-                $tddPath = base_path('../public_html/' . $data->ttd);
-
                 $nama = strtolower($data->nama_mahasiswa);
                 $nim = strtolower($data->nim);
 
-                $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                $tddBase64 = '';
+                $stempelBase64 = '';
 
-                $stempelPath = base_path('../public_html/img/stempel.png');
-                $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+                if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
+                    if (!empty($data->ttd)) {
+                        $tddPath = base_path('../public_html/' . $data->ttd);
+                        if (file_exists($tddPath)) {
+                            $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                        }
+                    }
+
+                    $stempelPath = base_path('../public_html/img/stempel.png');
+                    if (file_exists($stempelPath)) {
+                        $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+                    }
+                }
 
                 $jabatan = 'Staff Program Studi ' . ucwords($data->nama_prodi) . ' Fakultas ' . ucwords($data->nama_fakultas);
                 $staff = 'Staff Prodi ' . ucwords($data->nama_prodi);
@@ -477,95 +501,25 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
     public function downloadPdf($id)
     {
         try {
-            $data = SuratPernyataanVerifikasiNilai::leftJoin('prodi', 'prodi.id', '=', 'surat_pernyataan_verifikasi_nilai.prodi_id')
-                ->leftJoin('users', 'users.prodi_id', '=', 'prodi.id')
-                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
-                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
-                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_pernyataan_verifikasi_nilai.tanda_tangan_id')
-                ->select(
-                    'surat_pernyataan_verifikasi_nilai.*',
-                    'users.name as nama_staff',
-                    'prodi.nama as nama_prodi',
-                    'tanda_tangan.gambar as ttd',
-                    'tanda_tangan.nama as nama_penandatangan',
-                    'fakultas.nama as nama_fakultas'
-                )
-                ->where('surat_pernyataan_verifikasi_nilai.id', $id)
-                ->first();
-            Log::info($data);
+            $data = SuratPernyataanVerifikasiNilai::find($id);
+
             if (!$data) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data tidak ditemukan'
-                ], 404);
+                return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
             }
 
-            $kopPath = base_path('../public_html/img/kop.jpg');
-            $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
-
-            $tddPath = base_path('../public_html/' . $data->ttd);
-
-            $nama = strtolower($data->nama_mahasiswa);
-            $nim = strtolower($data->nim);
-
-            $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
-
-            $stempelPath = base_path('../public_html/img/stempel.png');
-            $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
-
-            $jabatan = 'Staff Program Studi ' . ucwords($data->nama_prodi) . ' Fakultas ' . ucwords($data->nama_fakultas);
-            $staff = 'Staff Prodi ' . ucwords($data->nama_prodi);
-            $pdfData = [
-                'nomor' => $data->nomor,
-                'nama_penandatangan' => $data->nama_penandatangan,
-                'niy' => $data->niy,
-                'jabatan' => $jabatan,
-                'staff' => $staff,
-                'nama_mahasiswa' => $nama,
-                'nim' => $nim,
-                'prodi' => $data->nama_prodi,
-                'fakultas' => $data->nama_fakultas,
-                'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
-                'jenis_kelamin' => $data->jenis_kelamin,
-                'kopBase64' => $kopBase64,
-                'ttd' => $tddBase64,
-                'stempel' => $stempelBase64,
-            ];
-
-            $pdf = Pdf::loadView('pdf.surat_pernyataan_verifikasi_nilai', $pdfData)
-                ->setPaper('a4', 'portrait');
-
-            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
-            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratPernyataanVerifikasiNilaiController/');
-            $fileName = 'surat_pernyataan_verifikasi_nilai_' . $data->nim . '_' . uniqid() . '.pdf';
-
-            if (!file_exists($directory)) {
-                mkdir($directory, 0755, true);
+            if (empty($data->local_path) || !file_exists($data->local_path)) {
+                return response()->json(['status' => false, 'message' => 'File PDF tidak ditemukan di server'], 404);
             }
 
-            $path = $directory . $fileName;
-            $pdf->save($path);
+            $fileName = basename($data->local_path);
 
-            $data->update(['local_path' => $path]);
-
-            $nameTable = 'Surat Pernyataan Verifikasi Nilai';
-
-            $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
-
-            if (empty($data->drive_file_id)) {
-                UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratPernyataanVerifikasiNilai::class);
-            }
-
-            return response($pdf->output(), 200, [
+            return response()->file($data->local_path, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
             Log::error($th->getMessage());
-            return response()->json([
-                'status' => false,
-                'message' => 'Data gagal diunduh: ' . $th->getMessage()
-            ]);
+            return response()->json(['status' => false, 'message' => 'Gagal download PDF']);
         }
     }
 

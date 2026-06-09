@@ -164,6 +164,7 @@ class Sk6Controller extends Controller
             $sklmk->user_id = $user->id;
             $sklmk->jenis_kelamin = $user->jenis_kelamin;
             $sklmk->status = 'pending';
+            $sklmk->petanda_tangan = 'tidak';
             $sklmk->save();
 
             $nomorSklmkObj = new NoSurat();
@@ -193,6 +194,7 @@ class Sk6Controller extends Controller
             $skak->user_id = $user->id;
             $skak->jenis_kelamin = $user->jenis_kelamin;
             $skak->status = 'pending';
+            $skak->petanda_tangan = 'tidak';
             $skak->save();
 
             $nomorSkakObj = new NoSurat();
@@ -228,6 +230,7 @@ class Sk6Controller extends Controller
             $sktkp->user_id = $user->id;
             $sktkp->jenis_kelamin = $user->jenis_kelamin;
             $sktkp->status = 'pending';
+            $sktkp->petanda_tangan = 'tidak';
             $sktkp->save();
 
             $nomorSktkpObj = new NoSurat();
@@ -264,6 +267,7 @@ class Sk6Controller extends Controller
             $skqa->user_id = $user->id;
             $skqa->jenis_kelamin = $user->jenis_kelamin;
             $skqa->status = 'pending';
+            $skqa->petanda_tangan = 'tidak';
             $skqa->save();
 
             $nomorSkqaObj = new NoSurat();
@@ -293,6 +297,7 @@ class Sk6Controller extends Controller
             $skukd->user_id = $user->id;
             $skukd->jenis_kelamin = $user->jenis_kelamin;
             $skukd->status = 'pending';
+            $skukd->petanda_tangan = 'tidak';
             $skukd->save();
 
             $nomorSkukdObj = new NoSurat();
@@ -633,6 +638,7 @@ class Sk6Controller extends Controller
                 $sklmk->kelas_pondok = $validate['kelas_pondok'];
                 $sklmk->tanggal = $tanggal;
                 $sklmk->jenis_kelamin = $user->jenis_kelamin;
+                $sklmk->petanda_tangan = 'tidak';
                 $sklmk->save();
             }
 
@@ -649,6 +655,7 @@ class Sk6Controller extends Controller
                 $skak->kelas_pondok = $validate['kelas_pondok'];
                 $skak->tanggal = $tanggal;
                 $skak->jenis_kelamin = $user->jenis_kelamin;
+                $skak->petanda_tangan = 'tidak';
                 $skak->save();
             }
 
@@ -665,6 +672,7 @@ class Sk6Controller extends Controller
                 $sktkp->kelas_pondok = $validate['kelas_pondok'];
                 $sktkp->tanggal = $tanggal;
                 $sktkp->jenis_kelamin = $user->jenis_kelamin;
+                $sktkp->petanda_tangan = 'tidak';
                 $sktkp->save();
             }
 
@@ -688,6 +696,7 @@ class Sk6Controller extends Controller
                 $skqa->tanggal_berlaku_dari = $validate['tanggal_berlaku_dari'] ?? null;
                 $skqa->tanggal_berlaku_sampai = $validate['tanggal_berlaku_sampai'] ?? null;
                 $skqa->jenis_kelamin = $user->jenis_kelamin;
+                $skqa->petanda_tangan = 'tidak';
                 $skqa->save();
             }
 
@@ -703,6 +712,7 @@ class Sk6Controller extends Controller
                 $skukd->kelas_pondok = $validate['kelas_pondok'];
                 $skukd->tanggal = $tanggal;
                 $skukd->jenis_kelamin = $user->jenis_kelamin;
+                $skukd->petanda_tangan = 'tidak';
                 $skukd->save();
             }
 
@@ -814,67 +824,26 @@ class Sk6Controller extends Controller
 
     public function downloadPdf($id)
     {
-        ini_set('memory_limit', '512M');
-        ini_set('max_execution_time', '300');
-
         try {
-            $sk6 = SuratKeterangan6::with([
-                'skLulusMk',
-                'skAdminKeuangan',
-                'skTasmaKknPpl',
-                'skUjianKomprehensifDiniyah',
-                'skQismulAman'
-            ])->find($id);
+            $data = SuratKeterangan6::find($id);
 
-            if (!$sk6) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data tidak ditemukan'
-                ], 404);
+            if (!$data) {
+                return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
             }
 
-            $sklmk = $this->getSklmkDetail($sk6->surat_keterangan_lulus_mata_kuliah_id);
-            if (!$sklmk) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data Lulus MK tidak ditemukan'
-                ], 404);
+            if (empty($data->local_path) || !file_exists($data->local_path)) {
+                return response()->json(['status' => false, 'message' => 'File PDF tidak ditemukan di server'], 404);
             }
 
-            $pdfData = $this->buildSk6PdfData($sk6, $sklmk);
+            $fileName = basename($data->local_path);
 
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.sk_6', $pdfData)->setPaper('a4', 'portrait');
-            $fileName = 'SK6_' . $sklmk->nim . '_' . uniqid() . '.pdf';
-
-            $prodiFolder = \Illuminate\Support\Facades\Auth::user()?->prodi ? \Illuminate\Support\Facades\Auth::user()->prodi->nama : ($sklmk->nama_prodi ?? 'UMUM');
-            $directory = base_path('../public_html/pdf/' . $prodiFolder . '/Sk6Controller/');
-            if (!\Illuminate\Support\Facades\File::exists($directory)) {
-                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
-            }
-            $path = $directory . '/' . $fileName;
-
-            $pdf->save($path);
-
-            $sk6->update(['local_path' => $path]);
-
-            $nameTable = 'Surat Keterangan 6';
-            $googlePath = $sklmk->nama_prodi . '/' . $nameTable . '/' . $fileName;
-            if (empty($sk6->drive_file_id)) {
-                \App\Jobs\UploudSuratToDrive::dispatch($id, $nameTable, $sklmk->nama_prodi, SuratKeterangan6::class);
-            }
-
-            $this->dispatchGoogleDriveJobs($sk6, $sklmk->nama_prodi, $path);
-
-            return response($pdf->output(), 200, [
+            return response()->file($data->local_path, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
-            Log::error((string) $th);
-            return response()->json([
-                'status' => false,
-                'message' => 'Gagal mengunduh PDF: Terjadi kesalahan pada server'
-            ], 500);
+            \Illuminate\Support\Facades\Log::error($th->getMessage());
+            return response()->json(['status' => false, 'message' => 'Gagal download PDF']);
         }
     }
 

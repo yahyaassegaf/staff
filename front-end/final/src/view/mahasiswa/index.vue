@@ -483,7 +483,7 @@ export default defineComponent({
           </template>
 
           <template v-else-if="column === 'nama_prodi'">
-            {{ item.nama_prodi || '-' }}
+            {{ item.prodi?.nama || '-' }}
           </template>
 
           <template v-else-if="column === 'action'">

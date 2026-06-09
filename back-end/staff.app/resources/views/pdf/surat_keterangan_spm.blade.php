@@ -155,6 +155,7 @@
                 <td>:</td>
                 <td>{{ $alamat_tugas }}</td>
             </tr>
+
             <tr>
                 <td>Tahun</td>
                 <td>:</td>
@@ -180,20 +181,20 @@
                     Pengawas SPM,
                     <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -25px; margin-bottom: -35px;">
                         <tr>
-                            <td style="
-                                height: 140px;
-                                text-align: center;
-                                vertical-align: middle;
-                                /* background-image: url('{{ $stempel }}'); */
-                                background-repeat: no-repeat;
-                                background-position: 20% 50%;
-                                background-size: 135px 135px;
-                            ">
-                                @if($pengawas_ttd)
-                                <!-- <img src="{{ $pengawas_ttd }}" style="width: 170px; max-height: 80px; object-fit: contain;"> -->
-                                @else
-                                <br><br><br><br>
-                                @endif
+                            <td style="height: 140px; text-align: center; vertical-align: middle; padding: 0;">
+                                <div style="position: relative; width: 100%; height: 140px;">
+                                    @if(!empty($stempel))
+                                    <img src="{{ $stempel }}" style="position: absolute; left: -10px; top: 5px; width: 110px; height: 110px; z-index: 2;">
+                                    @endif
+                                    
+                                    @if($pengawas_ttd)
+                                    <!-- <img src="{{ $pengawas_ttd }}" style="position: absolute; left: 0px; top: 30px; width: 170px; max-height: 80px; object-fit: contain; z-index: 1;"> -->
+                                    @else
+                                    <div style="position: absolute; left: 0; right: 0; top: 60px; z-index: 2;">
+                                        <br>
+                                    </div>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     </table>
@@ -211,20 +212,20 @@
                     Kaprodi {{ $alias_prodi ?? $prodi_mhs }}
                     <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -25px; margin-bottom: -35px;">
                         <tr>
-                            <td style="
-                                height: 140px;
-                                text-align: center;
-                                vertical-align: middle;
-                                /* background-image: url('{{ $stempel }}'); */
-                                background-repeat: no-repeat;
-                                background-position: 20% 50%;
-                                background-size: 135px 135px;
-                            ">
-                                @if($ttd)
-                                <!-- <img src="{{ $ttd }}" style="width: 170px; max-height: 80px; object-fit: contain;"> -->
-                                @else
-                                <br><br><br><br>
-                                @endif
+                            <td style="height: 140px; text-align: center; vertical-align: middle; padding: 0;">
+                                <div style="position: relative; width: 100%; height: 140px;">
+                                    @if(!empty($stempel))
+                                    <img src="{{ $stempel }}" style="position: absolute; left: -10px; top: 5px; width: 110px; height: 110px; z-index: 2;">
+                                    @endif
+                                    
+                                    @if($ttd)
+                                    <img src="{{ $ttd }}" style="position: absolute; left: 0px; top: 30px; width: 170px; max-height: 80px; object-fit: contain; z-index: 1;">
+                                    @else
+                                    <div style="position: absolute; left: 0; right: 0; top: 60px; z-index: 2;">
+                                        <br>
+                                    </div>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     </table>

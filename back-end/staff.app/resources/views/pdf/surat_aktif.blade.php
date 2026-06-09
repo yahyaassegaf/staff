@@ -120,11 +120,6 @@
                 <td width="5%">:</td>
                 <td>{{ $nama }}</td>
             </tr>
-            <!-- <tr>
-                <td>NIK</td>
-                <td>:</td>
-                <td>{{ $nik }}</td>
-            </tr> -->
             <tr>
                 <td>NIM</td>
                 <td>:</td>
@@ -161,11 +156,6 @@
                 <td>{{ $nama_ortu }}</td>
             </tr>
             <tr>
-                <td>NIK</td>
-                <td>:</td>
-                <td>{{ $nik_ortu }}</td>
-            </tr>
-            <tr>
                 <td>Alamat</td>
                 <td>:</td>
                 <td>{{ $alamat_ortu }}</td>
@@ -181,7 +171,6 @@
             Demikian surat keterangan ini kami sampaikan, semoga dapat dipergunakan sebagaimana
             mestinya dan apabila terdapat kekeliruan akan diperbaiki sebagaimana mestinya.
         </p>
-
         <!-- TANDA TANGAN -->
         <table class="ttd" width="100%" cellpadding="0" cellspacing="0" style="margin-top:50px;">
             <tr>
@@ -192,16 +181,17 @@
 
                     <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -20px; margin-bottom: -25px;">
                         <tr>
-                            <td style="
-                                height:115px;
-                                text-align:center;
-                                vertical-align:middle;
-                                /* background-image: url('{{ $stempel }}'); */
-                                background-repeat: no-repeat;
-                                background-position: 20% 50%;
-                                background-size: 110px 110px;
-                            ">
-                                <!-- <img src="{{ $ttd }}" style="width:280px;"> -->
+                            <td style="height: 120px; text-align: center; vertical-align: middle; padding: 0;">
+                                <div style="position: relative; width: 100%; height: 120px;">
+                                    @if(!empty($stempel))
+                                    <img src="{{ $stempel }}" style="position: absolute; left: -10px; top: 5px; width: 110px; height: 110px; z-index: 2;">
+                                    @endif
+
+                                    @if(!empty($ttd))
+                                    <img src="{{ $ttd }}" style="position: absolute; left: 0px; top: 15px; width: 200px; z-index: 1;">
+
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     </table>

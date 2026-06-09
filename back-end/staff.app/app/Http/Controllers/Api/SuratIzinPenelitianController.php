@@ -83,6 +83,7 @@ class SuratIzinPenelitianController extends Controller
                 'semester' => 'required|string|max:255',
                 'dari_tanggal' => 'required|date',
                 'tanggal' => 'required|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -113,6 +114,7 @@ class SuratIzinPenelitianController extends Controller
             $sip->user_id = Auth::user()->id;
             $sip->jenis_kelamin = Auth::user()->jenis_kelamin;
             $sip->status = 'pending';
+            $sip->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $sip->save();
 
             $Nomor = new NoSurat();
@@ -141,7 +143,7 @@ class SuratIzinPenelitianController extends Controller
                     'fakultas.dekan as nama_dekan',
                     'fakultas.nidn_dekan',
                     'tanda_tangan.nama as nama_ttd',
-                    'tanda_tangan.gambar as ttd',
+                    \DB::raw('COALESCE(tanda_tangan.tdd, tanda_tangan.gambar) as ttd'),
                 )
                 ->where('surat_izin_penelitian.id', $sip->id)
                 ->first();
@@ -151,15 +153,26 @@ class SuratIzinPenelitianController extends Controller
                 $kopBase64 = SuratService::getBase64Image($kopPath);
 
                 $tddBase64 = '';
-                if (!empty($data->ttd)) {
+                $stempelBase64 = '';
+
+                if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
+                    if (!empty($data->ttd)) {
+                if (str_starts_with($data->ttd, 'data:image')) {
+                    $tddBase64 = $data->ttd;
+                } else {
                     $tddPath = base_path('../public_html/' . $data->ttd);
                     if (file_exists($tddPath)) {
                         $tddBase64 = SuratService::getBase64Image($tddPath);
                     }
                 }
+            }
 
-                $stempelPath = base_path('../public_html/img/stempel.png');
-                $stempelBase64 = SuratService::getBase64Image($stempelPath);
+                    $stempelPath = base_path('../public_html/img/stempel.png');
+                    if (file_exists($stempelPath)) {
+                        $stempelBase64 = SuratService::getBase64Image($stempelPath);
+                    }
+                }
+
                 $pdfData = [
                     'nomor' => $data->nomor,
                     'nama' => $data->nama,
@@ -172,7 +185,6 @@ class SuratIzinPenelitianController extends Controller
                     'nidn_dekan' => $data->nidn_dekan,
                     'prodi_name' => $data->prodi_name,
                     'fakultas_name' => $data->fakultas_name,
-
                     'kopBase64' => $kopBase64,
                     'ttd' => $tddBase64,
                     'stempel' => $stempelBase64
@@ -282,6 +294,7 @@ class SuratIzinPenelitianController extends Controller
                 'semester' => 'required|string|max:255',
                 'dari_tanggal' => 'required|date',
                 'tanggal' => 'required|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak',
             ]);
 
             if ($validator->fails()) {
@@ -322,6 +335,7 @@ class SuratIzinPenelitianController extends Controller
 
 
             $sip->jenis_kelamin = Auth::user()->jenis_kelamin;
+            $sip->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
 
             // Delete old file from Google Drive if exists
             if (!empty($oldDriveFileId)) {
@@ -350,7 +364,7 @@ class SuratIzinPenelitianController extends Controller
                     'fakultas.dekan as nama_dekan',
                     'fakultas.nidn_dekan',
                     'tanda_tangan.nama as nama_ttd',
-                    'tanda_tangan.gambar as ttd',
+                    \DB::raw('COALESCE(tanda_tangan.tdd, tanda_tangan.gambar) as ttd'),
                 )
                 ->where('surat_izin_penelitian.id', $sip->id)
                 ->first();
@@ -360,15 +374,26 @@ class SuratIzinPenelitianController extends Controller
                 $kopBase64 = SuratService::getBase64Image($kopPath);
 
                 $tddBase64 = '';
-                if (!empty($data->ttd)) {
+                $stempelBase64 = '';
+
+                if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
+                    if (!empty($data->ttd)) {
+                if (str_starts_with($data->ttd, 'data:image')) {
+                    $tddBase64 = $data->ttd;
+                } else {
                     $tddPath = base_path('../public_html/' . $data->ttd);
                     if (file_exists($tddPath)) {
                         $tddBase64 = SuratService::getBase64Image($tddPath);
                     }
                 }
+            }
 
-                $stempelPath = base_path('../public_html/img/stempel.png');
-                $stempelBase64 = SuratService::getBase64Image($stempelPath);
+                    $stempelPath = base_path('../public_html/img/stempel.png');
+                    if (file_exists($stempelPath)) {
+                        $stempelBase64 = SuratService::getBase64Image($stempelPath);
+                    }
+                }
+
                 $pdfData = [
                     'nomor' => $data->nomor,
                     'nama' => $data->nama,
@@ -446,83 +471,25 @@ class SuratIzinPenelitianController extends Controller
     public function downloadPdf($id)
     {
         try {
-            $data = SuratIzinPenelitian::leftJoin('prodi', 'prodi.id', '=', 'surat_izin_penelitian.prodi_id')
-                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
-                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
-                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'fakultas.tanda_tangan_id')
-                ->select(
-                    'surat_izin_penelitian.*',
-                    'prodi.nama as prodi_name',
-                    'prodi.nama_kepala',
-                    'prodi.nidn_kepala',
-                    'fakultas.nama as fakultas_name',
-                    'fakultas.dekan as nama_dekan',
-                    'fakultas.nidn_dekan',
-                    'tanda_tangan.nama as nama_ttd',
-                    'tanda_tangan.gambar as ttd',
-                )
-                ->where('surat_izin_penelitian.id', $id)
-                ->first();
+            $data = SuratIzinPenelitian::find($id);
 
             if (!$data) {
                 return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
             }
 
-            $kopPath = base_path('../public_html/img/kop.jpg');
-            $kopBase64 = SuratService::getBase64Image($kopPath);
-
-            $tddPath = base_path('../public_html/' . $data->ttd);
-            $tddBase64 = SuratService::getBase64Image($tddPath);
-
-            $stempelPath = base_path('../public_html/img/stempel.png');
-            $stempelBase64 = SuratService::getBase64Image($stempelPath);
-            $pdfData = [
-                'nomor' => $data->nomor,
-                'nama' => $data->nama,
-                'nim' => $data->nim,
-                'kepada' => $data->kepada,
-                'semester' => $data->semester,
-                'dari_tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->dari_tanggal),
-                'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
-                'nama_dekan' => $data->nama_dekan ?? $data->nama_dekan,
-                'nidn_dekan' => $data->nidn_dekan,
-                'prodi_name' => $data->prodi_name,
-                'fakultas_name' => $data->fakultas_name,
-
-                'kopBase64' => $kopBase64,
-                'ttd' => $tddBase64,
-                'stempel' => $stempelBase64
-            ];
-
-            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi_name ?? 'UMUM');
-            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratIzinPenelitianController/');
-            $pdf = Pdf::loadView('pdf.surat_izin_penelitian', $pdfData)->setPaper('a4', 'portrait');
-            $fileName = 'surat_izin_penelitian_' . $data->nim . '_' . uniqid() . '.pdf';
-
-            if (!file_exists($directory)) {
-                mkdir($directory, 0755, true);
+            if (empty($data->local_path) || !file_exists($data->local_path)) {
+                return response()->json(['status' => false, 'message' => 'File PDF tidak ditemukan di server'], 404);
             }
 
-            $path = $directory . $fileName;
-            $pdf->save($path);
+            $fileName = basename($data->local_path);
 
-            $data->update(['local_path' => $path]);
-
-            $nameTable = 'Surat Izin Penelitian';
-
-            $googlePath = $data->prodi_name . '/' . $nameTable . '/' . $fileName;
-
-            if (empty($data->drive_file_id)) {
-                UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi_name, SuratIzinPenelitian::class);
-            }
-
-            return response($pdf->output(), 200, [
+            return response()->file($data->local_path, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
             Log::error($th->getMessage());
-            return response()->json(['status' => false, 'message' => 'Gagal generate PDF']);
+            return response()->json(['status' => false, 'message' => 'Gagal download PDF']);
         }
     }
 

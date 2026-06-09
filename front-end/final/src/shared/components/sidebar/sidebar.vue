@@ -539,7 +539,7 @@ function filterMenuByLevel(items, level, parentAllowed = false) {
       } else {
         // If no allowedLevels and user is baak, only allow specific menus
         if (level === 'baak' && !parentAllowed) {
-            const allowedForBaak = ['Ijazah', 'Account', 'MAIN', 'Dashboard'];
+            const allowedForBaak = ['Ijazah', 'Data', 'Account', 'MAIN', 'WEB APPS', 'Dashboard'];
             if (allowedForBaak.includes(item.title) || allowedForBaak.includes(item.menutitle)) {
                 isAllowed = true;
             } else {
@@ -554,7 +554,7 @@ function filterMenuByLevel(items, level, parentAllowed = false) {
       // Recursively filter children
       if (item.children && item.children.length > 0) {
         let passParentAllowed = parentAllowed;
-        const allowedForBaak = ['Ijazah', 'Account', 'MAIN', 'Dashboard'];
+        const allowedForBaak = ['Ijazah', 'Data', 'Account', 'MAIN', 'WEB APPS', 'Dashboard'];
         if (level === 'baak' && (allowedForBaak.includes(item.title) || allowedForBaak.includes(item.menutitle) || (item.allowedLevels && item.allowedLevels.includes('baak')))) {
             passParentAllowed = true;
         }

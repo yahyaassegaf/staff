@@ -188,20 +188,18 @@
                 Dekan {{ $nama_fakultas }}<br>
 
                 <!-- AREA TTD (OVERLAY AMAN) -->
-                <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 5px; margin-bottom: 5px;">
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -20px; margin-bottom: -20px;">
                     <tr>
-                        <td style="
-                            height:60px;
-                            text-align:center;
-                            vertical-align:middle;
-                            @if(!empty($stempel)) /* background-image: url('{{ $stempel }}'); */ @endif
-                            background-repeat: no-repeat;
-                            background-position: center left;
-                            background-size: 110px 110px;
-                        ">
-                            @if(!empty($ttd))
-                            <!-- <img src="{{ $ttd }}" style="width:200px; max-height:85px; object-fit:contain; margin-left: 40px; display: block;"> -->
-                            @endif
+                        <td style="height:60px; text-align:center; vertical-align:middle; padding:0;">
+                            <div style="position: relative; width: 100%; height: 110px;">
+                                @if(!empty($stempel))
+                                <img src="{{ $stempel }}" style="position: absolute; left: 30px; top: 0px; width: 110px; height: 110px; z-index: 2;">
+                                @endif
+                                
+                                @if(!empty($ttd))
+                                <img src="{{ $ttd }}" style="position: absolute; left: 40px; top: 10px; width: 200px; z-index: 1;">
+                                @endif
+                            </div>
                         </td>
                     </tr>
                 </table>

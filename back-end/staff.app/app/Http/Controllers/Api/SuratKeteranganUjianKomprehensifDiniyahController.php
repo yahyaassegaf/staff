@@ -133,6 +133,7 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
             $data->user_id = Auth::user()->id;
             $data->jenis_kelamin = Auth::user()->jenis_kelamin;
             $data->status = 'pending';
+            $data->petanda_tangan = 'tidak';
             $data->save();
 
             $Nomor = new NoSurat();
@@ -392,6 +393,7 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
             $data->drive_file_id = null;
             $data->drive_link = null;
             $data->status = 'pending';
+            $data->petanda_tangan = 'tidak';
             $data->save();
 
             // Re-fetch record with joins to build the new PDF
@@ -502,98 +504,26 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
 
     public function downloadPdf($id)
     {
-        Log::info('masuk.....');
-        Log::info($id);
         try {
-            $data = SuratKeteranganUjianKomprehensifDiniyah::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_ujian_komprehensif_diniyah.prodi_id')
-                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
-                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
-                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_keterangan_ujian_komprehensif_diniyah.tanda_tangan_id')
-                ->select(
-                    'surat_keterangan_ujian_komprehensif_diniyah.*',
-                    'prodi.nama as nama_prodi',
-                    'fakultas.nama as fakultas',
-                    'tanda_tangan.nama as nama_ttd',
-                    'tanda_tangan.gambar as ttd'
-                )
-                ->where('surat_keterangan_ujian_komprehensif_diniyah.id', $id)
-                ->first();
+            $data = SuratKeteranganUjianKomprehensifDiniyah::find($id);
 
             if (!$data) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data tidak ditemukan'
-                ], 404);
-            }
-            Log::info($data);
-            $settingKompre = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_komprehensif')->first();
-            $namaKetua = $settingKompre && $settingKompre->tandaTangan ? $settingKompre->tandaTangan->nama : ($data->nama_ttd ?? $data->koor_komprehensif);
-            $ttdKetua = $settingKompre && $settingKompre->tandaTangan ? $settingKompre->tandaTangan->gambar : $data->ttd;
-
-            $kopPath = base_path('../public_html/img/kop.jpg');
-            $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
-            
-            $tddPath = base_path('../public_html/' . $ttdKetua);
-            $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
-            
-            $stempelPath = base_path('../public_html/img/stempel.png');
-            $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
-
-            $pdfData = [
-                'nomor_surat' => $data->nomor_surat,
-                'nama' => $data->nama_lengkap,
-                'tempat_lahir' => $data->tempat_lahir,
-                'tanggal_lahir' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal_lahir),
-                'nim' => $data->nim,
-                'fakultas' => $data->fakultas,
-                'prodi' => $data->nama_prodi,
-                'alamat' => $data->alamat_rumah,
-                'kelas' => $data->kelas_pondok,
-                'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
-                'nama_penandatangan' => $namaKetua,
-                'jabatan_penandatangan' => 'Ketua / Koordinator Komprehensip',
-                'kopBase64' => $kopBase64,
-                'ttd' => $tddBase64,
-                'stempel' => $stempelBase64
-            ];
-
-            // Load view pdf.komprehensif created by user
-            $pdf = Pdf::loadView('pdf.komprehensif', $pdfData)
-                ->setPaper('a4', 'portrait');
-            Log::info('pdf');
-            $fileName = 'surat_keterangan_ukd_' . $data->nim . '.pdf';
-
-            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
-            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganUjianKomprehensifDiniyahController/');
-            $fileName = 'surat_keterangan_ujian_komprehensif_diniyah_' . $data->nim . '_' . $data->alias_prodi . '_' . uniqid() . '.pdf';
-
-            if (!file_exists($directory)) {
-                mkdir($directory, 0755, true);
+                return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
             }
 
-            $path = $directory . $fileName;
-            $pdf->save($path);
-
-            $data->update(['local_path' => $path]);
-
-            $nameTable = 'Surat Keterangan Ujian Komprehensif Diniyah';
-
-            $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
-
-            if (empty($data->drive_file_id)) {
-                UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganUjianKomprehensifDiniyah::class);
+            if (empty($data->local_path) || !file_exists($data->local_path)) {
+                return response()->json(['status' => false, 'message' => 'File PDF tidak ditemukan di server'], 404);
             }
 
-            return response($pdf->output(), 200, [
+            $fileName = basename($data->local_path);
+
+            return response()->file($data->local_path, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
-            Log::info($th->getMessage());
-            return response()->json([
-                'status' => false,
-                'message' => 'Data gagal diunduh'
-            ]);
+            \Illuminate\Support\Facades\Log::error($th->getMessage());
+            return response()->json(['status' => false, 'message' => 'Gagal download PDF']);
         }
     }
 }

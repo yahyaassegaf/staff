@@ -9,10 +9,11 @@ use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Events\BeforeSheet;
 use Illuminate\Support\Str;
 
-class MahasiswaImport implements ToCollection, WithHeadingRow, WithEvents
+class MahasiswaImport implements ToCollection, WithHeadingRow, WithEvents, SkipsEmptyRows
 {
     private $errors = [];
     private $successCount = 0;
@@ -70,8 +71,21 @@ class MahasiswaImport implements ToCollection, WithHeadingRow, WithEvents
                 $nama = trim($row['nama'] ?? '');
                 $nim = trim($row['nim'] ?? '');
 
-                // Lewati jika nama dan nim kosong (abaikan spasi)
+                // Lewati jika nama dan nim kosong (abaikan spasi) (baris kosong)
                 if ($nama === '' && $nim === '') {
+                    continue;
+                }
+
+                // NIM dan Nama wajib diisi
+                if ($nim === '') {
+                    $this->addError($rowNumber, "NIM tidak boleh kosong (Sheet: {$this->currentSheetName}, Nama: {$nama})");
+                    $this->failedCount++;
+                    continue;
+                }
+
+                if ($nama === '') {
+                    $this->addError($rowNumber, "Nama tidak boleh kosong (Sheet: {$this->currentSheetName}, NIM: {$nim})");
+                    $this->failedCount++;
                     continue;
                 }
 
@@ -100,8 +114,8 @@ class MahasiswaImport implements ToCollection, WithHeadingRow, WithEvents
                 Mahasiswa::updateOrCreate(
                     ['nim' => (string) ($row['nim'] ?? '')],
                     [
-                        'nama' => (string) ($row['nama'] ?? ''),
-                        'nik' => (string) ($row['nik'] ?? ''), // Pake string krn NIK panjang
+                        'nama' => $nama,
+                        'nik' => isset($row['nik']) && trim($row['nik']) !== '' ? (string) $row['nik'] : null, // Set null jika kosong
                         'tgl_lahir' => $this->parseFileDate($row['tempat_tanggal_lahir'] ?? $row['tgl_lahir'] ?? $row['tanggal_lahir'] ?? null),
                         'nilai_akreditasi' => (string) ($row['nilai_akreditasi'] ?? ''),
                         'nomor_sk_ban_pt' => (string) ($row['nomor_sk_ban_pt'] ?? ''),

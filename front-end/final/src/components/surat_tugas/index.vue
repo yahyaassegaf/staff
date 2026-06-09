@@ -35,6 +35,7 @@ const defaultForm = {
   masa_penugasan: "",
   tanggal: "",
   jenis_kelamin: "",
+  petanda_tangan: 'tidak',
 };
 
 const disableListMhsWatcher = ref(false);
@@ -181,6 +182,7 @@ watch(
     Object.assign(form, val);
 
     form.id = val.id ?? "";
+    form.petanda_tangan = val.petanda_tangan ?? 'tidak';
     form.no_surat = extractNo(val.no_surat ?? val.nomor_surat ?? "");
     form.nomor = val.nomor ?? "";
     form.prodi_id = val.prodi_id ?? 0;
@@ -488,6 +490,23 @@ function submitForm() {
                 ></textarea>
                 <div v-if="errors?.judul_skripsi" class="invalid-feedback">
                   {{ errors.judul_skripsi[0] }}
+                </div>
+              </div>
+              <div class="col-xl-12 mt-3">
+                <label class="form-label fw-bold">Pakai Tanda Tangan & Stempel :</label>
+                <div v-if="isLoadingData" class="skeleton-input" style="width: 150px;"></div>
+                <div v-else class="d-flex align-items-center mt-2">
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_ya" value="ya" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_ya">Ya</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_tidak" value="tidak" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_tidak">Tidak</label>
+                  </div>
+                </div>
+                <div v-if="errors?.petanda_tangan" class="invalid-feedback d-block">
+                  {{ errors.petanda_tangan[0] }}
                 </div>
               </div>
             </div>

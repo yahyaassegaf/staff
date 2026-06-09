@@ -26,17 +26,18 @@ const defaultForm = {
   prodi_id: 0,
   nama_mhs: "",
   nim: "",
-  nik: "",
+
   tempat_lahir: "",
   tanggal_lahir: "",
   prodi_mhs: "",
   semester: "",
   tahun_akademik: "",
   nama_ortu: "",
-  nik_ortu: "",
+
   alamat_ortu: "",
   hp_ortu: "",
   tanggal: "",
+  petanda_tangan: 'tidak',
 };
 
 const disableListMhsWatcher = ref(false);
@@ -185,12 +186,13 @@ watch(
     Object.assign(form, val);
 
     form.id = val.id ?? "";
+    form.petanda_tangan = val.petanda_tangan ?? 'tidak';
     form.no_surat = extractNo(val.no_surat ?? val.nomor_surat ?? "");
     form.nomor_surat = val.nomor_surat ?? "";
     form.prodi_id = val.prodi_id ?? 0;
     form.nama_mhs = val.nama_mhs || val.nama_lengkap || "";
     form.nim = val.nim ?? "";
-    form.nik = val.nik ?? "";
+
     form.tempat_lahir = val.tempat_lahir ?? "";
     form.tanggal_lahir = val.tanggal_lahir
       ? val.tanggal_lahir.slice(0, 10)
@@ -199,7 +201,7 @@ watch(
     form.semester = val.semester ?? "";
     form.tahun_akademik = val.tahun_akademik ?? "";
     form.nama_ortu = val.nama_ortu ?? "";
-    form.nik_ortu = val.nik_ortu ?? "";
+
     form.alamat_ortu = val.alamat_ortu ?? "";
     form.hp_ortu = val.hp_ortu ?? "";
     form.tanggal = val.tanggal ? val.tanggal.slice(0, 10) : "";
@@ -325,7 +327,7 @@ function submitForm() {
                 </div>
               </div>
 
-              <div class="col-xl-4">
+              <div class="col-xl-6">
                 <label class="form-label">Nama Mahasiswa :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
@@ -342,7 +344,7 @@ function submitForm() {
                 </div>
               </div>
 
-              <div class="col-xl-4">
+              <div class="col-xl-6">
                 <label class="form-label">NIM :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
@@ -358,21 +360,6 @@ function submitForm() {
                 </div>
               </div>
 
-              <div class="col-xl-4">
-                <label class="form-label">NIK Mahasiswa :</label>
-                <div v-if="isLoadingData" class="skeleton-input"></div>
-                <input
-                  v-else
-                  type="text"
-                  v-model="form.nik"
-                  class="form-control"
-                  :class="{ 'is-invalid': errors?.nik }"
-                  placeholder="Isikan NIK"
-                />
-                <div v-if="errors?.nik" class="invalid-feedback">
-                  {{ errors.nik[0] }}
-                </div>
-              </div>
 
               <div class="col-xl-6">
                 <label class="form-label">Tempat Lahir:</label>
@@ -473,21 +460,6 @@ function submitForm() {
                 </div>
               </div>
 
-              <div class="col-xl-6">
-                <label class="form-label">NIK Orang Tua:</label>
-                <div v-if="isLoadingData" class="skeleton-input"></div>
-                <input
-                  v-else
-                  type="text"
-                  v-model="form.nik_ortu"
-                  class="form-control"
-                  :class="{ 'is-invalid': errors?.nik_ortu }"
-                  placeholder="Isikan NIK Orang Tua"
-                />
-                <div v-if="errors?.nik_ortu" class="invalid-feedback">
-                  {{ errors.nik_ortu[0] }}
-                </div>
-              </div>
 
               <div class="col-xl-6">
                 <label class="form-label">Alamat Orang Tua:</label>
@@ -525,7 +497,7 @@ function submitForm() {
                 </div>
               </div>
 
-              <div class="col-xl-12">
+              <div class="col-xl-6">
                 <label class="form-label">Tanggal Surat:</label>
                 <input
                   type="date"
@@ -535,6 +507,23 @@ function submitForm() {
                 />
                 <div v-if="errors?.tanggal" class="invalid-feedback">
                   {{ errors.tanggal[0] }}
+                </div>
+              </div>
+              <div class="col-xl-12 mt-3">
+                <label class="form-label fw-bold">Pakai Tanda Tangan & Stempel :</label>
+                <div v-if="isLoadingData" class="skeleton-input" style="width: 150px;"></div>
+                <div v-else class="d-flex align-items-center mt-2">
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_ya" value="ya" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_ya">Ya</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_tidak" value="tidak" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_tidak">Tidak</label>
+                  </div>
+                </div>
+                <div v-if="errors?.petanda_tangan" class="invalid-feedback d-block">
+                  {{ errors.petanda_tangan[0] }}
                 </div>
               </div>
             </div>

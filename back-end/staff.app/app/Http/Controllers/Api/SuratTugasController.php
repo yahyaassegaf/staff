@@ -86,6 +86,7 @@ class SuratTugasController extends Controller
                 'judul_skripsi' => 'required|string',
                 'masa_penugasan' => 'required|date',
                 'tanggal' => 'required|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -121,6 +122,7 @@ class SuratTugasController extends Controller
             $st->prodi_id = $validate['prodi_id'];
             $st->jenis_kelamin = Auth::user()->jenis_kelamin;
             $st->status = 'pending';
+            $st->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $st->save();
 
             $Nomor = new NoSurat();
@@ -134,6 +136,84 @@ class SuratTugasController extends Controller
             $log->nama_surat = 'Surat Tugas';
             $log->user_id = Auth::user()->id;
             $log->save();
+
+            // Re-fetch record with joins to build the new PDF
+            $data = SuratTugas::leftJoin('prodi', 'prodi.id', '=', 'surat_tugas.prodi_id')
+                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
+                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
+                ->select(
+                    'surat_tugas.*',
+                    'prodi.nama as prodi_name',
+                    'prodi.nama_kepala',
+                    'prodi.nidn_kepala',
+                    'fakultas.nama as fakultas_name',
+                    \DB::raw('COALESCE(tanda_tangan.tdd, tanda_tangan.gambar) as ttd')
+                )
+                ->where('surat_tugas.id', $st->id)
+                ->first();
+
+            if ($data) {
+                $kopPath = base_path('../public_html/img/kop.jpg');
+                $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
+
+                $tddBase64 = '';
+                $stempelBase64 = '';
+
+                if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
+                    if (!empty($data->ttd)) {
+                        if (str_starts_with($data->ttd, 'data:image')) {
+                            $tddBase64 = $data->ttd;
+                        } else {
+                            $tddPath = base_path('../public_html/' . $data->ttd);
+                            if (file_exists($tddPath)) {
+                                $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                            }
+                        }
+                    }
+
+                    $stempelPath = base_path('../public_html/img/stempel.png');
+                    if (file_exists($stempelPath)) {
+                        $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+                    }
+                }
+
+                $pdfData = [
+                    'nomor' => $data->nomor,
+                    'nama_dosen' => $data->nama_dosen,
+                    'alamat_dosen' => $data->alamat_dosen,
+                    'tugas_dosen' => $data->tugas_dosen,
+                    'tugasnya' => $data->tugasnya,
+                    'nama_mhs' => $data->nama_mhs,
+                    'nim_nik' => $data->nim_nik,
+                    'fakultas_prodi' => $data->fakultas_prodi,
+                    'judul_skripsi' => $data->judul_skripsi,
+                    'masa_penugasan' => $data->masa_penugasan,
+                    'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+                    'nama_kepala' => $data->nama_kepala,
+                    'nidn_kepala' => $data->nidn_kepala,
+                    'kopBase64' => $kopBase64,
+                    'ttd' => $tddBase64,
+                    'stempel' => $stempelBase64,
+                ];
+
+                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi_name ?? 'UMUM');
+                $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratTugasController/');
+                $pdf = Pdf::loadView('pdf.surat_tugas', $pdfData)->setPaper('a4', 'portrait');
+                $fileName = 'surat_tugas_' . $data->nim_nik . '_' . uniqid() . '.pdf';
+ 
+                if (!file_exists($directory)) {
+                    mkdir($directory, 0755, true);
+                }
+ 
+                $path = $directory . $fileName;
+                $pdf->save($path);
+ 
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Surat Tugas';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $data->prodi_name, SuratTugas::class);
+            }
 
             return response()->json([
                 'status' => true,
@@ -249,6 +329,7 @@ class SuratTugasController extends Controller
                 'masa_penugasan' => 'required|string|max:255',
                 'tanggal' => 'required|date',
                 'jenis_kelamin' => 'required|string',
+                'petanda_tangan' => 'nullable|in:ya,tidak',
             ]);
 
             if ($validator->fails()) {
@@ -286,6 +367,7 @@ class SuratTugasController extends Controller
             $st->tanggal = $validate['tanggal'];
             $st->prodi_id = $validate['prodi_id'];
             $st->jenis_kelamin = $validate['jenis_kelamin'];
+            $st->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
 
             // Delete old file from Google Drive if exists
             if (!empty($oldDriveFileId)) {
@@ -311,7 +393,7 @@ class SuratTugasController extends Controller
                     'prodi.nama_kepala',
                     'prodi.nidn_kepala',
                     'fakultas.nama as fakultas_name',
-                    'tanda_tangan.gambar as ttd'
+                    \DB::raw('COALESCE(tanda_tangan.tdd, tanda_tangan.gambar) as ttd')
                 )
                 ->where('surat_tugas.id', $st->id)
                 ->first();
@@ -319,12 +401,24 @@ class SuratTugasController extends Controller
             if ($data) {
                 $kopPath = base_path('../public_html/img/kop.jpg');
                 $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
-                $tddPath = base_path('../public_html/' . $data->ttd);
 
-                $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
-                $stempelPath = base_path('../public_html/img/stempel.png');
+                $tddBase64 = '';
+                $stempelBase64 = '';
 
-                $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+                if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
+                    if (!empty($data->ttd)) {
+                        $tddPath = base_path('../public_html/' . $data->ttd);
+                        if (file_exists($tddPath)) {
+                            $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                        }
+                    }
+
+                    $stempelPath = base_path('../public_html/img/stempel.png');
+                    if (file_exists($stempelPath)) {
+                        $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+                    }
+                }
+
                 $pdfData = [
                     'nomor' => $data->nomor,
                     'nama_dosen' => $data->nama_dosen,
@@ -378,81 +472,25 @@ class SuratTugasController extends Controller
     public function downloadPdf($id)
     {
         try {
-            $data = SuratTugas::leftJoin('prodi', 'prodi.id', '=', 'surat_tugas.prodi_id')
-                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
-                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
-                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
-                ->select(
-                    'surat_tugas.*',
-                    'prodi.nama as prodi_name',
-                    'prodi.nama_kepala',
-                    'prodi.nidn_kepala',
-                    'fakultas.nama as fakultas_name',
-                    'tanda_tangan.gambar as ttd'
-                )
-                ->where('surat_tugas.id', $id)
-                ->first();
+            $data = SuratTugas::find($id);
 
             if (!$data) {
                 return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
             }
 
-            $kopPath = base_path('../public_html/img/kop.jpg');
-            $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
-            $tddPath = base_path('../public_html/' . $data->ttd);
-
-            $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
-            $stempelPath = base_path('../public_html/img/stempel.png');
-
-            $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
-            $pdfData = [
-                'nomor' => $data->nomor,
-                'nama_dosen' => $data->nama_dosen,
-                'alamat_dosen' => $data->alamat_dosen,
-                'tugas_dosen' => $data->tugas_dosen,
-                'tugasnya' => $data->tugasnya,
-                'nama_mhs' => $data->nama_mhs,
-                'nim_nik' => $data->nim_nik,
-                'fakultas_prodi' => $data->fakultas_prodi,
-                'judul_skripsi' => $data->judul_skripsi,
-                'masa_penugasan' => $data->masa_penugasan,
-                'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
-                'nama_kepala' => $data->nama_kepala,
-                'nidn_kepala' => $data->nidn_kepala,
-                'kopBase64' => $kopBase64,
-                'ttd' => $tddBase64,
-                'stempel' => $stempelBase64,
-            ];
-
-            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi_name ?? 'UMUM');
-            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratTugasController/');
-            $pdf = Pdf::loadView('pdf.surat_tugas', $pdfData)->setPaper('a4', 'portrait');
-            $fileName = 'surat_tugas_' . $data->nim_nik . '_' . uniqid() . '.pdf';
- 
-            if (!file_exists($directory)) {
-                mkdir($directory, 0755, true);
-            }
- 
-            $path = $directory . $fileName;
-            $pdf->save($path);
- 
-            $data->update(['local_path' => $path]);
-
-            $nameTable = 'Surat Tugas';
-
-            $googlePath = $data->prodi_name . '/' . $nameTable . '/' . $fileName;
-
-            if (empty($data->drive_file_id)) {
-                UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi_name, SuratTugas::class);
+            if (empty($data->local_path) || !file_exists($data->local_path)) {
+                return response()->json(['status' => false, 'message' => 'File PDF tidak ditemukan di server'], 404);
             }
 
-            return response($pdf->output(), 200, [
+            $fileName = basename($data->local_path);
+
+            return response()->file($data->local_path, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
             Log::error($th->getMessage());
-            return response()->json(['status' => false, 'message' => 'Gagal generate PDF']);
+            return response()->json(['status' => false, 'message' => 'Gagal download PDF']);
         }
     }
 

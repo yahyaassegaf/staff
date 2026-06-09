@@ -264,50 +264,25 @@ class HasilRapatController extends Controller
     public function downloadPdf($id)
     {
         try {
-            $data = HasilRapat::with(['prodi'])->find($id);
-            if (!$data) return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
+            $data = HasilRapat::find($id);
 
-            $anggota = AnggotaRapat::with('user')->where('hasil_rapat_id', $id)->get();
-            $kopPath = base_path('../public_html/img/kop.jpg');
-            $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
-
-            $pdfData = [
-                'nomor_surat' => $data->nomor_surat,
-                'agenda' => $data->agenda,
-                'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
-                'waktu' => $data->waktu,
-                'tempat' => $data->tempat,
-                'pembahasan' => $data->pembahasan,
-                'anggota' => $anggota,
-                'kopBase64' => $kopBase64,
-            ];
-
-            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi->nama ?? 'Umum');
-            $directory = base_path('../public_html/pdf/' . $prodiName . '/HasilRapatController/');
-            $pdf = Pdf::loadView('pdf.v_hasil_rapat', $pdfData)->setPaper('a4', 'portrait');
-            $fileName = 'hasil_rapat_' . str_replace('/', '_', $data->nomor_surat) . '_' . uniqid() . '.pdf';
-            if (!file_exists($directory)) mkdir($directory, 0755, true);
- 
-            $path = $directory . $fileName;
-            $pdf->save($path);
- 
-            $data->update(['local_path' => $path]);
-
-            // Upload ke Google Drive hanya jika file belum ada
-            $nameTable = 'Hasil Rapat';
-            $prodiName = $data->prodi->nama ?? 'Umum';
-
-            if (empty($data->drive_file_id)) {
-                UploudSuratToDrive::dispatch($id, $nameTable, $prodiName, HasilRapat::class);
+            if (!$data) {
+                return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
             }
 
-            return response($pdf->output(), 200, [
+            if (empty($data->local_path) || !file_exists($data->local_path)) {
+                return response()->json(['status' => false, 'message' => 'File PDF tidak ditemukan di server'], 404);
+            }
+
+            $fileName = basename($data->local_path);
+
+            return response()->file($data->local_path, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
-            Log::info($th->getMessage());
-            return response()->json(['status' => false, 'message' => 'Gagal generate PDF']);
+            \Illuminate\Support\Facades\Log::error($th->getMessage());
+            return response()->json(['status' => false, 'message' => 'Gagal download PDF']);
         }
     }
 

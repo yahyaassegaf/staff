@@ -103,6 +103,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
                 'alamat_rumah' => 'required|string',
                 'kelas_pondok' => 'required|string|max:255',
                 'tanggal' => 'nullable|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -137,6 +138,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             $sklmk->user_id         = Auth::user()->id;
             $sklmk->jenis_kelamin   = Auth::user()->jenis_kelamin;
             $sklmk->status          = $validate['status'] ?? 'pending';
+            $sklmk->petanda_tangan  = $validate['petanda_tangan'] ?? 'tidak';
             $sklmk->save();
 
             $Nomor                  = new NoSurat();
@@ -284,6 +286,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
                 'tanggal' => 'required|date',
                 'drive_file_id' => 'nullable|string',
                 'status' => 'nullable|in:pending,uploaded,failed',
+                'petanda_tangan' => 'nullable|in:ya,tidak',
             ]);
 
             if ($validator->fails()) {
@@ -320,6 +323,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             $sklmk->kelas_pondok = $validate['kelas_pondok'];
             $sklmk->tanggal = $validate['tanggal'];
             $sklmk->jenis_kelamin = Auth::user()->jenis_kelamin;
+            $sklmk->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             
             // Delete old file from Google Drive if exists
             if (!empty($oldDriveFileId)) {
@@ -414,69 +418,26 @@ class SuratKeteranganLulusMataKuliahController extends Controller
     }
     public function downloadPdf($id)
     {
-        ini_set('memory_limit', '512M');
-        ini_set('max_execution_time', '300');
-
         try {
-            $data = SuratKeteranganLulusMataKuliah::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_lulus_mata_kuliah.prodi_id')
-                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
-                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
-                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'fakultas.tanda_tangan_id')
-                ->select(
-                    'surat_keterangan_lulus_mata_kuliah.*',
-                    'prodi.nama as nama_prodi',
-                    'fakultas.nama as fakultas',
-                    'fakultas.dekan as dekan',
-                    'fakultas.nidn_dekan as nidn_dekan',
-                    'prodi.alias as alias_prodi',
-                    'prodi.nidn_kepala as nidn_kepala_prodi',
-                    'prodi.nama_kepala as nama_kepala_prodi',
-                    'tanda_tangan.gambar as ttd',
-                )
-                ->where('surat_keterangan_lulus_mata_kuliah.id', $id)
-                ->first();
+            $data = SuratKeteranganLulusMataKuliah::find($id);
 
             if (!$data) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data tidak ditemukan'
-                ], 404);
+                return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
             }
 
-            $pdfData = $this->buildPdfData($data);
-
-            $pdf = Pdf::loadView('pdf.v_surat_keterangan_lulus_mata_kuliah', $pdfData)->setPaper('a4', 'portrait');
-
-            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
-            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganLulusMataKuliahController');
-            $fileName = 'surat_keterangan_lulus_mata_kuliah_' . $data->nim . '_' . $data->prodi_mahasiswa . '_' . uniqid() . '.pdf';
-
-            if (!\Illuminate\Support\Facades\File::exists($directory)) {
-                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+            if (empty($data->local_path) || !file_exists($data->local_path)) {
+                return response()->json(['status' => false, 'message' => 'File PDF tidak ditemukan di server'], 404);
             }
 
-            $path = $directory . '/' . $fileName;
-            $pdf->save($path);
+            $fileName = basename($data->local_path);
 
-            $data->update(['local_path' => $path]);
-
-            $nameTable = 'Surat Keterangan Lulus Mata Kuliah';
-            $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
-
-            if (empty($data->drive_file_id)) {
-                UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganLulusMataKuliah::class);
-            }
-
-            return response($pdf->output(), 200, [
+            return response()->file($data->local_path, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
-            Log::error((string) $th);
-            return response()->json([
-                'status' => false,
-                'message' => 'Gagal mengunduh PDF: Terjadi kesalahan pada server'
-            ], 500);
+            \Illuminate\Support\Facades\Log::error($th->getMessage());
+            return response()->json(['status' => false, 'message' => 'Gagal download PDF']);
         }
     }
 
@@ -485,11 +446,22 @@ class SuratKeteranganLulusMataKuliahController extends Controller
         $kopPath = base_path('../public_html/img/kop.jpg');
         $kopBase64 = SuratService::getBase64Image($kopPath);
 
-        $stempelPath = base_path('../public_html/img/stempel.png');
-        $stempelBase64 = SuratService::getBase64Image($stempelPath);
+        $stempelBase64 = '';
+        $tddBase64 = '';
 
-        $tddPath = base_path('../public_html/' . $data->ttd);
-        $tddBase64 = SuratService::getBase64Image($tddPath);
+        if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
+            $stempelPath = base_path('../public_html/img/stempel.png');
+            if (file_exists($stempelPath)) {
+                $stempelBase64 = SuratService::getBase64Image($stempelPath);
+            }
+
+            if (!empty($data->ttd)) {
+                $tddPath = base_path('../public_html/' . $data->ttd);
+                if (file_exists($tddPath)) {
+                    $tddBase64 = SuratService::getBase64Image($tddPath);
+                }
+            }
+        }
 
         return [
             'nomor_surat' => $data->nomor_surat,

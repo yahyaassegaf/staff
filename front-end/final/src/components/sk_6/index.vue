@@ -550,7 +550,7 @@ function submitForm() {
                 </div>
               </div>
 
-              <div class="col-xl-12">
+              <div class="col-xl-6">
                 <label class="form-label">Alamat Rumah:</label>
                 <div v-if="isLoadingData" class="skeleton-input" style="height: 62px"></div>
                 <textarea

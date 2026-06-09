@@ -144,6 +144,7 @@ class SuratKeteranganTasmaKknPplController extends Controller
             $sktkp->tanggal       = $validate['tanggal'];
             $sktkp->user_id       = Auth::user()->id;
             $sktkp->status        = 'pending';
+            $sktkp->petanda_tangan = 'tidak';
             $sktkp->save();
 
             $Nomor                = new NoSurat();
@@ -343,6 +344,7 @@ class SuratKeteranganTasmaKknPplController extends Controller
             $sktkp->drive_file_id = null;
             $sktkp->drive_link = null;
             $sktkp->status = 'pending';
+            $sktkp->petanda_tangan = 'tidak';
             $sktkp->save();
 
             // Re-fetch record with joins to build the new PDF
@@ -423,66 +425,26 @@ class SuratKeteranganTasmaKknPplController extends Controller
 
     public function downloadPdf($id)
     {
-        ini_set('memory_limit', '512M');
-        ini_set('max_execution_time', '300');
-
         try {
-            $data = SuratKeteranganTasmaKknPpl::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_tasma_kkn_ppl.prodi_id')
-                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
-                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
-                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'surat_keterangan_tasma_kkn_ppl.tanda_tangan_id')
-                ->select(
-                    'fakultas.nama as fakultas',
-                    'surat_keterangan_tasma_kkn_ppl.*',
-                    'prodi.nama as nama_prodi',
-                    'prodi.alias as alias_prodi',
-                    'tanda_tangan.nama as nama_ttd',
-                    'tanda_tangan.gambar as ttd',
-                )
-                ->where('surat_keterangan_tasma_kkn_ppl.id', $id)
-                ->first();
+            $data = SuratKeteranganTasmaKknPpl::find($id);
 
             if (!$data) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data tidak ditemukan'
-                ], 404);
+                return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
             }
 
-            $pdfData = $this->buildPdfData($data);
-
-            $pdf = Pdf::loadView('pdf.surat_tasma_kkn_ppl', $pdfData)->setPaper('a4', 'portrait');
-
-            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
-            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganTasmaKknPplController');
-            $fileName = 'surat_keterangan_tasma_kkn_ppl_' . $data->nim . '_' . uniqid() . '.pdf';
-
-            if (!\Illuminate\Support\Facades\File::exists($directory)) {
-                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+            if (empty($data->local_path) || !file_exists($data->local_path)) {
+                return response()->json(['status' => false, 'message' => 'File PDF tidak ditemukan di server'], 404);
             }
 
-            $path = $directory . '/' . $fileName;
-            $pdf->save($path);
+            $fileName = basename($data->local_path);
 
-            $data->update(['local_path' => $path]);
-
-            $nameTable = 'Surat Keterangan TASMA, KKN, PPL';
-            $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
-
-            if (empty($data->drive_file_id)) {
-                UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganTasmaKknPpl::class);
-            }
-
-            return response($pdf->output(), 200, [
+            return response()->file($data->local_path, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
-            Log::error((string) $th);
-            return response()->json([
-                'status' => false,
-                'message' => 'Gagal mengunduh PDF: Terjadi kesalahan pada server'
-            ], 500);
+            \Illuminate\Support\Facades\Log::error($th->getMessage());
+            return response()->json(['status' => false, 'message' => 'Gagal download PDF']);
         }
     }
 

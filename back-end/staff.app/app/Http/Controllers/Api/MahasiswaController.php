@@ -14,7 +14,7 @@ class MahasiswaController extends Controller
 {
     public function index(Request $request)
     {
-        $data = Mahasiswa::query();
+        $data = Mahasiswa::with('prodi');
 
         if ($request->filled('search')) {
             $search = $request->search;

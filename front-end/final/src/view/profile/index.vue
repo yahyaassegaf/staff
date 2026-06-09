@@ -3,6 +3,7 @@ import { defineComponent, onMounted, ref, reactive } from "vue";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import { apiGet, apiPost } from "../../services/api/request";
+import { BASE_URL, ASSET_URL } from "../../services/api/http";
 import Pageheader from "../../shared/components/pageheader/pageheader.vue";
 
 export default defineComponent({
@@ -38,6 +39,16 @@ export default defineComponent({
     });
 
     const activeTab = ref("personal");
+
+    const getFotoUrl = (img: string) => {
+      if (!img) return '/images/faces/9.jpg';
+      const normalizedImg = img.replace(/\\/g, '/');
+      if (normalizedImg.startsWith('foto/')) {
+        const filename = normalizedImg.replace('foto/', '');
+        return `${BASE_URL}/foto/${encodeURIComponent(filename)}`;
+      }
+      return `${ASSET_URL}/storage/${normalizedImg}`;
+    };
 
     async function getLevel() {
       try {
@@ -110,6 +121,7 @@ export default defineComponent({
       const formData = new FormData();
       formData.append("foto", selectedFile.value);
       formData.append("name", form.name);
+      formData.append("username", form.username);
       formData.append("email", form.email);
       formData.append("handphone", form.handphone);
       formData.append("_method", "PUT");
@@ -211,6 +223,7 @@ export default defineComponent({
       uploading,
       activeTab,
       dataToPass,
+      getFotoUrl,
     };
   },
 });
@@ -230,10 +243,7 @@ export default defineComponent({
                 <span class="avatar avatar-xxl avatar-rounded profile-img-main">
                   <img
                     :src="
-                      imageUrl ||
-                      (user.img
-                        ? '/storage/' + user.img
-                        : '/images/faces/9.jpg')
+                      imageUrl || getFotoUrl(user?.img)
                     "
                     alt="profile-img"
                   />

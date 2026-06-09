@@ -144,20 +144,17 @@
 
                 <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -5px; margin-bottom: -15px;">
                     <tr>
-                        <td style="
-                            height:120px;
-                            text-align:left;
-                            vertical-align:middle;
-                            @if(!empty($stempel)) /* background-image: url('{{ $stempel }}'); */ @endif
-                            background-repeat: no-repeat;
-                            background-position: left center;
-                            background-size: 110px 110px;
-                        ">
-                            @if(!empty($ttd))
-                            <!-- <img src="{{ $ttd }}" style="max-width:200px; max-height: 80px; object-fit: contain; margin-left: -5px;"> -->
-                            @else
-                            <span style="font-style: italic; color: #555;">Ttd & stempel basah</span>
-                            @endif
+                        <td style="height:120px; text-align:left; vertical-align:middle; padding:0;">
+                            <div style="position: relative; width: 100%; height: 120px;">
+                                @if(!empty($stempel))
+                                <img src="{{ $stempel }}" style="position: absolute; left: -30px; top: 5px; width: 95px; height: 95px; z-index: 2;">
+                                @endif
+                                
+                                @if(!empty($ttd))
+                                <img src="{{ $ttd }}" style="position: absolute; left: -15px; top: 15px; width: 175px; z-index: 1;">
+
+                                @endif
+                            </div>
                         </td>
                     </tr>
                 </table>
@@ -223,20 +220,17 @@
 
                 <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -5px; margin-bottom: -15px;">
                     <tr>
-                        <td style="
-                            height:120px;
-                            text-align:left;
-                            vertical-align:middle;
-                            @if(!empty($stempel)) /* background-image: url('{{ $stempel }}'); */ @endif
-                            background-repeat: no-repeat;
-                            background-position: left center;
-                            background-size: 110px 110px;
-                        ">
-                            @if(!empty($ttd))
-                            <!-- <img src="{{ $ttd }}" style="max-width:200px; max-height: 80px; object-fit: contain; margin-left: -5px;"> -->
-                            @else
-                            <span style="font-style: italic; color: #555;">Ttd & stempel basah</span>
-                            @endif
+                        <td style="height:120px; text-align:left; vertical-align:middle; padding:0;">
+                            <div style="position: relative; width: 100%; height: 120px;">
+                                @if(!empty($stempel))
+                                <img src="{{ $stempel }}" style="position: absolute; left: -30px; top: 5px; width: 95px; height: 95px; z-index: 2;">
+                                @endif
+                                
+                                @if(!empty($ttd))
+                                <img src="{{ $ttd }}" style="position: absolute; left: -15px; top: 20px; max-width:200px; max-height: 80px; object-fit: contain; z-index: 1;">
+
+                                @endif
+                            </div>
                         </td>
                     </tr>
                 </table>

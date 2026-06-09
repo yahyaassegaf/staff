@@ -35,7 +35,10 @@ use App\Http\Controllers\Api\SuratKeteranganDaftarS2Controller;
 Route::post('/login', [LoginController::class, 'login'])->name('api.login');
 Route::get('/profile', [LoginController::class, 'profile'])->middleware('auth:sanctum');
 Route::put('/profile', [LoginController::class, 'updateProfile'])->middleware('auth:sanctum');
-Route::get('/logout', [LoginController::class, 'logout'])->middleware('auth:sanctum');
+Route::post('/logout', [LoginController::class, 'logout']);
+Route::get('/foto/{filename}', [LoginController::class, 'serveFoto'])->where('filename', '.*');
+
+
 Route::get('/get-level', [LoginController::class, 'getLevel'])->middleware('auth:sanctum');
 Route::get('/data-users', [LoginController::class, 'dataUsers'])->middleware('auth:sanctum');
 Route::get('/data-users/{id}', [LoginController::class, 'show'])->middleware('auth:sanctum');

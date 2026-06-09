@@ -33,9 +33,9 @@ class LoginController extends Controller
         $validate = $validator->validated();
 
         $user = User::join('level', 'level.id', '=', 'users.level_id')
-            ->join('prodi', 'prodi.id', '=', 'users.prodi_id')
+            ->leftJoin('prodi', 'prodi.id', '=', 'users.prodi_id')
             ->where('username', $validate['username'])
-            ->select('users.*', 'level.nama as level', 'prodi.nama as prodi','prodi.alias as prodi_alias')
+            ->select('users.*', 'level.nama as level', 'prodi.nama as prodi', 'prodi.alias as prodi_alias')
             ->first();
 
         Log::info($user);
@@ -70,7 +70,7 @@ class LoginController extends Controller
 
         // Ambil data user beserta nama level
         $userWithLevel = User::join('level', 'level.id', '=', 'users.level_id')
-        ->leftJoin('prodi', 'prodi.id', '=', 'users.prodi_id') 
+            ->leftJoin('prodi', 'prodi.id', '=', 'users.prodi_id')
             ->where('users.id', $user->id)
             ->select('users.*', 'level.nama as level')
             ->first();
@@ -117,8 +117,14 @@ class LoginController extends Controller
             }
 
             if ($request->hasFile('foto')) {
-                $path = $request->file('foto')->store('img', 'public');
-                $user->img = $path;
+                $dir = base_path('../public_html/foto/');
+                if (!file_exists($dir)) {
+                    mkdir($dir, 0755, true);
+                }
+                $file = $request->file('foto');
+                $filename = time() . '_' . $file->getClientOriginalName();
+                $file->move($dir, $filename);
+                $user->img = 'foto/' . $filename;
             }
 
             $user->save();
@@ -134,6 +140,21 @@ class LoginController extends Controller
                 'message' => 'Profile gagal diupdate: ' . $th->getMessage()
             ]);
         }
+    }
+
+    public function serveFoto($filename)
+    {
+        $path = base_path('../public_html/foto/' . $filename);
+
+        if (!file_exists($path)) {
+            abort(404);
+        }
+
+        $mime = mime_content_type($path);
+        return response()->file($path, [
+            'Content-Type' => $mime,
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
     }
 
     public function logout(Request $request)
@@ -254,8 +275,14 @@ class LoginController extends Controller
             }
 
             if ($request->hasFile('foto')) {
-                $path = $request->file('foto')->store('img', 'public');
-                $user->img = $path;
+                $dir = base_path('../public_html/foto/');
+                if (!file_exists($dir)) {
+                    mkdir($dir, 0755, true);
+                }
+                $file = $request->file('foto');
+                $filename = time() . '_' . $file->getClientOriginalName();
+                $file->move($dir, $filename);
+                $user->img = 'foto/' . $filename;
             }
 
             $user->save();
@@ -315,8 +342,16 @@ class LoginController extends Controller
 
             $validate = $validator->validated();
 
+            $path = null;
             if ($request->hasFile('foto')) {
-                $path = $request->file('foto')->store('img', 'public');
+                $dir = base_path('../public_html/foto/');
+                if (!file_exists($dir)) {
+                    mkdir($dir, 0755, true);
+                }
+                $file = $request->file('foto');
+                $filename = time() . '_' . $file->getClientOriginalName();
+                $file->move($dir, $filename);
+                $path = 'foto/' . $filename;
             }
 
 

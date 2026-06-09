@@ -150,7 +150,6 @@
             Demikian surat tugas ini kami sampaikan agar dapat dilaksanakan dengan penuh tanggung jawab.
         </p>
 
-        <!-- TANDA TANGAN -->
         <table class="ttd" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">
             <tr>
                 <td width="60%"></td>
@@ -159,16 +158,17 @@
                     Kepala Prodi
                     <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -20px; margin-bottom: -30px;">
                         <tr>
-                            <td style="
-                                height: 155px;
-                                text-align:center;
-                                vertical-align:middle;
-                                /* background-image: url('{{ $stempel }}'); */
-                                background-repeat: no-repeat;
-                                background-position: 20% 50%;
-                                background-size: 145px 145px;
-                            ">
-                                <!-- <img src="{{ $ttd }}" style="width:330px;"> -->
+                            <td style="height: 155px; text-align:center; vertical-align:middle; padding:0;">
+                                <div style="position: relative; width: 100%; height: 155px;">
+                                    @if(!empty($stempel))
+                                    <img src="{{ $stempel }}" style="position: absolute; left: -10px; top: 5px; width: 115px; height: 115px; z-index: 2;">
+                                    @endif
+                                    
+                                    @if(!empty($ttd))
+                                    <img src="{{ $ttd }}" style="position: absolute; left: 0px; top: 20px; width: 200px; z-index: 1;">
+
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     </table>

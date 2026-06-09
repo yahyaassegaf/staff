@@ -88,6 +88,7 @@ class SuratKeteranganTransferController extends Controller
                 'alamat' => 'nullable|string',
                 'universitas_tujuan' => 'nullable|string|max:255',
                 'tanggal' => 'required|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -141,6 +142,7 @@ class SuratKeteranganTransferController extends Controller
             $skt->prodi_id = $validate['prodi_id'];
             $skt->jenis_kelamin = Auth::user()->jenis_kelamin;
             $skt->status = 'pending';
+            $skt->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $skt->save();
 
             $Nomor = new NoSurat();
@@ -169,7 +171,7 @@ class SuratKeteranganTransferController extends Controller
                     'fakultas.nama as fakultas_name',
                     'fakultas.dekan as dekan',
                     'fakultas.nidn_dekan as nidn_dekan',
-                    'tanda_tangan.gambar as ttd',
+                    \DB::raw('COALESCE(tanda_tangan.tdd, tanda_tangan.gambar) as ttd'),
                     'th_akademik.nama as th_akademik_nama',
                     'th_akademik.semester as th_akademik_semester'
                 )
@@ -283,6 +285,7 @@ class SuratKeteranganTransferController extends Controller
                 'alamat' => 'nullable|string',
                 'universitas_tujuan' => 'nullable|string|max:255',
                 'tanggal' => 'required|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak',
             ]);
 
             if ($validator->fails()) {
@@ -334,6 +337,7 @@ class SuratKeteranganTransferController extends Controller
             $skt->tanggal = $validate['tanggal'];
             $skt->prodi_id = $validate['prodi_id'];
             $skt->jenis_kelamin = Auth::user()->jenis_kelamin;
+            $skt->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
 
             // Delete old file from Google Drive if exists
             if (!empty($oldDriveFileId)) {
@@ -362,7 +366,7 @@ class SuratKeteranganTransferController extends Controller
                     'fakultas.nama as fakultas_name',
                     'fakultas.dekan as dekan',
                     'fakultas.nidn_dekan as nidn_dekan',
-                    'tanda_tangan.gambar as ttd',
+                    \DB::raw('COALESCE(tanda_tangan.tdd, tanda_tangan.gambar) as ttd'),
                     'th_akademik.nama as th_akademik_nama',
                     'th_akademik.semester as th_akademik_semester'
                 )
@@ -430,63 +434,26 @@ class SuratKeteranganTransferController extends Controller
 
     public function downloadPdf($id)
     {
-        ini_set('memory_limit', '512M');
-        ini_set('max_execution_time', '300');
-
         try {
-            $data = SuratKeteranganTransfer::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_transfer.prodi_id')
-                ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
-                ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
-                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'fakultas.tanda_tangan_id')
-                ->leftJoin('th_akademik', 'th_akademik.id', '=', 'surat_keterangan_transfer.tahun_akademik')
-                ->select(
-                    'surat_keterangan_transfer.*',
-                    'prodi.nama as prodi_name',
-                    'prodi.nama_kepala',
-                    'prodi.nidn_kepala',
-                    'fakultas.nama as fakultas_name',
-                    'fakultas.dekan as dekan',
-                    'fakultas.nidn_dekan as nidn_dekan',
-                    'tanda_tangan.gambar as ttd',
-                    'th_akademik.nama as th_akademik_nama',
-                    'th_akademik.semester as th_akademik_semester'
-                )
-                ->where('surat_keterangan_transfer.id', $id)
-                ->first();
+            $data = SuratKeteranganTransfer::find($id);
 
             if (!$data) {
                 return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
             }
 
-            $pdfData = $this->buildPdfData($data);
-
-            $pdf = Pdf::loadView('pdf.surat_keterangan_transfer', $pdfData)->setPaper('a4', 'portrait');
-            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi_name ?? 'UMUM');
-            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganTransferController');
-            $fileName = 'surat_keterangan_transfer_' . $data->nim . '_' . uniqid() . '.pdf';
-
-            if (!\Illuminate\Support\Facades\File::exists($directory)) {
-                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
-            }
-            $path = $directory . '/' . $fileName;
-
-            $pdf->save($path);
-            $data->update(['local_path' => $path]);
-
-            $nameTable = 'Surat Keterangan Transfer';
-            $googlePath = $data->prodi_name . '/' . $nameTable . '/' . $fileName;
-
-            if (empty($data->drive_file_id)) {
-                UploudSuratToDrive::dispatch($id, $nameTable, $data->prodi_name, SuratKeteranganTransfer::class);
+            if (empty($data->local_path) || !file_exists($data->local_path)) {
+                return response()->json(['status' => false, 'message' => 'File PDF tidak ditemukan di server'], 404);
             }
 
-            return response($pdf->output(), 200, [
+            $fileName = basename($data->local_path);
+
+            return response()->file($data->local_path, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
-            Log::error((string) $th);
-            return response()->json(['status' => false, 'message' => 'Gagal generate PDF: Terjadi kesalahan pada server'], 500);
+            Log::error($th->getMessage());
+            return response()->json(['status' => false, 'message' => 'Gagal download PDF']);
         }
     }
 
@@ -527,11 +494,26 @@ class SuratKeteranganTransferController extends Controller
         $kopPath = base_path('../public_html/img/kop.jpg');
         $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
 
-        $stempelPath = base_path('../public_html/img/stempel.png');
-        $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+        $stempelBase64 = '';
+        $ttdBase64 = '';
 
-        $ttdPath = base_path('../public_html/' . $data->ttd);
-        $ttdBase64 = \App\Services\SuratService::getBase64Image($ttdPath);
+        if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
+            $stempelPath = base_path('../public_html/img/stempel.png');
+            if (file_exists($stempelPath)) {
+                $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+            }
+
+            if (!empty($data->ttd)) {
+                if (str_starts_with($data->ttd, 'data:image')) {
+                    $ttdBase64 = $data->ttd;
+                } else {
+                    $ttdPath = base_path('../public_html/' . $data->ttd);
+                    if (file_exists($ttdPath)) {
+                        $ttdBase64 = \App\Services\SuratService::getBase64Image($ttdPath);
+                    }
+                }
+            }
+        }
 
         $tahunAkademik = $data->th_akademik_nama ?? $data->tahun_akademik;
         $nama_fakultas = 'Fakultas ' . ucwords($data->fakultas_name);

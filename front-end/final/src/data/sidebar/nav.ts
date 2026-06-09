@@ -133,11 +133,12 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   //   ]
   // },
   {
-    menutitle: 'WEB APPS'
+    menutitle: 'WEB APPS',
+    allowedLevels: ['baak', 'admin']
   },
 
   {
-    title: "Data", icon: Svgicons.Applicationicon, type: "sub", active: false, selected: false, dirchange: false, allowedLevels: ['admin'], children: [
+    title: "Data", icon: Svgicons.Applicationicon, type: "sub", active: false, selected: false, dirchange: false, allowedLevels: ['baak', 'admin'], children: [
 
       { path: "/prodi", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Prodi" },
       { path: "/fakultas", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Fakultas" },

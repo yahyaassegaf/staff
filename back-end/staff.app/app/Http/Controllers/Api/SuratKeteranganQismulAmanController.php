@@ -147,6 +147,7 @@ class SuratKeteranganQismulAmanController extends Controller
             $skqa->tanggal = $validate['tanggal'];
             $skqa->user_id = Auth::user()->id;
             $skqa->status = $validate['status'] ?? 'pending';
+            $skqa->petanda_tangan = 'tidak';
             $skqa->save();
 
             $Nomor              = new NoSurat();
@@ -339,6 +340,7 @@ class SuratKeteranganQismulAmanController extends Controller
             $skqa->drive_file_id = null;
             $skqa->drive_link = null;
             $skqa->status = 'pending';
+            $skqa->petanda_tangan = 'tidak';
             $skqa->save();
 
             // Re-fetch record with joins to build the new PDF
@@ -415,62 +417,26 @@ class SuratKeteranganQismulAmanController extends Controller
 
     public function downloadPdf($id)
     {
-        ini_set('memory_limit', '512M');
-        ini_set('max_execution_time', '300');
-
         try {
-            $data = SuratKeteranganQismulAman::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_qismul_aman.prodi_id')
-                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
-                ->select(
-                    'surat_keterangan_qismul_aman.*',
-                    'prodi.nama as nama_prodi',
-                    'prodi.alias as alias_prodi',
-                    'tanda_tangan.gambar as ttd',
-                )
-                ->where('surat_keterangan_qismul_aman.id', $id)
-                ->first();
+            $data = SuratKeteranganQismulAman::find($id);
 
             if (!$data) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data tidak ditemukan'
-                ], 404);
+                return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
             }
 
-            $pdfData = $this->buildPdfData($data);
-
-            $pdf = Pdf::loadView('pdf.surat_qismul_aman', $pdfData)->setPaper('a4', 'portrait');
-
-            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
-            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganQismulAmanController');
-            $fileName = 'surat_keterangan_qismul_aman_' . $data->nim . '_' . uniqid() . '.pdf';
-
-            if (!\Illuminate\Support\Facades\File::exists($directory)) {
-                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+            if (empty($data->local_path) || !file_exists($data->local_path)) {
+                return response()->json(['status' => false, 'message' => 'File PDF tidak ditemukan di server'], 404);
             }
 
-            $path = $directory . '/' . $fileName;
-            $pdf->save($path);
+            $fileName = basename($data->local_path);
 
-            $data->update(['local_path' => $path]);
-
-            $nameTable = 'Surat Keterangan Qismul Aman';
-            $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
-
-            if (empty($data->drive_file_id)) {
-                UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganQismulAman::class);
-            }
-
-            return response($pdf->output(), 200, [
+            return response()->file($data->local_path, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
-            Log::error((string) $th);
-            return response()->json([
-                'status' => false,
-                'message' => 'Gagal mengunduh PDF: Terjadi kesalahan pada server'
-            ], 500);
+            \Illuminate\Support\Facades\Log::error($th->getMessage());
+            return response()->json(['status' => false, 'message' => 'Gagal download PDF']);
         }
     }
 

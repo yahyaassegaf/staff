@@ -93,6 +93,7 @@ class SuratKeteranganSpmController extends Controller
                 'tahun' => 'required|string|max:100',
                 'semester' => 'required|string|max:50',
                 'tanggal' => 'required|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -129,6 +130,7 @@ class SuratKeteranganSpmController extends Controller
             $spm->user_id = Auth::user()->id;
             $spm->jenis_kelamin = Auth::user()->jenis_kelamin;
             $spm->status = 'pending';
+            $spm->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $spm->save();
 
             $Nomor              = new NoSurat();
@@ -152,7 +154,7 @@ class SuratKeteranganSpmController extends Controller
                     'prodi.alias as alias_prodi',
                     'prodi.nama_kepala as nama_kepala_prodi',
                     'prodi.nidn_kepala as nidn_kepala_prodi',
-                    'tanda_tangan.gambar as ttd'
+                    \DB::raw('COALESCE(tanda_tangan.tdd, tanda_tangan.gambar) as ttd')
                 )
                 ->where('surat_keterangan_spm.id', $spm->id)
                 ->first();
@@ -268,9 +270,10 @@ class SuratKeteranganSpmController extends Controller
                 'nama_ortu' => 'required|string|max:255',
                 'tempat_tugas' => 'required|string|max:255',
                 'alamat_tugas' => 'required|string',
-                'tahun' => 'required|string|max:100',
-                'semester' => 'required|string|max:50',
+                'tahun' => 'nullable|string|max:100',
+                'semester' => 'nullable|string|max:50',
                 'tanggal' => 'required|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak',
             ]);
 
             if ($validator->fails()) {
@@ -313,6 +316,7 @@ class SuratKeteranganSpmController extends Controller
                 'tanggal' => $validate['tanggal'],
                 'jenis_kelamin' => Auth::user()->jenis_kelamin,
                 'user_id' => Auth::user()->id,
+                'petanda_tangan' => $validate['petanda_tangan'] ?? 'tidak',
             ]);
             $spm->save();
 
@@ -339,7 +343,7 @@ class SuratKeteranganSpmController extends Controller
                     'prodi.alias as alias_prodi',
                     'prodi.nama_kepala as nama_kepala_prodi',
                     'prodi.nidn_kepala as nidn_kepala_prodi',
-                    'tanda_tangan.gambar as ttd'
+                    \DB::raw('COALESCE(tanda_tangan.tdd, tanda_tangan.gambar) as ttd')
                 )
                 ->where('surat_keterangan_spm.id', $spm->id)
                 ->first();
@@ -406,93 +410,74 @@ class SuratKeteranganSpmController extends Controller
 
     public function downloadPdf($id)
     {
-        ini_set('memory_limit', '512M');
-        ini_set('max_execution_time', '300');
-
         try {
-            $data = SuratKeteranganSpm::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_spm.prodi_id')
-                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
-                ->select(
-                    'surat_keterangan_spm.*',
-                    'prodi.nama as nama_prodi',
-                    'prodi.alias as alias_prodi',
-                    'prodi.nama_kepala as nama_kepala_prodi',
-                    'prodi.nidn_kepala as nidn_kepala_prodi',
-                    'tanda_tangan.gambar as ttd'
-                )
-                ->where('surat_keterangan_spm.id', $id)
-                ->first();
+            $data = SuratKeteranganSpm::find($id);
 
             if (!$data) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data tidak ditemukan'
-                ], 404);
+                return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
             }
 
-            $pdfData = $this->buildPdfData($data);
-
-            $pdf = Pdf::loadView('pdf.surat_keterangan_spm', $pdfData)->setPaper('a4', 'portrait');
-
-            $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->nama_prodi ?? 'UMUM');
-            $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganSpmController');
-            $fileName = 'surat_keterangan_spm_' . $data->nim . '_' . uniqid() . '.pdf';
-
-            if (!\Illuminate\Support\Facades\File::exists($directory)) {
-                \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+            if (empty($data->local_path) || !file_exists($data->local_path)) {
+                return response()->json(['status' => false, 'message' => 'File PDF tidak ditemukan di server'], 404);
             }
 
-            $path = $directory . '/' . $fileName;
-            $pdf->save($path);
+            $fileName = basename($data->local_path);
 
-            $data->update(['local_path' => $path]);
-
-            $nameTable = 'Surat Keterangan SPM';
-            $googlePath = $data->nama_prodi . '/' . $nameTable . '/' . $fileName;
-
-            if (empty($data->drive_file_id)) {
-                UploudSuratToDrive::dispatch($id, $nameTable, $data->nama_prodi, SuratKeteranganSpm::class);
-            }
-
-            return response($pdf->output(), 200, [
+            return response()->file($data->local_path, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
-            Log::error((string) $th);
-            return response()->json([
-                'status' => false,
-                'message' => 'Gagal mengunduh PDF: Terjadi kesalahan pada server'
-            ], 500);
+            Log::error($th->getMessage());
+            return response()->json(['status' => false, 'message' => 'Gagal download PDF']);
         }
     }
 
     private function buildPdfData($data)
     {
-        $stempelPath = base_path('../public_html/img/stempel.png');
-        $stempelBase64 = SuratService::getBase64Image($stempelPath);
-
-        $tddPath = base_path('../public_html/' . $data->ttd);
-        $tddBase64 = SuratService::getBase64Image($tddPath);
-
-        $kopPath = base_path('../public_html/img/kop.jpg');
-        $kopBase64 = SuratService::getBase64Image($kopPath);
-
-        // Cari tanda tangan Pengawas SPM dari tabel setting_jabatan dengan key pengawas_spm
+        $stempelBase64 = '';
+        $tddBase64 = '';
+        $pengawasTtdBase64 = null;
+        
         $settingJabatan = SettingJabatan::with('tandaTangan')
             ->where('kunci_jabatan', 'pengawas_spm')
             ->first();
 
         $pengawasNama = 'Dr. Muhamad Sholehuddin, M.H.I.';
-        $pengawasTtdBase64 = null;
 
         if ($settingJabatan && $settingJabatan->tandaTangan) {
             $pengawasNama = $settingJabatan->tandaTangan->nama;
-            if (!empty($settingJabatan->tandaTangan->gambar)) {
-                $pengawasPath = base_path('../public_html/' . $settingJabatan->tandaTangan->gambar);
-                $pengawasTtdBase64 = SuratService::getBase64Image($pengawasPath);
+        }
+
+        if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
+            $stempelPath = base_path('../public_html/img/stempel.png');
+            if (file_exists($stempelPath)) {
+                $stempelBase64 = SuratService::getBase64Image($stempelPath);
+            }
+
+            if (!empty($data->ttd)) {
+                if (str_starts_with($data->ttd, 'data:image')) {
+                    $tddBase64 = $data->ttd;
+                } else {
+                    $tddPath = base_path('../public_html/' . $data->ttd);
+                    if (file_exists($tddPath)) {
+                        $tddBase64 = SuratService::getBase64Image($tddPath);
+                    }
+                }
+            }
+
+            if ($settingJabatan && $settingJabatan->tandaTangan) {
+                if (!empty($settingJabatan->tandaTangan->gambar)) {
+                    $pengawasPath = base_path('../public_html/' . $settingJabatan->tandaTangan->gambar);
+                    if (file_exists($pengawasPath)) {
+                        $pengawasTtdBase64 = SuratService::getBase64Image($pengawasPath);
+                    }
+                }
             }
         }
+
+        $kopPath = base_path('../public_html/img/kop.jpg');
+        $kopBase64 = SuratService::getBase64Image($kopPath);
 
         return [
             'nomor_surat' => $data->nomor_surat,

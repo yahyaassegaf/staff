@@ -22,12 +22,9 @@ export default defineComponent({
     const total = ref(0);
     const headers = [
       { text: "No", value: "no", sortable: false },
-      { text: "Nomor Surat", value: "nomor_surat", sortable: true },
       { text: "NIM", value: "nim", sortable: true },
       { text: "Nama Lengkap", value: "nama_lengkap", sortable: true },
       { text: "Tempat Tugas", value: "tempat_tugas", sortable: true },
-      { text: "Tahun", value: "tahun", sortable: true },
-      { text: "Semester", value: "semester", sortable: true },
       { text: "URL", value: "drive_link", sortable: false },
       { text: "Action", value: "action", sortable: false },
     ];
