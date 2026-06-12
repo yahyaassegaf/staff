@@ -144,7 +144,7 @@
 
         <!-- KALIMAT TAMBAHAN -->
         <p class="text-justify">
-            Merupakan mahasiswa/i pada Program Studi Pendidikan Bahasa Arab Fakultas Tarbiyah
+            Merupakan mahasiswa/i pada Program Studi {{ $nama_prodi }} Fakultas {{ $fakultas }}
             Universitas Islam Internasional Darullughah Wadda’wah Bangil, dan orang tua dari mahasiswa/i tersebut adalah:
         </p>
 

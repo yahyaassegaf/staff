@@ -155,7 +155,6 @@
                 <td>:</td>
                 <td>{{ $alamat_tugas }}</td>
             </tr>
-
             <tr>
                 <td>Tahun</td>
                 <td>:</td>

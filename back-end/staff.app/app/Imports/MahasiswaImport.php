@@ -23,6 +23,7 @@ class MahasiswaImport implements ToCollection, WithHeadingRow, WithEvents, Skips
     private $batchId = null;
     private $skippedSheets = [];
     private $skipCurrentSheet = false;
+    private $skippedNames = [];
 
     /**
      * Daftarkan event untuk menangkap nama sheet sebelum diproses
@@ -70,9 +71,16 @@ class MahasiswaImport implements ToCollection, WithHeadingRow, WithEvents, Skips
                 // Bersihkan input
                 $nama = trim($row['nama'] ?? '');
                 $nim = trim($row['nim'] ?? '');
+                $nik = trim($row['nik'] ?? '');
 
-                // Lewati jika nama dan nim kosong (abaikan spasi) (baris kosong)
-                if ($nama === '' && $nim === '') {
+                if ($nama === '' && $nim === '' && $nik === '') {
+                    continue;
+                }
+
+                if ($nama === '' || $nim === '' || $nik === '') {
+                    $identifier = $nama !== '' ? $nama : ($nim !== '' ? "NIM: $nim" : "Baris $rowNumber");
+                    $prodiInfo = $row['prodi'] ?? $row['program_studi'] ?? $this->currentSheetName;
+                    $this->skippedNames[] = "$identifier (Prodi: $prodiInfo)";
                     continue;
                 }
 
@@ -249,5 +257,9 @@ class MahasiswaImport implements ToCollection, WithHeadingRow, WithEvents, Skips
     public function getSkippedSheets(): array
     {
         return $this->skippedSheets;
+    }
+    public function getSkippedNames(): array
+    {
+        return $this->skippedNames;
     }
 }

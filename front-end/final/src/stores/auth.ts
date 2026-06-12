@@ -51,6 +51,13 @@ export const useAuthStore = defineStore('auth', {
 
         const token = auth.data.token;
         localStorage.setItem('token', token); // Store token in localStorage
+        
+        if (auth.data.user) {
+           localStorage.setItem('userLevel', auth.data.user.level?.toLowerCase() || "");
+           localStorage.setItem('userImage', auth.data.user.img || "");
+           window.dispatchEvent(new Event('profileUpdated'));
+        }
+
         this.authenticated = true;
         this.loading = false;
         return { authenticated: true };

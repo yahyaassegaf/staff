@@ -161,13 +161,17 @@ class MahasiswaController extends Controller
             $skippedSheets = $import->getSkippedSheets();
             $skippedMsg = count($skippedSheets) > 0 ? ", " . count($skippedSheets) . " sheet dilewati (" . implode(', ', $skippedSheets) . ")" : "";
 
+            $skippedNames = $import->getSkippedNames();
+            $skippedNamesMsg = count($skippedNames) > 0 ? ". Terdapat " . count($skippedNames) . " data yang dilewati karena ada data (nama/nim/nik) yang kosong: " . implode(', ', $skippedNames) : "";
+
             return response()->json([
                 'status' => true,
-                'message' => "Import selesai. {$import->getSuccessCount()} berhasil, {$import->getFailedCount()} gagal{$skippedMsg}",
+                'message' => "Import selesai. {$import->getSuccessCount()} berhasil, {$import->getFailedCount()} gagal{$skippedMsg}{$skippedNamesMsg}",
                 'data' => [
                     'success' => $import->getSuccessCount(),
                     'failed' => $import->getFailedCount(),
                     'skipped_sheets' => $skippedSheets,
+                    'skipped_names' => $skippedNames,
                     'errors' => $import->getErrors(),
                 ],
             ]);

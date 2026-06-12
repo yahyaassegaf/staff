@@ -451,7 +451,7 @@
               class="side-menu__item p-1 rounded-circle mb-0"
             >
               <span class="avatar avatar-md avatar-rounded">
-                <img src="/images/faces/10.jpg" alt="" />
+                <img :src="getFotoUrl(userImage)" alt="profile-img" />
               </span>
             </router-link>
           </li>
@@ -495,21 +495,34 @@ import media80 from "/images/media/media-80.png";
 import { switcherStore } from "../../../stores/switcher";
 import RecursiveMenu from "../../UI/recursiveMenu.vue";
 import { apiGet } from "../../../services/api/request";
+import { getFotoUrl } from "../../../utils/helpers";
 
 const userLevel = ref(localStorage.getItem('userLevel') || "");
+const userImage = ref(localStorage.getItem('userImage') || "");
 
 // Fetch user profile to get level
 async function fetchUserLevel() {
   try {
-    const response = await apiGet("/profile");
+    const response = await apiGet("/profile", { _t: new Date().getTime() });
     if (response.success && response.data?.status && response.data?.user) {
       const level = response.data.user.level?.toLowerCase() || "";
       userLevel.value = level;
       localStorage.setItem('userLevel', level);
+      
+      const img = response.data.user.img || "";
+      userImage.value = img;
+      localStorage.setItem('userImage', img);
     }
   } catch (error) {
   }
 }
+
+// Listen to profile updates from other components
+onMounted(() => {
+  window.addEventListener('profileUpdated', () => {
+    userImage.value = localStorage.getItem('userImage') || "";
+  });
+});
 
 // Deep clone function to create new menu data
 function deepClone(obj) {

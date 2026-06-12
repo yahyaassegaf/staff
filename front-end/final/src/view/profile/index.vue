@@ -3,7 +3,8 @@ import { defineComponent, onMounted, ref, reactive } from "vue";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import { apiGet, apiPost } from "../../services/api/request";
-import { BASE_URL, ASSET_URL } from "../../services/api/http";
+import { BASE_URL } from "../../services/api/http";
+import { getFotoUrl } from "../../utils/helpers";
 import Pageheader from "../../shared/components/pageheader/pageheader.vue";
 
 export default defineComponent({
@@ -40,16 +41,6 @@ export default defineComponent({
 
     const activeTab = ref("personal");
 
-    const getFotoUrl = (img: string) => {
-      if (!img) return '/images/faces/9.jpg';
-      const normalizedImg = img.replace(/\\/g, '/');
-      if (normalizedImg.startsWith('foto/')) {
-        const filename = normalizedImg.replace('foto/', '');
-        return `${BASE_URL}/foto/${encodeURIComponent(filename)}`;
-      }
-      return `${ASSET_URL}/storage/${normalizedImg}`;
-    };
-
     async function getLevel() {
       try {
         const response = await apiGet("/get-level");
@@ -79,9 +70,14 @@ export default defineComponent({
     async function getProfile() {
       try {
         loading.value = true;
-        const response = await apiGet("/profile");
+        // Tambahkan timestamp agar browser tidak melakukan caching pada response profile
+        const response = await apiGet("/profile", { _t: new Date().getTime() });
         if (response.success && response.data.status) {
           user.value = response.data.user;
+          // Simpan foto secara global di localStorage agar komponen lain seperti sidebar bisa menggunakannya
+          localStorage.setItem('userImage', user.value.img || "");
+          window.dispatchEvent(new Event('profileUpdated'));
+          
           Object.assign(form, {
             id: user.value.id,
             username: user.value.username,
@@ -168,6 +164,11 @@ export default defineComponent({
 
       if (form.password) {
         formData.append("password", form.password);
+      }
+
+      // Jika user memilih foto baru, ikutkan juga saat klik Simpan
+      if (selectedFile.value) {
+        formData.append("foto", selectedFile.value);
       }
 
       formData.append("_method", "PUT");

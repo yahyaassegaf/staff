@@ -270,8 +270,8 @@ class SuratKeteranganSpmController extends Controller
                 'nama_ortu' => 'required|string|max:255',
                 'tempat_tugas' => 'required|string|max:255',
                 'alamat_tugas' => 'required|string',
-                'tahun' => 'nullable|string|max:100',
-                'semester' => 'nullable|string|max:50',
+                'tahun' => 'required|string|max:100',
+                'semester' => 'required|string|max:50',
                 'tanggal' => 'required|date',
                 'petanda_tangan' => 'nullable|in:ya,tidak',
             ]);
