@@ -37,6 +37,14 @@ export default defineComponent({
           formData.append('file_background', form.selectedFile);
         }
 
+        if (form.fields_positions) {
+          formData.append('fields_positions', JSON.stringify(form.fields_positions));
+        }
+
+        if (form.teks_statis) {
+          formData.append('teks_statis', JSON.stringify(form.teks_statis));
+        }
+
         const response = await apiPost("/template-ijazah", formData);
         
         if (response.success == true || response.data?.status == true) {

@@ -138,8 +138,8 @@
         </table>
 
         <p class="text-justify" style="text-indent: 0.5in; margin-top: 15px; margin-bottom: 15px;">
-            Adalah Benar <strong>Mahasiswa Aktif</strong> Program Studi {{ $prodi_mhs }} Darullughah Wadda'wah 
-            (UII DALWA) dan sedang mendapat tugas praktek Mengajar (<strong>SPM/<em>Mubta'ast</em></strong>) Pada 
+            Adalah Benar <strong>Mahasiswa Aktif</strong> Program Studi {{ $prodi_mhs }} Darullughah Wadda'wah
+            (UII DALWA) dan sedang mendapat tugas praktek Mengajar (<strong>SPM/<em>Mubta'ast</em></strong>) Pada
             Dan Tempat Tugas Mengajarnya Adalah:
         </p>
 
@@ -183,11 +183,11 @@
                             <td style="height: 140px; text-align: center; vertical-align: middle; padding: 0;">
                                 <div style="position: relative; width: 100%; height: 140px;">
                                     @if(!empty($stempel))
-                                    <img src="{{ $stempel }}" style="position: absolute; left: -10px; top: 5px; width: 110px; height: 110px; z-index: 2;">
+                                    <img src="{{ $stempel }}" style="position: absolute; left: 25px; top: 25px; width: 95px; height: 95px; z-index: 2;">
                                     @endif
-                                    
+
                                     @if($pengawas_ttd)
-                                    <!-- <img src="{{ $pengawas_ttd }}" style="position: absolute; left: 0px; top: 30px; width: 170px; max-height: 80px; object-fit: contain; z-index: 1;"> -->
+                                    <img src="{{ $pengawas_ttd }}" style="position: absolute; left: 15px; top: 25px; width: 200px; max-height: 95px; object-fit: contain; z-index: 1;">
                                     @else
                                     <div style="position: absolute; left: 0; right: 0; top: 60px; z-index: 2;">
                                         <br>
@@ -214,11 +214,11 @@
                             <td style="height: 140px; text-align: center; vertical-align: middle; padding: 0;">
                                 <div style="position: relative; width: 100%; height: 140px;">
                                     @if(!empty($stempel))
-                                    <img src="{{ $stempel }}" style="position: absolute; left: -10px; top: 5px; width: 110px; height: 110px; z-index: 2;">
+                                    <img src="{{ $stempel }}" style="position: absolute; left: 25px; top: 25px; width: 95px; height: 95px; z-index: 2;">
                                     @endif
-                                    
+
                                     @if($ttd)
-                                    <img src="{{ $ttd }}" style="position: absolute; left: 0px; top: 30px; width: 170px; max-height: 80px; object-fit: contain; z-index: 1;">
+                                    <img src="{{ $ttd }}" style="position: absolute; left: 15px; top: 15px; width: 260px; max-height: 130px; object-fit: contain; z-index: 1;">
                                     @else
                                     <div style="position: absolute; left: 0; right: 0; top: 60px; z-index: 2;">
                                         <br>

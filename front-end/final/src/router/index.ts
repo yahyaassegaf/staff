@@ -1743,6 +1743,16 @@ const routes: RouteRecordRaw[] = [
         name: "sk6-edit",
         component: () => import("../view/sk_6/edit/index.vue"),
       },
+      {
+        path: `print-ijazah`,
+        name: "print-ijazah",
+        component: () => import("../view/print_ijazah/index.vue"),
+      },
+      {
+        path: `print-ijazah/preview/:batch_id`,
+        name: "print-ijazah-preview",
+        component: () => import("../view/print_ijazah/preview.vue"),
+      },
     ],
   },
 ];

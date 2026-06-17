@@ -73,6 +73,7 @@ class TemplateIjazahController extends Controller
                 'ukuran_kertas'    => 'required|in:A4,A3,Legal,F4',
                 'orientasi'        => 'required|in:portrait,landscape',
                 'is_active'        => 'required|in:aktif,tidak',
+                'teks_statis'      => 'nullable',
             ]);
 
             if ($validator->fails()) {
@@ -100,6 +101,16 @@ class TemplateIjazahController extends Controller
             $templateIjazah->ukuran_kertas = $validate['ukuran_kertas'];
             $templateIjazah->orientasi = $validate['orientasi'];
             $templateIjazah->is_active = $validate['is_active'] ?? 'aktif';
+            
+            if (isset($validate['teks_statis'])) {
+                $teksStatis = $validate['teks_statis'];
+                if (is_string($teksStatis)) {
+                    $templateIjazah->teks_statis = json_decode($teksStatis, true);
+                } else {
+                    $templateIjazah->teks_statis = $teksStatis;
+                }
+            }
+
             $templateIjazah->user_id = Auth::user()->id;
             $templateIjazah->save();
 
@@ -139,18 +150,20 @@ class TemplateIjazahController extends Controller
             $fields_positions = [];
             foreach ($positions as $pos) {
                 $fields_positions[$pos->field_name] = [
-                    'x' => $pos->posisi_x,
-                    'y' => $pos->posisi_y,
-                    'fontSize' => $pos->font_size,
+                    'x' => (int) $pos->posisi_x,
+                    'y' => (int) $pos->posisi_y,
+                    'fontSize' => (int) $pos->font_size,
                     'fontFamily' => $pos->font_family,
-                    'alignment' => $pos->alignment
+                    'alignment' => $pos->alignment,
+                    'fontWeight' => $pos->font_weight
                 ];
             }
-            $templateIjazah->fields_positions = json_encode($fields_positions);
+            $data = $templateIjazah->toArray();
+            $data['fields_positions'] = $fields_positions;
 
             return response()->json([
                 'status' => true,
-                'data' => $templateIjazah,
+                'data' => $data,
                 'message' => 'Data berhasil diambil'
             ]);
         } catch (\Throwable $th) {
@@ -181,6 +194,7 @@ class TemplateIjazahController extends Controller
                 'orientasi'        => 'required|in:portrait,landscape',
                 'is_active'        => 'required|in:aktif,tidak',
                 'fields_positions' => 'nullable|string',
+                'teks_statis'      => 'nullable',
             ]);
 
             if ($validator->fails()) {
@@ -209,8 +223,18 @@ class TemplateIjazahController extends Controller
             Log::info('Existing data before update:', $templateIjazah->toArray());
 
             // Update fields
-            $templateIjazah->prodi_id = $validate['prodi_id'] ?? null;
-            $templateIjazah->jenjang = $validate['jenjang'] ?? null;
+            if (array_key_exists('prodi_id', $validate)) {
+                $templateIjazah->prodi_id = $validate['prodi_id'];
+            } else if ($request->has('prodi_id') && empty($request->prodi_id)) {
+                $templateIjazah->prodi_id = null;
+            }
+            
+            if (array_key_exists('jenjang', $validate)) {
+                $templateIjazah->jenjang = $validate['jenjang'];
+            } else if ($request->has('jenjang') && empty($request->jenjang)) {
+                $templateIjazah->jenjang = null;
+            }
+            
             $templateIjazah->nama_template = $validate['nama_template'];
 
             if ($request->hasFile('file_background')) {
@@ -224,6 +248,20 @@ class TemplateIjazahController extends Controller
             $templateIjazah->ukuran_kertas = $validate['ukuran_kertas'];
             $templateIjazah->orientasi = $validate['orientasi'];
             $templateIjazah->is_active = $validate['is_active'] ?? 'aktif';
+
+            if (array_key_exists('teks_statis', $validate)) {
+                $teksStatis = $validate['teks_statis'];
+                if ($teksStatis && $teksStatis !== '[]' && $teksStatis !== 'null') {
+                    if (is_string($teksStatis)) {
+                        $templateIjazah->teks_statis = json_decode($teksStatis, true);
+                    } else {
+                        $templateIjazah->teks_statis = $teksStatis;
+                    }
+                } else {
+                    $templateIjazah->teks_statis = null;
+                }
+            }
+
             $templateIjazah->user_id = Auth::user()->id;
 
             Log::info('Data to be saved:', $templateIjazah->toArray());
@@ -231,9 +269,16 @@ class TemplateIjazahController extends Controller
             $saved = $templateIjazah->save();
 
             // Save to posisi_template table
-            if ($saved && isset($validate['fields_positions'])) {
-                $positions = json_decode($validate['fields_positions'], true);
+            if ($saved && array_key_exists('fields_positions', $validate) && $validate['fields_positions']) {
+                $posRaw = $validate['fields_positions'];
+                $positions = is_string($posRaw) ? json_decode($posRaw, true) : $posRaw;
+                
                 if (is_array($positions)) {
+                    $keysToKeep = array_keys($positions);
+                    \App\Models\PosisiTemplate::where('template_id', $templateIjazah->id)
+                        ->whereNotIn('field_name', $keysToKeep)
+                        ->delete();
+
                     $urutan = 1;
                     foreach ($positions as $key => $pos) {
                         \App\Models\PosisiTemplate::updateOrCreate(
@@ -247,11 +292,21 @@ class TemplateIjazahController extends Controller
                                 'font_size' => $pos['fontSize'] ?? 12,
                                 'font_family' => $pos['fontFamily'] ?? 'Arial',
                                 'alignment' => $pos['alignment'] ?? 'left',
+                                'font_weight' => $pos['fontWeight'] ?? 'normal',
                                 'urutan' => $urutan++
                             ]
                         );
                     }
+                    Log::info('Posisi template saved successfully for ' . count($positions) . ' fields');
+                } else {
+                    Log::error('Positions is not an array after decode: ', ['posRaw' => $posRaw]);
                 }
+            } else {
+                Log::info('No fields_positions to save or conditions not met', [
+                    'saved' => $saved,
+                    'exists' => array_key_exists('fields_positions', $validate),
+                    'val' => $validate['fields_positions'] ?? null
+                ]);
             }
 
 

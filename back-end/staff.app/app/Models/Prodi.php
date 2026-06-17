@@ -19,4 +19,9 @@ class Prodi extends Model
     {
         return $this->belongsTo(TandaTangan::class, 'tanda_tangan_id');
     }
+
+    public function fakultasProdi()
+    {
+        return $this->hasOne(FakultasProdi::class, 'prodi_id');
+    }
 }

@@ -23,6 +23,7 @@ export default defineComponent({
       nama: "",
       aktif: "T",
       jenjang: "S1",
+      gelar: "",
       nidn_kepala: "",
       nama_kepala: "",
       tanda_tangan: null as {id: number, nama: string} | null,
@@ -44,6 +45,7 @@ export default defineComponent({
             nama: prodi.nama || "",
             aktif: prodi.aktif || "T",
             jenjang: prodi.jenjang || "S1",
+            gelar: prodi.gelar || "",
             nidn_kepala: prodi.nidn_kepala || "",
             nama_kepala: prodi.nama_kepala || "",
             tanda_tangan: prodi.tanda_tangan_id ? {

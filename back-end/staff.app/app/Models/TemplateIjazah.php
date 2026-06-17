@@ -14,6 +14,7 @@ class TemplateIjazah extends Model
         'prodi_id' => 'integer',
         'user_id' => 'integer',
         'fields_positions' => 'array',
+        'teks_statis' => 'array',
     ];
 
     public function user()
@@ -24,5 +25,10 @@ class TemplateIjazah extends Model
     public function prodi()
     {
         return $this->belongsTo(Prodi::class, 'prodi_id');
+    }
+
+    public function posisiTemplate()
+    {
+        return $this->hasMany(PosisiTemplate::class, 'template_id');
     }
 }

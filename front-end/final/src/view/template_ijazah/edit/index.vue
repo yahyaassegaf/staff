@@ -5,7 +5,7 @@ import { useRoute } from "vue-router";
 import TemplateIjazahComponent from "../../../components/template_ijazah/index.vue";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
-import { apiGet, apiPut } from "../../../services/api/request";
+import { apiGet, apiPut, apiPost } from "../../../services/api/request";
 import router from "../../../router";
 
 export default defineComponent({
@@ -46,6 +46,7 @@ export default defineComponent({
             orientasi: template.orientasi || "portrait",
             is_active: template.is_active || "aktif",
             fields_positions: template.fields_positions || null,
+            teks_statis: template.teks_statis || null,
             nama_prodi: template.nama_prodi || "",
           };
 
@@ -79,8 +80,10 @@ export default defineComponent({
         formData.append('is_active', form.is_active);
 
         // Extract prodi_id correctly (now already an ID from the component)
-        if (form.prodi_id !== null && form.prodi_id !== undefined) {
+        if (form.prodi_id !== null && form.prodi_id !== undefined && form.prodi_id !== '') {
           formData.append('prodi_id', String(form.prodi_id));
+        } else {
+          formData.append('prodi_id', '');
         }
 
         if (form.selectedFile) {
@@ -88,7 +91,11 @@ export default defineComponent({
         }
 
         if (form.fields_positions) {
-          formData.append('fields_positions', form.fields_positions);
+          formData.append('fields_positions', JSON.stringify(form.fields_positions));
+        }
+
+        if (form.teks_statis) {
+          formData.append('teks_statis', JSON.stringify(form.teks_statis));
         }
 
         // Use apiPost instead of apiPut because we're using _method: 'PUT' with FormData

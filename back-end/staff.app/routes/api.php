@@ -226,6 +226,24 @@ Route::post('/batch', [BatchController::class, 'store'])->middleware('auth:sanct
 Route::put('/batch/{id}', [BatchController::class, 'update'])->middleware('auth:sanctum');
 Route::delete('/batch/{id}', [BatchController::class, 'destroy'])->middleware('auth:sanctum');
 
+// Print Ijazah
+Route::get('/debug-fakultas/{batch_id}', function ($batch_id) {
+    $mahasiswas = \App\Models\Mahasiswa::where('batch_id', $batch_id)->get();
+    $prodiIds = $mahasiswas->pluck('prodi_id')->unique()->filter()->toArray();
+    $fakultasList = \Illuminate\Support\Facades\DB::table('fakultas_prodi')
+        ->join('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
+        ->whereIn('fakultas_prodi.prodi_id', $prodiIds)
+        ->select('fakultas_prodi.prodi_id', 'fakultas.nama', 'fakultas.alias', 'fakultas.nidn_dekan', 'fakultas.dekan')
+        ->get()
+        ->keyBy('prodi_id');
+    return response()->json([
+        'prodiIds' => $prodiIds,
+        'fakultasList' => $fakultasList
+    ]);
+});
+
+Route::get('/print-ijazah/batch/{batch_id}', [\App\Http\Controllers\Api\PrintIjazahController::class, 'getBatchPrint'])->middleware('auth:sanctum');
+
 // Jenis Surat Routes
 Route::get('/jenis-surat', [JenisSuratController::class, 'index'])->middleware('auth:sanctum');
 Route::get('/jenis-surat/{id}', [JenisSuratController::class, 'show'])->middleware('auth:sanctum');

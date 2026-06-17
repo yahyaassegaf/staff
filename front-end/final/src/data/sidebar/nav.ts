@@ -332,6 +332,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     icon: Svgicons.Pagesicon, title: "Ijazah", type: "sub", active: false, dirchange: false, allowedLevels: ['baak', 'admin'], children: [
       { path: "/mahasiswa", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Mahasiswa" },
       { path: "/template-ijazah", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Template Ijazah" },
+      { path: "/print-ijazah", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Print Ijazah" },
     ]
   },
 

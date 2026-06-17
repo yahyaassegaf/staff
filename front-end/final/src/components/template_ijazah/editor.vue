@@ -23,14 +23,15 @@ const defaultForm = {
   orientasi: "portrait",
   is_active: "aktif",
   fields_positions: {} as any,
+  teks_statis: null as any,
 };
 
 const form = reactive({ ...defaultForm });
 const isLoadingData = ref(false);
 const prodiOptions = ref<any[]>([]);
 
-// Static content (labels/text that don't change) - rendered on canvas but not draggable
-const staticContent = ref([
+// Static content (labels/text that don't change) - rendered on canvas
+const defaultStaticContent = [
   // Top-left header info labels
   { text: 'Nomor Ijazah Nasional', x: 30, y: 30, fontSize: 8, fontFamily: 'Arial', fontWeight: 'normal', alignment: 'left' },
   { text: ':', x: 125, y: 30, fontSize: 8, fontFamily: 'Arial', fontWeight: 'normal', alignment: 'left' },
@@ -40,63 +41,62 @@ const staticContent = ref([
   { text: ':', x: 125, y: 54, fontSize: 8, fontFamily: 'Arial', fontWeight: 'normal', alignment: 'left' },
 
   // Center header
-  { text: 'KEMENTERIAN AGAMA REPUBLIK INDONESIA', x: 300, y: 100, fontSize: 11, fontFamily: 'Times New Roman', fontWeight: 'bold', alignment: 'center', isPageCenter: true },
-  { text: 'INSTITUT AGAMA ISLAM DARULLUGHAH WADDA\'WAH', x: 300, y: 116, fontSize: 12, fontFamily: 'Times New Roman Bold', fontWeight: 'bold', alignment: 'center', isPageCenter: true },
-  { text: 'BANGIL', x: 300, y: 132, fontSize: 12, fontFamily: 'Times New Roman Bold', fontWeight: 'bold', alignment: 'center', isPageCenter: true },
+  { text: 'KEMENTERIAN AGAMA REPUBLIK INDONESIA', x: 297, y: 100, fontSize: 11, fontFamily: 'Times New Roman', fontWeight: 'bold', alignment: 'center' },
+  { text: 'INSTITUT AGAMA ISLAM DARULLUGHAH WADDA\'WAH', x: 297, y: 116, fontSize: 12, fontFamily: 'Times New Roman Bold', fontWeight: 'bold', alignment: 'center' },
+  { text: 'BANGIL', x: 297, y: 132, fontSize: 12, fontFamily: 'Times New Roman Bold', fontWeight: 'bold', alignment: 'center' },
 
   // Body text
-  { text: 'dengan ini menyatakan bahwa:', x: 300, y: 170, fontSize: 10, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center', isPageCenter: true },
+  { text: 'dengan ini menyatakan bahwa:', x: 297, y: 170, fontSize: 10, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
 
   // Labels before dynamic fields
   { text: 'lahir di', x: 350, y: 222, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'left' },
   { text: 'NIM:', x: 370, y: 240, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'left' },
   { text: 'NIK:', x: 370, y: 255, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'left' },
 
-  { text: 'telah menyelesaikan dengan baik dan memenuhi segala syarat pendidikan', x: 300, y: 290, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center', isPageCenter: true },
-  { text: 'pada tanggal', x: 420, y: 305, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'left' },
-  { text: 'oleh sebab itu kepadanya diberikan ijazah dan gelar:', x: 300, y: 320, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center', isPageCenter: true },
+  { text: 'telah menyelesaikan dengan baik dan memenuhi segala syarat pendidikan', x: 297, y: 290, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
+  { text: 'oleh sebab itu kepadanya diberikan ijazah dan gelar:', x: 297, y: 320, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
 
-  { text: 'beserta hak dan kewajiban yang melekat pada gelar tersebut.', x: 300, y: 370, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center', isPageCenter: true },
+  { text: 'beserta hak dan kewajiban yang melekat pada gelar tersebut.', x: 297, y: 370, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
 
   // Signature labels
   { text: 'Rektor,', x: 100, y: 470, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
   { text: 'Dekan,', x: 620, y: 470, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
-]);
+];
+
+const staticContent = ref([...defaultStaticContent.map(item => ({...item}))]);
 
 // Define ijazah fields (dynamic/draggable placeholders) based on the image
 const ijazahFields = ref([
   // Top-left: nomor-nomor
-  { key: 'nomor_ijazah_nasional', label: 'Nomor Ijazah Nasional', x: 135, y: 30, fontSize: 8, fontFamily: 'Arial', alignment: 'left' },
-  { key: 'nomor_sk_ban_pt', label: 'Nomor SK BAN-PT', x: 135, y: 42, fontSize: 8, fontFamily: 'Arial', alignment: 'left' },
-  { key: 'nilai_akreditasi', label: 'Nilai Akreditasi', x: 135, y: 54, fontSize: 8, fontFamily: 'Arial', alignment: 'left' },
+  { key: 'nomor_ijazah_nasional', label: 'Nomor Ijazah Nasional', x: 135, y: 30, fontSize: 8, fontFamily: 'Arial', fontWeight: 'normal', alignment: 'left' },
+  { key: 'nomor_sk_ban_pt', label: 'Nomor SK BAN-PT', x: 135, y: 42, fontSize: 8, fontFamily: 'Arial', fontWeight: 'normal', alignment: 'left' },
+  { key: 'nilai_akreditasi', label: 'Nilai Akreditasi', x: 135, y: 54, fontSize: 8, fontFamily: 'Arial', fontWeight: 'normal', alignment: 'left' },
 
   // Nama mahasiswa (bold, center)
-  { key: 'nama_mahasiswa', label: 'Nama Mahasiswa', x: 300, y: 190, fontSize: 13, fontFamily: 'Times New Roman Bold', alignment: 'center' },
+  { key: 'nama_mahasiswa', label: 'Nama Mahasiswa', x: 300, y: 190, fontSize: 13, fontFamily: 'Times New Roman', fontWeight: 'bold', alignment: 'center' },
 
   // Tempat & tanggal lahir
-  { key: 'tempat_tanggal_lahir', label: 'Tempat & Tanggal Lahir', x: 300, y: 222, fontSize: 9, fontFamily: 'Times New Roman', alignment: 'center' },
+  { key: 'tempat_tanggal_lahir', label: 'Tempat & Tanggal Lahir', x: 300, y: 222, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'left' },
 
   // NIM & NIK
-  { key: 'nim', label: 'NIM', x: 300, y: 240, fontSize: 9, fontFamily: 'Times New Roman', alignment: 'center' },
-  { key: 'nik', label: 'NIK', x: 300, y: 254, fontSize: 9, fontFamily: 'Times New Roman', alignment: 'center' },
+  { key: 'nim', label: 'NIM', x: 300, y: 240, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
+  { key: 'nik', label: 'NIK', x: 300, y: 254, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
 
   // Program Studi & Fakultas (bold) - combined on one line in the image
-  { key: 'program_studi', label: 'Program Studi', x: 300, y: 305, fontSize: 10, fontFamily: 'Times New Roman Bold', alignment: 'center' },
-  { key: 'fakultas', label: 'Fakultas', x: 300, y: 319, fontSize: 10, fontFamily: 'Times New Roman Bold', alignment: 'center' },
-  { key: 'tanggal_kelulusan', label: 'Tanggal Kelulusan', x: 390, y: 333, fontSize: 9, fontFamily: 'Times New Roman', alignment: 'left' },
+  { key: 'prodi_fakultas_tgl_lulus', label: 'Prodi, Fakultas & Kelulusan (Utuh 1 Baris)', x: 300, y: 310, fontSize: 10, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
 
   // Gelar (bold, larger font, underline-style)
-  { key: 'gelar', label: 'Gelar', x: 300, y: 370, fontSize: 12, fontFamily: 'Times New Roman Bold', alignment: 'center' },
+  { key: 'gelar', label: 'Gelar', x: 300, y: 370, fontSize: 12, fontFamily: 'Times New Roman', fontWeight: 'bold', alignment: 'center' },
 
   // Tanggal & Kota ijazah (right side) - "Bangil, 10 Januari 2021" format
-  { key: 'kota_tempat', label: 'Kota Tempat', x: 520, y: 440, fontSize: 9, fontFamily: 'Times New Roman', alignment: 'center' },
-  { key: 'tanggal_ijazah', label: 'Tanggal Ijazah', x: 520, y: 454, fontSize: 9, fontFamily: 'Times New Roman', alignment: 'center' },
+  { key: 'kota_tempat', label: 'Kota Tempat', x: 520, y: 440, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
+  { key: 'tanggal_ijazah', label: 'Tanggal Ijazah', x: 520, y: 454, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
 
   // Pejabat penandatangan
-  { key: 'nama_rektor', label: 'Nama Rektor', x: 100, y: 530, fontSize: 9, fontFamily: 'Times New Roman', alignment: 'center' },
-  { key: 'nidn_rektor', label: 'NIDN Rektor', x: 100, y: 544, fontSize: 8, fontFamily: 'Times New Roman', alignment: 'center' },
-  { key: 'nama_dekan', label: 'Nama Dekan', x: 520, y: 530, fontSize: 9, fontFamily: 'Times New Roman', alignment: 'center' },
-  { key: 'nidn_dekan', label: 'NIDN Dekan', x: 520, y: 544, fontSize: 8, fontFamily: 'Times New Roman', alignment: 'center' },
+  { key: 'nama_rektor', label: 'Nama Rektor', x: 100, y: 530, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
+  { key: 'nidn_rektor', label: 'NIDN Rektor', x: 100, y: 544, fontSize: 8, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
+  { key: 'nama_dekan', label: 'Nama Dekan', x: 520, y: 530, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
+  { key: 'nidn_dekan', label: 'NIDN Dekan', x: 520, y: 544, fontSize: 8, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
 ]);
 
 const selectedField = ref<any>(null);
@@ -139,6 +139,8 @@ watch(
       }
 
       // Load fields positions from saved data
+      console.log('LOADING FIELDS POSITIONS:', form.fields_positions);
+      console.log('TYPE OF FIELDS POSITIONS:', typeof form.fields_positions);
       if (form.fields_positions && typeof form.fields_positions === 'object') {
         Object.keys(form.fields_positions).forEach(key => {
           const fieldIndex = ijazahFields.value.findIndex(f => f.key === key);
@@ -146,6 +148,17 @@ watch(
             Object.assign(ijazahFields.value[fieldIndex], form.fields_positions[key]);
           }
         });
+      }
+
+      // Load teks statis from saved data
+      console.log('LOADING TEKS STATIS from form:', form.teks_statis);
+      console.log('TEKS STATIS type:', typeof form.teks_statis, 'isArray:', Array.isArray(form.teks_statis));
+      if (form.teks_statis && Array.isArray(form.teks_statis)) {
+        staticContent.value = [...form.teks_statis.map((item: any) => ({...item}))];
+        console.log('LOADED staticContent from saved data:', staticContent.value.length, 'items');
+      } else {
+        staticContent.value = [...defaultStaticContent.map(item => ({...item}))];
+        console.log('USING DEFAULT staticContent:', staticContent.value.length, 'items');
       }
 
       isLoadingData.value = false;
@@ -166,10 +179,36 @@ function submitForm() {
       fontSize: field.fontSize,
       fontFamily: field.fontFamily,
       alignment: field.alignment,
+      fontWeight: field.fontWeight || 'normal',
     };
   });
   form.fields_positions = positions;
+  form.teks_statis = [...staticContent.value.map(item => ({...item}))];
+  console.log('SUBMIT teks_statis:', JSON.stringify(form.teks_statis));
+  console.log('SUBMIT teks_statis count:', form.teks_statis.length);
   emit("submit", form);
+}
+
+function addStaticText() {
+  staticContent.value.push({
+    text: 'Teks Baru',
+    x: 100,
+    y: 100,
+    fontSize: 10,
+    fontFamily: 'Arial',
+    fontWeight: 'normal',
+    alignment: 'left'
+  });
+}
+
+function removeStaticText(item: any) {
+  const index = staticContent.value.indexOf(item);
+  if (index !== -1) {
+    staticContent.value.splice(index, 1);
+    if (selectedField.value === item) {
+      selectedField.value = null;
+    }
+  }
 }
 
 function selectField(field: any) {
@@ -214,7 +253,7 @@ function updateFieldProperty(property: string, value: any) {
 
 function copyPosisiCode() {
   const fieldData = ijazahFields.value.map(f => {
-    return `  { key: '${f.key}', label: '${f.label}', x: ${Math.round(f.x)}, y: ${Math.round(f.y)}, fontSize: ${f.fontSize}, fontFamily: '${f.fontFamily}', alignment: '${f.alignment}' }`;
+    return `  { key: '${f.key}', label: '${f.label}', x: ${Math.round(f.x)}, y: ${Math.round(f.y)}, fontSize: ${f.fontSize}, fontFamily: '${f.fontFamily}', fontWeight: '${f.fontWeight}', alignment: '${f.alignment}' }`;
   });
   const codeToPaste = `const ijazahFields = ref([\n${fieldData.join(",\n")}\n]);`;
   
@@ -397,6 +436,29 @@ const canvasHeight = computed(() => {
                   </div>
                 </div>
               </div>
+
+              <div class="card mt-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <div class="card-title">Teks Statis</div>
+                  <button class="btn btn-sm btn-success py-0 px-2" @click="addStaticText">+</button>
+                </div>
+                <div class="card-body p-2" style="max-height: 300px; overflow-y: auto;">
+                  <div
+                    v-for="(item, idx) in staticContent"
+                    :key="'static-list-' + idx"
+                    class="field-item p-2 mb-2 border rounded"
+                    :class="{ 'field-selected': selectedField === item }"
+                    @click="selectField(item)"
+                    style="cursor: pointer;"
+                  >
+                    <div class="fw-bold small">{{ item.text }}</div>
+                    <div class="text-success" style="font-size: 11px;">Teks Statis</div>
+                    <div class="text-muted" style="font-size: 10px;">
+                      X: {{ Math.round(item.x) }}, Y: {{ Math.round(item.y) }}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Canvas -->
@@ -426,26 +488,33 @@ const canvasHeight = computed(() => {
                     @mouseup="onCanvasMouseUp"
                     @mouseleave="onCanvasMouseUp"
                   >
-                    <!-- Static Content (non-draggable labels) -->
+                    <!-- Static Content (draggable labels) -->
                     <div
                       v-for="(item, idx) in staticContent"
                       :key="'static-' + idx"
-                      class="static-content"
+                      class="draggable-field"
+                      :class="{ 'field-active': selectedField === item }"
                       :style="{
                         position: 'absolute',
-                        left: item.isPageCenter ? '50%' : item.x + 'px',
+                        left: item.x + 'px',
                         top: item.y + 'px',
                         fontSize: item.fontSize + 'px',
                         fontFamily: item.fontFamily,
                         fontWeight: item.fontWeight,
                         textAlign: item.alignment,
                         whiteSpace: 'nowrap',
-                        transform: (item.alignment === 'center' || item.isPageCenter) ? 'translateX(-50%)' : 'none',
-                        color: '#333',
-                        pointerEvents: 'none',
-                        userSelect: 'none',
-                        zIndex: 0
+                        transform: item.alignment === 'center' ? 'translateX(-50%)' : (item.alignment === 'right' ? 'translateX(-100%)' : 'none'),
+                        cursor: isDragging ? 'move' : 'pointer',
+                        padding: '2px 4px',
+                        border: selectedField === item ? '2px solid #28a745' : '1px dashed rgba(40, 167, 69, 0.4)',
+                        borderRadius: '3px',
+                        zIndex: selectedField === item ? 10 : 1,
+                        background: selectedField === item ? 'rgba(40, 167, 69, 0.15)' : 'rgba(255, 255, 255, 0.5)',
+                        boxShadow: selectedField === item ? '0 0 0 2px #28a745' : 'none',
+                        color: '#333'
                       }"
+                      @mousedown="onFieldMouseDown($event, item)"
+                      @click="selectField(item)"
                     >
                       {{ item.text }}
                     </div>
@@ -462,6 +531,7 @@ const canvasHeight = computed(() => {
                         top: field.y + 'px',
                         fontSize: field.fontSize + 'px',
                         fontFamily: field.fontFamily,
+                        fontWeight: field.fontWeight === 'bold' ? 'bold' : 'normal',
                         textAlign: field.alignment,
                         transform: field.alignment === 'center' ? 'translateX(-50%)' : 'none',
                         cursor: isDragging ? 'move' : 'pointer',
@@ -512,8 +582,21 @@ const canvasHeight = computed(() => {
                   <div class="card-title">Properti Field</div>
                 </div>
                 <div class="card-body">
-                  <div class="mb-3">
-                    <label class="form-label small">Nama Field</label>
+                  <div class="mb-3" v-if="selectedField.text !== undefined">
+                    <label class="form-label small">Isi Teks Statis</label>
+                    <input
+                      type="text"
+                      class="form-control form-control-sm"
+                      v-model="selectedField.text"
+                      @input="updateFieldProperty('text', selectedField.text)"
+                    />
+                    <button class="btn btn-sm btn-danger mt-2 w-100" @click="removeStaticText(selectedField)">
+                      <i class="ri-delete-bin-line me-1"></i> Hapus Teks Statis
+                    </button>
+                  </div>
+
+                  <div class="mb-3" v-else>
+                    <label class="form-label small">Nama Field Dinamis</label>
                     <input
                       type="text"
                       class="form-control form-control-sm"
@@ -580,6 +663,18 @@ const canvasHeight = computed(() => {
                       <option value="left">Left</option>
                       <option value="center">Center</option>
                       <option value="right">Right</option>
+                    </select>
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label small">Font Weight</label>
+                    <select
+                      class="form-select form-select-sm"
+                      v-model="selectedField.fontWeight"
+                      @change="updateFieldProperty('fontWeight', selectedField.fontWeight)"
+                    >
+                      <option value="normal">Normal</option>
+                      <option value="bold">Bold</option>
                     </select>
                   </div>
 

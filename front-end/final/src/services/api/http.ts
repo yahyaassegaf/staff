@@ -20,7 +20,6 @@ http.interceptors.request.use(
         return config;
     },
 );
-
 export default http;
 
 

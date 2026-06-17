@@ -154,6 +154,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                     'surat_pernyataan_verifikasi_nilai.*',
                     'users.name as nama_staff',
                     'prodi.nama as nama_prodi',
+                    'prodi.alias as alias_prodi',
                     \DB::raw('COALESCE(tanda_tangan.tdd, tanda_tangan.gambar) as ttd'),
                     'tanda_tangan.nama as nama_penandatangan',
                     'fakultas.nama as nama_fakultas'
@@ -162,6 +163,22 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 ->first();
 
             if ($data) {
+                $aliasProdi = Auth::user()?->prodi ? Auth::user()->prodi->alias : ($data->alias_prodi ?? '');
+                $staffKunci = 'staff_' . strtolower($aliasProdi);
+                $settingJabatan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', $staffKunci)->first();
+                
+                $nama_penandatangan = $data->nama_penandatangan ?? '-';
+                $ttdDb = $data->ttd;
+                $niy = $data->niy;
+                
+                if ($settingJabatan && $settingJabatan->tandaTangan) {
+                    $nama_penandatangan = $settingJabatan->tandaTangan->nama ?: $nama_penandatangan;
+                    $ttdDb = $settingJabatan->tandaTangan->tdd ?? $settingJabatan->tandaTangan->gambar ?: $ttdDb;
+                    // Note: niy might not be in tanda_tangan, keep existing if so
+                }
+                
+                \Illuminate\Support\Facades\Log::info('SuratPernyataanVerifikasiNilai - staffKunci: ' . $staffKunci . ' | nama: ' . $nama_penandatangan);
+
                 $kopPath = base_path('../public_html/img/kop.jpg');
                 $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
 
@@ -169,11 +186,11 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 $stempelBase64 = '';
 
                 if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
-                    if (!empty($data->ttd)) {
-                        if (str_starts_with($data->ttd, 'data:image')) {
-                            $tddBase64 = $data->ttd;
+                    if (!empty($ttdDb)) {
+                        if (str_starts_with($ttdDb, 'data:image')) {
+                            $tddBase64 = $ttdDb;
                         } else {
-                            $tddPath = base_path('../public_html/' . $data->ttd);
+                            $tddPath = base_path('../public_html/' . $ttdDb);
                             if (file_exists($tddPath)) {
                                 $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
                             }
@@ -193,7 +210,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 $staff = 'Staff Prodi ' . ucwords($data->nama_prodi);
                 $pdfData = [
                     'nomor' => $data->nomor,
-                    'nama_penandatangan' => $data->nama_penandatangan,
+                    'nama_penandatangan' => $nama_penandatangan,
                     'niy' => $data->niy,
                     'jabatan' => $jabatan,
                     'staff' => $staff,
@@ -248,10 +265,20 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
             ->select(
                 'surat_pernyataan_verifikasi_nilai.*',
                 'prodi.nama as nama_prodi',
+                'prodi.alias as alias_prodi',
                 'tanda_tangan.nama as nama_ttd'
             )
             ->where('surat_pernyataan_verifikasi_nilai.id', $id)
             ->first();
+
+        if ($data) {
+            $aliasProdi = Auth::user()?->prodi ? Auth::user()->prodi->alias : ($data->alias_prodi ?? '');
+            $staffKunci = 'staff_' . strtolower($aliasProdi);
+            $settingJabatan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', $staffKunci)->first();
+            if ($settingJabatan && $settingJabatan->tandaTangan && !empty($settingJabatan->tandaTangan->nama)) {
+                $data->nama_ttd = $settingJabatan->tandaTangan->nama;
+            }
+        }
 
         if (!$data) {
             return response()->json([
@@ -389,6 +416,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                     'surat_pernyataan_verifikasi_nilai.*',
                     'users.name as nama_staff',
                     'prodi.nama as nama_prodi',
+                    'prodi.alias as alias_prodi',
                     \DB::raw('COALESCE(tanda_tangan.tdd, tanda_tangan.gambar) as ttd'),
                     'tanda_tangan.nama as nama_penandatangan',
                     'fakultas.nama as nama_fakultas'
@@ -397,6 +425,21 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 ->first();
 
             if ($data) {
+                $aliasProdi = Auth::user()?->prodi ? Auth::user()->prodi->alias : ($data->alias_prodi ?? '');
+                $staffKunci = 'staff_' . strtolower($aliasProdi);
+                $settingJabatan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', $staffKunci)->first();
+                
+                $nama_penandatangan = $data->nama_penandatangan ?? '-';
+                $ttdDb = $data->ttd;
+                $niy = $data->niy;
+
+                if ($settingJabatan && $settingJabatan->tandaTangan) {
+                    $nama_penandatangan = $settingJabatan->tandaTangan->nama ?: $nama_penandatangan;
+                    $ttdDb = $settingJabatan->tandaTangan->tdd ?? $settingJabatan->tandaTangan->gambar ?: $ttdDb;
+                }
+                
+                \Illuminate\Support\Facades\Log::info('SuratPernyataanVerifikasiNilai Update - staffKunci: ' . $staffKunci . ' | nama: ' . $nama_penandatangan);
+
                 $kopPath = base_path('../public_html/img/kop.jpg');
                 $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
 
@@ -407,10 +450,14 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 $stempelBase64 = '';
 
                 if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
-                    if (!empty($data->ttd)) {
-                        $tddPath = base_path('../public_html/' . $data->ttd);
-                        if (file_exists($tddPath)) {
-                            $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                    if (!empty($ttdDb)) {
+                        if (str_starts_with($ttdDb, 'data:image')) {
+                            $tddBase64 = $ttdDb;
+                        } else {
+                            $tddPath = base_path('../public_html/' . $ttdDb);
+                            if (file_exists($tddPath)) {
+                                $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                            }
                         }
                     }
 
@@ -424,8 +471,8 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 $staff = 'Staff Prodi ' . ucwords($data->nama_prodi);
                 $pdfData = [
                     'nomor' => $data->nomor,
-                    'nama_penandatangan' => $data->nama_penandatangan,
-                    'niy' => $data->niy,
+                    'nama_penandatangan' => $nama_penandatangan,
+                    'niy' => $niy,
                     'jabatan' => $jabatan,
                     'staff' => $staff,
                     'nama_mahasiswa' => $nama,

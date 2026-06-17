@@ -20,6 +20,7 @@ const defaultForm = {
   nama: "",
   aktif: "T",
   jenjang: "S1",
+  gelar: "",
   nidn_kepala: "",
   nama_kepala: "",
   tanda_tangan: null as {id: number, nama: string, tdd: string} | null,
@@ -64,7 +65,6 @@ watch(
       // Reset form then assign
       Object.assign(form, defaultForm);
       Object.assign(form, val);
-      
       
       // Ensure form.tanda_tangan is properly set for single select
       if (!form.tanda_tangan) form.tanda_tangan = null;
@@ -168,6 +168,23 @@ onMounted(() => {
                 </select>
                 <div v-if="errors?.jenjang" class="invalid-feedback">
                   {{ errors.jenjang[0] }}
+                </div>
+              </div>
+              <div class="col-xl-6">
+                <label for="input-gelar" class="form-label">Gelar :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
+                <input
+                  v-else
+                  type="text"
+                  v-model="form.gelar"
+                  class="form-control"
+                  :class="{ 'is-invalid': errors?.gelar }"
+                  id="input-gelar"
+                  maxlength="50"
+                  placeholder="Isikan gelar lulusan"
+                />
+                <div v-if="errors?.gelar" class="invalid-feedback">
+                  {{ errors.gelar[0] }}
                 </div>
               </div>
               <div class="col-xl-6">

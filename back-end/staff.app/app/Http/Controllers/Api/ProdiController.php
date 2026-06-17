@@ -57,6 +57,7 @@ class ProdiController extends Controller
                 'nama'      => 'nullable|string|max:75',
                 'aktif'     => 'required|in:Y,T',
                 'jenjang'   => 'nullable|string|in:S1,S2,S3',
+                'gelar'     => 'nullable|string|max:50',
                 'nidn_kepala' => 'nullable|string|max:15',
                 'nama_kepala' => 'nullable|string|max:60',
                 'tanda_tangan' => 'nullable|integer|exists:tanda_tangan,id',
@@ -78,6 +79,7 @@ class ProdiController extends Controller
             $prodi->nama = $validate['nama'] ?? null;
             $prodi->aktif = $validate['aktif'] ?? 'T';
             $prodi->jenjang = $validate['jenjang'] ?? 'S1';
+            $prodi->gelar = $validate['gelar'] ?? null;
             $prodi->nidn_kepala = $validate['nidn_kepala'] ?? null;
             $prodi->nama_kepala = $validate['nama_kepala'] ?? null;
             $prodi->user_id = Auth::user()->id;
@@ -136,6 +138,7 @@ class ProdiController extends Controller
                 'nama'      => 'nullable|string|max:75',
                 'aktif'     => 'required|in:Y,T',
                 'jenjang'   => 'nullable|string|in:S1,S2,S3',
+                'gelar'     => 'nullable|string|max:50',
                 'nidn_kepala' => 'nullable|string|max:15',
                 'nama_kepala' => 'nullable|string|max:60',
                 'tanda_tangan' => 'nullable|integer|exists:tanda_tangan,id',
@@ -166,6 +169,7 @@ class ProdiController extends Controller
             $prodi->nama = $validate['nama'] ?? null;
             $prodi->aktif = $validate['aktif'] ?? 'T';
             $prodi->jenjang = $validate['jenjang'] ?? 'S1';
+            $prodi->gelar = $validate['gelar'] ?? null;
             $prodi->nidn_kepala = $validate['nidn_kepala'] ?? null;
             $prodi->nama_kepala = $validate['nama_kepala'] ?? null;
             $prodi->user_id = Auth::user()->id;

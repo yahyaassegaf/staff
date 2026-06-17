@@ -2,16 +2,13 @@
 import { onMounted, ref, watch } from "vue";
 import { defineComponent } from "vue";
 import type { ServerOptions } from "vue3-easy-data-table";
-import { apiDelete, apiGet } from "../../services/api/request";
+import { apiGet } from "../../services/api/request";
 import SimpleCardComponent from "../../shared/components/@spk/simple-card.vue";
-import Pageheader from "../../shared/components/pageheader/pageheader.vue";
 import router from "../../router";
-import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 
 export default defineComponent({
   components: {
-    Pageheader,
     SimpleCardComponent,
   },
   setup() {
@@ -20,11 +17,9 @@ export default defineComponent({
     const total = ref(0);
     const headers = [
       { text: "No", value: "no", sortable: false },
-      { text: "Nama Kepala", value: "nama_kepala", sortable: true },
-      { text: "Kode", value: "kode", sortable: true },
-      { text: "Nama", value: "nama", sortable: true },
-      { text: "Jenjang", value: "jenjang", sortable: true },
-      { text: "Gelar", value: "gelar", sortable: true },
+      { text: "Nama Batch", value: "nama_batch", sortable: true },
+      { text: "Jumlah Mahasiswa", value: "mahasiswa_count", sortable: false },
+      { text: "Tanggal Import", value: "tanggal_import", sortable: true },
       { text: "Action", value: "action", sortable: false },
     ];
 
@@ -40,7 +35,7 @@ export default defineComponent({
     async function getData() {
       try {
         loading.value = true;
-        const response = await apiGet("/prodi", {
+        const response = await apiGet("/batch", {
           page: serverOptions.value.page,
           limit: serverOptions.value.rowsPerPage,
           sortBy: serverOptions.value.sortBy,
@@ -67,40 +62,8 @@ export default defineComponent({
       }
     }
 
-    function edit(params: any) {
-      router.push(`/prodi/edit/${params.id}`);
-    }
-
-    async function remove(params: any) {
-      try {
-        const response = await apiDelete("/prodi/" + params.id);
-        if (response.data.status || response.success) {
-          toast.success("Prodi berhasil dihapus", {
-            theme: "auto",
-            icon: true,
-            hideProgressBar: true,
-            autoClose: true,
-            position: "top-right",
-          });
-          getData();
-        } else {
-          toast.error("Prodi gagal dihapus", {
-            theme: "auto",
-            icon: true,
-            hideProgressBar: true,
-            autoClose: true,
-            position: "top-right",
-          });
-        }
-      } catch (error) {
-        toast.error("Terjadi kesalahan saat menghapus prodi", {
-          theme: "auto",
-          icon: true,
-          hideProgressBar: true,
-          autoClose: true,
-          position: "top-right",
-        });
-      }
+    function print(params: any) {
+      router.push(`/print-ijazah/preview/${params.id}`);
     }
 
     watch([searchValue], () => {
@@ -115,18 +78,12 @@ export default defineComponent({
       getData();
     });
 
-    function goAdd() {
-      return router.push("/prodi/add");
-    }
-
     return {
       headers,
       items,
       getData,
-      edit,
-      remove,
+      print,
       total,
-      goAdd,
       serverOptions,
       searchValue,
       loading,
@@ -140,26 +97,20 @@ export default defineComponent({
     <div
       class="d-md-flex align-items-center justify-content-between my-4 page-header-breadcrumb"
     >
-      <h1 class="page-title fw-semibold fs-18 mb-0">Prodi</h1>
+      <h1 class="page-title fw-semibold fs-18 mb-0">Print Ijazah</h1>
       <div class="ms-md-1 ms-0">
         <nav>
           <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item">
-              <a href="javascript:void(0);">Master</a>
+              <a href="javascript:void(0);">Aplikasi</a>
             </li>
-            <li class="breadcrumb-item active" aria-current="page">Prodi</li>
+            <li class="breadcrumb-item active" aria-current="page">Print Ijazah</li>
           </ol>
         </nav>
       </div>
     </div>
 
     <SimpleCardComponent>
-      <template #showheader>
-        <button class="btn btn-primary btn-wave shadow-sm" @click="goAdd">
-          <i class="ri-add-line align-middle me-1"></i> Tambah Data
-        </button>
-      </template>
-
       <div class="row mb-3">
         <div class="col-md-3 ms-auto">
           <div class="input-group">
@@ -167,7 +118,7 @@ export default defineComponent({
               type="text"
               class="form-control form-control-sm"
               v-model="searchValue"
-              placeholder="Cari prodi..."
+              placeholder="Cari batch..."
             />
             <button class="btn btn-primary btn-sm" type="button">
               <i class="ri-search-line"></i>
@@ -195,31 +146,18 @@ export default defineComponent({
           </div>
         </template>
         <template #item="{ item, column }">
-          <template v-if="column === 'aktif'">
-            <span
-              :class="
-                item.aktif === 'Y' ? 'badge bg-success' : 'badge bg-danger'
-              "
-            >
-              {{ item.aktif === "Y" ? "Aktif" : "Tidak Aktif" }}
-            </span>
+          <template v-if="column === 'tanggal_import'">
+            {{ item.tanggal_import ? new Date(item.tanggal_import).toLocaleDateString('id-ID') : '-' }}
           </template>
 
           <template v-else-if="column === 'action'">
             <div class="btn-list">
               <button
-                class="btn btn-sm btn-icon btn-primary-light btn-wave"
-                title="Edit"
-                @click="edit(item)"
+                class="btn btn-sm btn-icon btn-success-light btn-wave"
+                title="Print Ijazah"
+                @click="print(item)"
               >
-                <i class="ri-edit-line"></i>
-              </button>
-              <button
-                class="btn btn-sm btn-icon btn-danger-light btn-wave"
-                title="Hapus"
-                @click="remove(item)"
-              >
-                <i class="ri-delete-bin-line"></i>
+                <i class="ri-printer-line"></i> Print
               </button>
             </div>
           </template>
@@ -235,9 +173,9 @@ export default defineComponent({
 
 <style scoped>
 .btn-icon {
-  width: 2rem;
+  width: auto;
   height: 2rem;
-  padding: 0;
+  padding: 0 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

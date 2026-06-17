@@ -212,7 +212,7 @@ class SuratKeteranganSpmController extends Controller
             ], 404);
         }
 
-        
+
         $nomorStr = $spm->nomor_surat ?? $spm->nomor ?? null;
         if ($nomorStr) {
             $parts = explode('/', $nomorStr);
@@ -438,7 +438,7 @@ class SuratKeteranganSpmController extends Controller
         $stempelBase64 = '';
         $tddBase64 = '';
         $pengawasTtdBase64 = null;
-        
+
         $settingJabatan = SettingJabatan::with('tandaTangan')
             ->where('kunci_jabatan', 'pengawas_spm')
             ->first();
@@ -467,11 +467,17 @@ class SuratKeteranganSpmController extends Controller
             }
 
             if ($settingJabatan && $settingJabatan->tandaTangan) {
+                $foundGambar = false;
                 if (!empty($settingJabatan->tandaTangan->gambar)) {
                     $pengawasPath = base_path('../public_html/' . $settingJabatan->tandaTangan->gambar);
                     if (file_exists($pengawasPath)) {
                         $pengawasTtdBase64 = SuratService::getBase64Image($pengawasPath);
+                        $foundGambar = true;
                     }
+                }
+                
+                if (!$foundGambar && !empty($settingJabatan->tandaTangan->tdd)) {
+                    $pengawasTtdBase64 = $settingJabatan->tandaTangan->tdd;
                 }
             }
         }

@@ -3,16 +3,11 @@ require __DIR__.'/vendor/autoload.php';
 $app = require_once __DIR__.'/bootstrap/app.php';
 $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
-try {
-    $c = app(App\Http\Controllers\Api\Sk6Controller::class);
-    $latest = \App\Models\SuratKeterangan6::orderBy('id', 'desc')->first();
-    if (!$latest) {
-        echo "No data found\n";
-        exit;
-    }
-    echo "Generating PDF for ID: " . $latest->id . "\n";
-    $c->downloadPdf($latest->id);
-    echo "SUCCESS\n";
-} catch (\Throwable $e) {
-    echo "ERROR: " . (string)$e . "\n";
-}
+
+$prodis = \App\Models\Prodi::pluck('alias')->toArray();
+$jabatan = \App\Models\SettingJabatan::pluck('kunci_jabatan')->toArray();
+
+echo "Prodi Aliases:\n";
+print_r($prodis);
+echo "SettingJabatan Keys:\n";
+print_r($jabatan);

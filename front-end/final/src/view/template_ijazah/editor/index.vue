@@ -26,6 +26,7 @@ export default defineComponent({
       orientasi: "portrait",
       is_active: "aktif",
       fields_positions: {} as any,
+      teks_statis: null as any,
     });
 
     async function getTemplate() {
@@ -47,6 +48,17 @@ export default defineComponent({
             }
           }
 
+          // Parse teks_statis if it exists as JSON string
+          let teksStatis = null;
+          if (template.teks_statis) {
+            try {
+              teksStatis = typeof template.teks_statis === 'string'
+                ? JSON.parse(template.teks_statis)
+                : template.teks_statis;
+            } catch (e) {
+            }
+          }
+
           templateData.value = {
             id: template.id,
             prodi_id: template.prodi_id ? Number(template.prodi_id) : null,
@@ -57,6 +69,7 @@ export default defineComponent({
             orientasi: template.orientasi || "portrait",
             is_active: template.is_active || "aktif",
             fields_positions: fieldsPositions,
+            teks_statis: teksStatis,
           };
 
         }
@@ -78,11 +91,14 @@ export default defineComponent({
         loading.value = true;
         errors.value = {};
         
-        // Convert fields_positions to JSON string
+        // Convert fields_positions and teks_statis to JSON string
         const formData = {
           ...form,
           fields_positions: JSON.stringify(form.fields_positions || {}),
+          teks_statis: form.teks_statis ? JSON.stringify(form.teks_statis) : null,
         };
+
+        console.log('SUBMIT formData teks_statis:', formData.teks_statis);
 
         const response = await apiPut(`/template-ijazah/${form.id}`, formData);
         if (response.success == true) {

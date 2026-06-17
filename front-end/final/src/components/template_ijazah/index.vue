@@ -37,7 +37,8 @@ const loadProdi = async () => {
     const response = await apiGet('/get-all-prodi');
     if (response.success) {
       const data = response.data?.data || [];
-      prodiOptions.value = Array.isArray(data) ? data : [];
+      const options = Array.isArray(data) ? data : [];
+      prodiOptions.value = [{ id: '', nama: 'Global (Semua Prodi)' }, ...options];
     }
   } catch (error) {
   }
@@ -151,10 +152,10 @@ function submitForm() {
   // Extract ID for the payload
   let prodiId = null;
   if (form.prodi_id) {
-    if (typeof form.prodi_id === 'object' && form.prodi_id.id) {
-      prodiId = Number(form.prodi_id.id);
+    if (typeof form.prodi_id === 'object') {
+      prodiId = form.prodi_id.id === '' ? null : Number(form.prodi_id.id);
     } else {
-      prodiId = Number(form.prodi_id);
+      prodiId = form.prodi_id === '' ? null : Number(form.prodi_id);
     }
   }
 

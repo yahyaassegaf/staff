@@ -286,6 +286,13 @@ class Sk6Controller extends Controller
             $skukd = new SuratKeteranganUjianKomprehensifDiniyah();
             $skukd->nomor_surat = $nomorSkukd;
             $skukd->prodi_id = $validate['prodi_id'];
+
+            $settingKomprehensif = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_komprehensif')->first();
+            if ($settingKomprehensif && $settingKomprehensif->tandaTangan) {
+                $skukd->tanda_tangan_id = $settingKomprehensif->tanda_tangan_id;
+                $skukd->koor_komprehensif = $settingKomprehensif->tandaTangan->nama;
+            }
+
             $skukd->nama_lengkap = $validate['nama_mhs'];
             $skukd->tempat_lahir = $validate['tempat_lahir'];
             $skukd->tanggal_lahir = $validate['tanggal_lahir'];
@@ -703,6 +710,13 @@ class Sk6Controller extends Controller
             if ($skukd) {
                 $skukd->nomor_surat = $nomorSkukd;
                 $skukd->prodi_id = $validate['prodi_id'];
+
+                $settingKomprehensif = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_komprehensif')->first();
+                if ($settingKomprehensif && $settingKomprehensif->tandaTangan) {
+                    $skukd->tanda_tangan_id = $settingKomprehensif->tanda_tangan_id;
+                    $skukd->koor_komprehensif = $settingKomprehensif->tandaTangan->nama;
+                }
+
                 $skukd->nama_lengkap = $validate['nama_mhs'];
                 $skukd->tempat_lahir = $validate['tempat_lahir'];
                 $skukd->tanggal_lahir = $validate['tanggal_lahir'];
@@ -905,7 +919,27 @@ class Sk6Controller extends Controller
 
         $ttdSkak = $this->getTtdJabatan('kepala_biro_keuangan');
         $ttdSktkp = $this->getTtdJabatan('ketua_tasma');
-        $ttdSkukd = $this->getTtdJabatan('ketua_komprehensif');
+        
+        if ($skukd && $skukd->tanda_tangan_id) {
+            $tandaTangan = \App\Models\TandaTangan::find($skukd->tanda_tangan_id);
+            $ttdBase64 = '';
+            if ($tandaTangan) {
+                if ($tandaTangan->gambar) {
+                    $ttdBase64 = \App\Services\SuratService::getBase64Image(base_path('../public_html/' . $tandaTangan->gambar));
+                } elseif ($tandaTangan->tdd) {
+                    $ttdBase64 = $tandaTangan->tdd;
+                }
+                $ttdSkukd = [
+                    'nama' => $tandaTangan->nama,
+                    'ttd' => $ttdBase64,
+                ];
+            } else {
+                $ttdSkukd = $this->getTtdJabatan('ketua_komprehensif');
+            }
+        } else {
+            $ttdSkukd = $this->getTtdJabatan('ketua_komprehensif');
+        }
+
         $ttdSkqa = $this->getTtdJabatan('ketua_qismul_aman');
 
         $stempelPath = base_path('../public_html/img/stempel.png');
@@ -1235,9 +1269,14 @@ class Sk6Controller extends Controller
             ->first();
 
         if ($data) {
-            $settingKompre = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_komprehensif')->first();
-            $namaKetua = $settingKompre && $settingKompre->tandaTangan ? $settingKompre->tandaTangan->nama : ($data->nama_ttd ?? $data->koor_komprehensif);
-            $ttdKetua = $settingKompre && $settingKompre->tandaTangan ? $settingKompre->tandaTangan->gambar : $data->ttd;
+            $namaKetua = $data->nama_ttd ?? $data->koor_komprehensif;
+            $ttdKetua = $data->ttd;
+
+            if (!$namaKetua) {
+                $settingKompre = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_komprehensif')->first();
+                $namaKetua = $settingKompre && $settingKompre->tandaTangan ? $settingKompre->tandaTangan->nama : null;
+                $ttdKetua = $settingKompre && $settingKompre->tandaTangan ? $settingKompre->tandaTangan->gambar : null;
+            }
 
             $kopPath = base_path('../public_html/img/kop.jpg');
             $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
