@@ -18,7 +18,7 @@
 
         /* KOP SURAT */
         .kop {
-            margin-top: -2.1cm;
+            margin-top: 1cm;
             margin-left: -1.5cm;
             margin-right: -1.5cm;
             margin-bottom: 15px;
@@ -27,8 +27,7 @@
         .kop img {
             margin-top: 5px;
             width: 100%;
-            max-height: 155px;
-            object-fit: contain;
+            height: auto;
             display: block;
         }
 

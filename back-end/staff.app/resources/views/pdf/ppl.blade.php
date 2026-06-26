@@ -34,6 +34,7 @@
 
         /* ===== KOP SURAT ===== */
         .kop {
+            margin-top: 1cm;
             width: 100%;
         }
 

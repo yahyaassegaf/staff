@@ -11,6 +11,7 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Events\BeforeSheet;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class MahasiswaImport implements ToCollection, WithHeadingRow, WithEvents, SkipsEmptyRows
@@ -72,32 +73,58 @@ class MahasiswaImport implements ToCollection, WithHeadingRow, WithEvents, Skips
                 $nama = trim($row['nama'] ?? '');
                 $nim = trim($row['nim'] ?? '');
                 $nik = trim($row['nik'] ?? '');
+                $ttlRaw = trim($row['tempat_tanggal_lahir'] ?? $row['tgl_lahir'] ?? $row['tanggal_lahir'] ?? '');
+                $nilaiAkreditasi = trim($row['nilai_akreditasi'] ?? '');
+                $nomorSkBanPt = trim($row['nomor_sk_ban_pt'] ?? '');
+                $nomorIjazahNasional = trim($row['nomor_ijazah_nasional'] ?? '');
+                $tanggalSkYudisium = trim($row['tanggal_sk_yudisium'] ?? '');
+                $tanggalPenerbitan = trim($row['tanggal_penerbitan'] ?? '');
 
+                // Log beberapa baris pertama untuk debugging header/data
+                if ($index < 3) {
+                    Log::info("Import Mahasiswa - Sheet: {$this->currentSheetName}, Baris {$rowNumber}", [
+                        'raw_keys' => $row->keys()->toArray(),
+                        'nama' => $nama,
+                        'nim' => $nim,
+                        'nik' => $nik,
+                    ]);
+                }
+
+                // Skip baris yang benar-benar kosong (semua kolom utama kosong)
                 if ($nama === '' && $nim === '' && $nik === '') {
                     continue;
                 }
 
-                if ($nama === '' || $nim === '' || $nik === '') {
+                // Validasi semua kolom wajib — jika salah satu kosong, skip baris ini
+                $requiredFields = [
+                    'Nama' => $nama,
+                    'NIM' => $nim,
+                    'NIK' => $nik,
+                    'Tempat/Tgl Lahir' => $ttlRaw,
+                    'Nilai Akreditasi' => $nilaiAkreditasi,
+                    'Nomor SK BAN-PT' => $nomorSkBanPt,
+                    'Nomor Ijazah Nasional' => $nomorIjazahNasional,
+                    'Tanggal SK Yudisium' => $tanggalSkYudisium,
+                    'Tanggal Penerbitan' => $tanggalPenerbitan,
+                ];
+
+                $emptyFields = [];
+                foreach ($requiredFields as $label => $value) {
+                    if ($value === '' || $value === null) {
+                        $emptyFields[] = $label;
+                    }
+                }
+
+                if (!empty($emptyFields)) {
                     $identifier = $nama !== '' ? $nama : ($nim !== '' ? "NIM: $nim" : "Baris $rowNumber");
-                    $prodiInfo = $row['prodi'] ?? $row['program_studi'] ?? $this->currentSheetName;
-                    $this->skippedNames[] = "$identifier (Prodi: $prodiInfo)";
+                    $kolomKosong = implode(', ', $emptyFields);
+                    $this->skippedNames[] = "{$identifier} (Sheet: {$this->currentSheetName}, Kolom kosong: {$kolomKosong})";
                     continue;
                 }
 
-                // NIM dan Nama wajib diisi
-                if ($nim === '') {
-                    $this->addError($rowNumber, "NIM tidak boleh kosong (Sheet: {$this->currentSheetName}, Nama: {$nama})");
-                    $this->failedCount++;
-                    continue;
-                }
-
-                if ($nama === '') {
-                    $this->addError($rowNumber, "Nama tidak boleh kosong (Sheet: {$this->currentSheetName}, NIM: {$nim})");
-                    $this->failedCount++;
-                    continue;
-                }
-
+                // Resolve Prodi ID
                 $prodiId = null;
+                $prodiValue = null;
 
                 // 1. Prioritas: Cek apakah nama sheet adalah identitas Prodi
                 if ($this->sheetResolvedProdiId) {
@@ -112,24 +139,28 @@ class MahasiswaImport implements ToCollection, WithHeadingRow, WithEvents, Skips
                 }
 
                 if (!$prodiId) {
-                    // Jika baris ada isinya (nama/nim) tapi prodi tidak ketemu, baru anggap error
                     $this->addError($rowNumber, "Program studi tidak ditemukan (Sheet: {$this->currentSheetName}, Input: " . ($prodiValue ?? 'N/A') . ")");
                     $this->failedCount++;
                     continue;
                 }
 
+                // Parsing tempat & tanggal lahir dari kolom gabungan
+                $tempatLahir = $this->parseTempatLahir($ttlRaw);
+                $tglLahir = $this->parseTglLahirString($ttlRaw);
+
                 // Update or Create Mahasiswa
                 Mahasiswa::updateOrCreate(
-                    ['nim' => (string) ($row['nim'] ?? '')],
+                    ['nim' => (string) $nim],
                     [
                         'nama' => $nama,
-                        'nik' => isset($row['nik']) && trim($row['nik']) !== '' ? (string) $row['nik'] : null, // Set null jika kosong
-                        'tgl_lahir' => $this->parseFileDate($row['tempat_tanggal_lahir'] ?? $row['tgl_lahir'] ?? $row['tanggal_lahir'] ?? null),
-                        'nilai_akreditasi' => (string) ($row['nilai_akreditasi'] ?? ''),
-                        'nomor_sk_ban_pt' => (string) ($row['nomor_sk_ban_pt'] ?? ''),
-                        'nomor_ijazah_nasional' => (string) ($row['nomor_ijazah_nasional'] ?? ''),
-                        'tanggal_sk_yudisium' => (string) ($row['tanggal_sk_yudisium'] ?? ''),
-                        'tanggal_penerbitan' => (string) ($row['tanggal_penerbitan'] ?? ''),
+                        'nik' => (string) $nik,
+                        'tempat_lahir' => $tempatLahir,
+                        'tgl_lahir' => $tglLahir,
+                        'nilai_akreditasi' => $nilaiAkreditasi,
+                        'nomor_sk_ban_pt' => $nomorSkBanPt,
+                        'nomor_ijazah_nasional' => $nomorIjazahNasional,
+                        'tanggal_sk_yudisium' => $tanggalSkYudisium,
+                        'tanggal_penerbitan' => $tanggalPenerbitan,
                         'prodi_id' => $prodiId,
                         'batch_id' => $this->batchId,
                         'status' => strtolower((string) ($row['status'] ?? 'belum')) === 'sudah' ? 'sudah' : 'belum',
@@ -184,9 +215,10 @@ class MahasiswaImport implements ToCollection, WithHeadingRow, WithEvents, Skips
     }
 
     /**
-     * Parsing tanggal dari excel
+     * Parsing tanggal lahir dari string gabungan "Tempat, Tanggal"
+     * Menyimpan bagian tanggal apa adanya sebagai varchar (misal: "14 Maret 1997")
      */
-    protected function parseFileDate($value): ?string
+    protected function parseTglLahirString($value): ?string
     {
         if (!$value) return null;
 
@@ -194,44 +226,24 @@ class MahasiswaImport implements ToCollection, WithHeadingRow, WithEvents, Skips
             return $value->format('Y-m-d');
         }
 
-        // Jika format "Tempat, Tanggal", ambil setelah koma
-        if (is_string($value) && strpos($value, ',') !== false) {
-            $value = trim(explode(',', $value)[1]);
+        $value = (string) $value;
+
+        // Jika format "Tempat, Tanggal" → ambil bagian setelah koma
+        if (strpos($value, ',') !== false) {
+            return trim(explode(',', $value, 2)[1]);
         }
 
-        try {
-            // Excel numeric date handle
-            if (is_numeric($value)) {
+        // Jika format angka Excel → konversi ke tanggal
+        if (is_numeric($value)) {
+            try {
                 return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($value)->format('Y-m-d');
+            } catch (\Exception $e) {
+                return $value;
             }
-
-            // Handle Indonesian Month Names (Maret -> March, etc)
-            $months = [
-                'Januari' => 'January',
-                'Februari' => 'February',
-                'Maret' => 'March',
-                'April' => 'April',
-                'Mei' => 'May',
-                'Juni' => 'June',
-                'Juli' => 'July',
-                'Agustus' => 'August',
-                'September' => 'September',
-                'Oktober' => 'October',
-                'November' => 'November',
-                'Desember' => 'December'
-            ];
-
-            $cleanValue = str_replace(array_keys($months), array_values($months), $value);
-
-            $timestamp = strtotime($cleanValue);
-            if ($timestamp) {
-                return date('Y-m-d', $timestamp);
-            }
-
-            return null;
-        } catch (\Exception $e) {
-            return null;
         }
+
+        // Kembalikan string apa adanya (misal: "14 Maret 1997")
+        return trim($value);
     }
 
     private function addError(int $row, string $message): void

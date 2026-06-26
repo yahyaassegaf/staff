@@ -8,7 +8,7 @@
     <style>
         /* WAJIB untuk DomPDF */
         @page {
-            margin: 1cm 2cm 1cm 2cm;
+            margin: 0cm 2cm 1cm 2cm;
         }
 
         body {
@@ -70,15 +70,14 @@
         }
 
         .kop img {
-            margin-top: 35px;
+            margin-top: 0px;
             width: 100%;
-            max-height: 155px;
-            object-fit: contain;
+            height: auto;
             display: block;
         }
 
         .kop {
-            margin-top: -2.1cm;
+            margin-top: 0.1cm;
             margin-left: -1.5cm;
             margin-right: -1.5cm;
         }
@@ -149,7 +148,7 @@
                                 @if(!empty($stempel))
                                 <img src="{{ $stempel }}" style="position: absolute; left: -30px; top: 5px; width: 95px; height: 95px; z-index: 2;">
                                 @endif
-                                
+
                                 @if(!empty($ttd))
                                 <img src="{{ $ttd }}" style="position: absolute; left: -15px; top: 15px; width: 175px; z-index: 1;">
 
@@ -225,7 +224,7 @@
                                 @if(!empty($stempel))
                                 <img src="{{ $stempel }}" style="position: absolute; left: -30px; top: 5px; width: 95px; height: 95px; z-index: 2;">
                                 @endif
-                                
+
                                 @if(!empty($ttd))
                                 <img src="{{ $ttd }}" style="position: absolute; left: -15px; top: 20px; max-width:200px; max-height: 80px; object-fit: contain; z-index: 1;">
 

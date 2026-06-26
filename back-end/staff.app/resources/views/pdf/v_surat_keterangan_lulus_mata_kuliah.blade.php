@@ -8,7 +8,7 @@
     <style>
         /* WAJIB untuk DomPDF */
         @page {
-            margin: 1cm 2cm 1cm 2cm;
+            margin: 0cm 2cm 1cm 2cm;
         }
 
         body {
@@ -78,10 +78,9 @@
         }
 
         .kop img {
-            margin-top: 0;
+            margin-top: 0cm;
             width: 100%;
-            max-height: 155px;
-            object-fit: contain;
+            height: auto;
             display: block;
         }
 
@@ -91,7 +90,7 @@
         }
 
         .kop {
-            margin-top: -1cm;
+            margin-top: 0.1cm;
             /* mentok ke atas batas margin kertas (1cm) */
             margin-left: -1.5cm;
             /* tembus margin kiri */
@@ -187,24 +186,18 @@
             <!-- BLOK KANAN -->
             <td width="40%" style="text-align:center;">
                 Bangil, {{ $tanggal_surat }}<br>
-                Dekan Fakultas {{ $fakultas }}<br>
+                Ketua Prodi {{ $alias_prodi }}<br>
 
                 <!-- AREA TTD (OVERLAY AMAN) -->
-                <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -20px; margin-bottom: -25px;">
-                    <tr>
-                        <td style="
-            height:115px;
-            text-align:center;
-            vertical-align:middle;
-            /* background-image: url('{{ $stempel }}'); */
-            background-repeat: no-repeat;
-            background-position: 20% 50%;
-            background-size: 110px 110px;
-        ">
-                            <!-- <img src="{{ $ttd }}" style="width:280px;"> -->
-                        </td>
-                    </tr>
-                </table>
+                <div style="position: relative; width: 280px; height: 120px; margin: 0 auto; margin-top: -10px; margin-bottom: -35px;">
+                    @if(!empty($stempel))
+                    <img src="{{ $stempel }}" style="position: absolute; left: 20px; top: -5px; width: 110px; height: 110px; z-index: 2;">
+                    @endif
+
+                    @if(!empty($ttd))
+                    <img src="{{ $ttd }}" style="position: absolute; left: 70px; top: 10px; max-width:220px; max-height: 90px; object-fit: contain; z-index: 1;">
+                    @endif
+                </div>
                 <div class="nama-ttd" style="margin-top:4px;">
                     {{ $dekan }}
                 </div>

@@ -324,7 +324,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             $sklmk->tanggal = $validate['tanggal'];
             $sklmk->jenis_kelamin = Auth::user()->jenis_kelamin;
             $sklmk->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
-            
+
             // Delete old file from Google Drive if exists
             if (!empty($oldDriveFileId)) {
                 \App\Services\GoogleDrive::deleteFile($oldDriveFileId);
@@ -443,6 +443,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
 
     private function buildPdfData($data)
     {
+        Log::info($data->nama_kepala_prodi);
         $kopPath = base_path('../public_html/img/kop.jpg');
         $kopBase64 = SuratService::getBase64Image($kopPath);
 
@@ -456,9 +457,13 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             }
 
             if (!empty($data->ttd)) {
-                $tddPath = base_path('../public_html/' . $data->ttd);
-                if (file_exists($tddPath)) {
-                    $tddBase64 = SuratService::getBase64Image($tddPath);
+                if (str_starts_with($data->ttd, 'data:image')) {
+                    $tddBase64 = $data->ttd;
+                } else {
+                    $tddPath = base_path('../public_html/' . $data->ttd);
+                    if (file_exists($tddPath)) {
+                        $tddBase64 = SuratService::getBase64Image($tddPath);
+                    }
                 }
             }
         }
@@ -474,8 +479,8 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             'alamat' => $data->alamat_rumah,
             'kelas' => $data->kelas_pondok,
             'alias_prodi' => $data->alias_prodi,
-            'dekan' => $data->dekan,
-            'nidn_dekan' => $data->nidn_dekan,
+            'dekan' => $data->nama_kepala_prodi ? $data->nama_kepala_prodi : $data->dekan,
+            'nidn_dekan' => $data->nidn_kepala_prodi ? $data->nidn_kepala_prodi : $data->nidn_dekan,
             'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
             'stempel' => $stempelBase64,
             'ttd' => $tddBase64,

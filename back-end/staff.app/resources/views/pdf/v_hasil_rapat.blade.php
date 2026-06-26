@@ -21,15 +21,14 @@
 
         /* ===== KOP SURAT ===== */
         .kop {
-            margin-top: -0.1cm;
+            margin-top: 1cm;
             margin-left: -1cm;
             margin-right: -1cm;
         }
 
         .kop img {
             width: 100%;
-            max-height: 155px;
-            object-fit: contain;
+            height: auto;
             display: block;
         }
 

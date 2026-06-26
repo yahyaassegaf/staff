@@ -46,7 +46,7 @@ class MahasiswaController extends Controller
                 'nama' => 'required|string|max:255',
                 'nim' => 'required|string|max:255',
                 'nik' => 'required|string|max:255',
-                'tgl_lahir' => 'required|date',
+                'tgl_lahir' => 'required|string|max:255',
                 'nilai_akreditasi' => 'required|string|max:255',
                 'nomor_sk_ban_pt' => 'required|string|max:255',
                 'nomor_ijazah_nasional' => 'required|string|max:255',
@@ -96,7 +96,7 @@ class MahasiswaController extends Controller
                 'nama' => 'required|string|max:255',
                 'nim' => 'required|string|max:255',
                 'nik' => 'required|string|max:255',
-                'tgl_lahir' => 'required|date',
+                'tgl_lahir' => 'required|string|max:255',
                 'nilai_akreditasi' => 'required|string|max:255',
                 'nomor_sk_ban_pt' => 'required|string|max:255',
                 'nomor_ijazah_nasional' => 'required|string|max:255',
@@ -162,7 +162,7 @@ class MahasiswaController extends Controller
             $skippedMsg = count($skippedSheets) > 0 ? ", " . count($skippedSheets) . " sheet dilewati (" . implode(', ', $skippedSheets) . ")" : "";
 
             $skippedNames = $import->getSkippedNames();
-            $skippedNamesMsg = count($skippedNames) > 0 ? ". Terdapat " . count($skippedNames) . " data yang dilewati karena ada data (nama/nim/nik) yang kosong: " . implode(', ', $skippedNames) : "";
+            $skippedNamesMsg = count($skippedNames) > 0 ? ". Terdapat " . count($skippedNames) . " data yang dilewati karena ada kolom yang kosong: " . implode(' | ', $skippedNames) : "";
 
             return response()->json([
                 'status' => true,
@@ -170,6 +170,7 @@ class MahasiswaController extends Controller
                 'data' => [
                     'success' => $import->getSuccessCount(),
                     'failed' => $import->getFailedCount(),
+                    'skipped' => count($skippedNames),
                     'skipped_sheets' => $skippedSheets,
                     'skipped_names' => $skippedNames,
                     'errors' => $import->getErrors(),

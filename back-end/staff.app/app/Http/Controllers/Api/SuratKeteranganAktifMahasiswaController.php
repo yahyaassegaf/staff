@@ -359,14 +359,14 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganAktifMahasiswaController');
                 $pdf = Pdf::loadView('pdf.surat_aktif', $pdfData)->setPaper('a4', 'portrait');
                 $fileName = 'surat_keterangan_aktif_mahasiswa_' . $data->nim . '_' . uniqid() . '.pdf';
- 
+
                 if (!\Illuminate\Support\Facades\File::exists($directory)) {
                     \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
                 }
- 
+
                 $path = $directory . '/' . $fileName;
                 $pdf->save($path);
- 
+
                 $data->update(['local_path' => $path]);
 
                 $nameTable = 'Surat Keterangan Aktif Mahasiswa';
@@ -486,9 +486,9 @@ class SuratKeteranganAktifMahasiswaController extends Controller
             'nama_prodi' => $data->nama_prodi,
             'nama_kepala_prodi' => $data->nama_kepala_prodi,
             'nidn_kepala_prodi' => $data->nidn_kepala_prodi,
-            'dekan' => $data->dekan,
+            'dekan' => $data->nama_kepala_prodi ? $data->nama_kepala_prodi : $data->dekan,
             'fakultas' => $data->fakultas,
-            'nidn_dekan' => $data->nidn_dekan,
+            'nidn_dekan' => $data->nidn_kepala_prodi ? $data->nidn_kepala_prodi : $data->nidn_dekan,
             'kopBase64' => $kopBase64,
             'stempel' => $stempelBase64,
             'ttd' => $tddBase64,

@@ -8,7 +8,7 @@
     <style>
         /* WAJIB untuk DomPDF */
         @page {
-            margin: 1cm 2cm 1cm 2cm;
+            margin: 0cm 2cm 1cm 2cm;
         }
 
         body {
@@ -79,10 +79,9 @@
         }
 
         .kop img {
-            margin-top: 5px;
+            margin-top: 0px;
             width: 100%;
-            max-height: 155px;
-            object-fit: contain;
+            height: auto;
             display: block;
         }
 
@@ -92,7 +91,7 @@
         }
 
         .kop {
-            margin-top: -1cm;
+            margin-top: 0.1cm;
             /* naik ke atas */
             margin-left: -1.5cm;
             /* tembus margin kiri */

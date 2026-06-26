@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Batch;
 use App\Models\Mahasiswa;
+use App\Models\SettingJabatan;
 use App\Models\TemplateIjazah;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -39,10 +40,9 @@ class PrintIjazahController extends Controller
             ->where('is_active', 'aktif')
             ->get();
 
-        // Ambil data tanda tangan/jabatan (rektor) dari setting_jabatan
-        $rektor = DB::table('setting_jabatan')
-            ->where('kunci_jabatan', 'Rektor')
-            ->orWhere('kunci_jabatan', 'like', '%rektor%')
+        // Ambil data tanda tangan/jabatan (rektor) dari setting_jabatan dengan relasi tanda_tangan
+        $rektor = SettingJabatan::with('tandaTangan')
+            ->where('kunci_jabatan', 'rektor')
             ->first();
 
         // Ambil data fakultas untuk relasi prodi
@@ -125,11 +125,11 @@ class PrintIjazahController extends Controller
 
                 // Dekan (dari fakultas)
                 'nama_dekan'               => $namaFakultas ? ($namaFakultas->dekan ?: 'DEBUG: DEKAN KOSONG DI DB') : 'DEBUG: RELASI FAKULTAS-PRODI TIDAK ADA',
-                'nidn_dekan'               => $namaFakultas ? ($namaFakultas->nidn_dekan ?? '') : '',
+                'nidn_dekan'               => $namaFakultas && !empty($namaFakultas->nidn_dekan) ? 'NIDN. ' . $namaFakultas->nidn_dekan : '',
 
                 // Rektor (dari setting_jabatan)
-                'nama_rektor'              => $rektor ? ($rektor->nama ?? '') : '',
-                'nidn_rektor'              => $rektor ? ($rektor->nidn ?? '') : '',
+                'nama_rektor'              => $rektor && $rektor->tandaTangan ? ($rektor->tandaTangan->nama ?? '') : '',
+                'nidn_rektor'              => $rektor && !empty($rektor->nidn) ? 'NIDN. ' . $rektor->nidn : '',
 
                 // Kota (bisa dikonfigurasi atau dari prodi)
                 'kota_tempat'              => 'Bangil',
