@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-export const BASE_URL = 'http://staff.test:8081/api';
-export const ASSET_URL = 'http://staff.test/back-end/public_html';
-// export const BASE_URL = 'https://staffapp.uiidalwa.web.id/api';
-// export const ASSET_URL = 'https://staffapp.uiidalwa.web.id/public_html';
+// export const BASE_URL = 'http://staff.test:8081/api';
+// export const ASSET_URL = 'http://staff.test/back-end/public_html';
+export const BASE_URL = 'https://staffapp.uiidalwa.web.id/api';
+export const ASSET_URL = 'https://staffapp.uiidalwa.web.id/public_html';
 
 const http = axios.create({
     baseURL: BASE_URL,

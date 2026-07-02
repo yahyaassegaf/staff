@@ -20,12 +20,9 @@ export default defineComponent({
     const total = ref(0);
     const headers = [
       { text: "No", value: "no", sortable: false },
-      { text: "Nomor Surat", value: "nomor", sortable: true },
-      { text: "Nama Dosen", value: "nama_dosen", sortable: true },
       { text: "Nama Mahasiswa", value: "nama_mhs", sortable: true },
-      { text: "NIM / NIK", value: "nim_nik", sortable: true },
-      { text: "Tugas", value: "tugas_dosen", sortable: true },
-      { text: "Tanggal", value: "tanggal", sortable: true },
+      { text: "Pembimbing 1", value: "pebimbing1", sortable: true },
+      { text: "Pembimbing 2", value: "pebimbing2", sortable: true },
       { text: "URL", value: "drive_link", sortable: false },
       { text: "Action", value: "action", sortable: false },
     ];

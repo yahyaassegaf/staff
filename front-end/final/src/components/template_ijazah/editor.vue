@@ -145,7 +145,16 @@ watch(
         Object.keys(form.fields_positions).forEach(key => {
           const fieldIndex = ijazahFields.value.findIndex(f => f.key === key);
           if (fieldIndex !== -1) {
-            Object.assign(ijazahFields.value[fieldIndex], form.fields_positions[key]);
+            const savedPos = { ...form.fields_positions[key] };
+            const defaultField = ijazahFields.value[fieldIndex];
+            
+            // Jika posisi dari database 0,0 (kemungkinan karena bug sebelumnya), gunakan posisi default
+            if (savedPos.x === 0 && savedPos.y === 0) {
+              savedPos.x = defaultField.x;
+              savedPos.y = defaultField.y;
+            }
+            
+            Object.assign(ijazahFields.value[fieldIndex], savedPos);
           }
         });
       }

@@ -24,17 +24,16 @@ const defaultForm = {
   no_surat: "",
   nomor: "",
   prodi_id: 0,
-  nama_dosen: "",
-  alamat_dosen: "",
-  tugas_dosen: "",
-  tugasnya: "",
+  pebimbing1: "",
+  alamat_pebimbing1: "",
+  tugas_pebimbing1: "",
+  pebimbing2: "",
+  alamat_pebimbing2: "",
+  tugas_pebimbing2: "",
   nama_mhs: "",
   nim_nik: "",
-  fakultas_prodi: "",
   judul_skripsi: "",
   masa_penugasan: "",
-  tanggal: "",
-  jenis_kelamin: "",
   petanda_tangan: 'tidak',
 };
 
@@ -42,7 +41,6 @@ const disableListMhsWatcher = ref(false);
 
 const readonlyField = ref({
   nama_mhs: false,
-  fakultas_prodi: false,
 });
 
 const form = reactive({ ...defaultForm });
@@ -63,17 +61,6 @@ watch(listMhs, async (val) => {
   form.nama_mhs = val.nama;
   form.nim_nik = val.nim;
 
-  if (val.alias_prodi) {
-    form.fakultas_prodi = val.alias_prodi;
-    readonlyField.value.fakultas_prodi = true;
-  } else {
-    form.fakultas_prodi = val.prodi_mhs;
-    readonlyField.value.fakultas_prodi = false;
-  }
-
-  if (val.jenis_kelamin) {
-    form.jenis_kelamin = val.jenis_kelamin;
-  }
   isLoadingData.value = false;
 });
 
@@ -92,7 +79,6 @@ async function getProdi() {
   } catch (error) {
   }
 }
-
 
 const listJenisSurat = ref<any[]>([]);
 
@@ -118,7 +104,7 @@ const formatParts = computed(() => {
     if (!js) return "";
     let str = js.format_surat;
     
-    const dateObj = form.tanggal ? new Date(form.tanggal) : new Date();
+    const dateObj = new Date(); // removed form.tanggal
     const dd = String(dateObj.getDate()).padStart(2, "0");
     const romanBulan = getRoman(dateObj.getMonth() + 1);
     const yyyy = dateObj.getFullYear();
@@ -149,7 +135,6 @@ const formatParts = computed(() => {
   return parseToParts(getFormat(12));
 });
 
-
 function extractNo(fullStr: string) {
   if (!fullStr) return "";
   const firstPart = fullStr.split("/")[0];
@@ -176,6 +161,7 @@ watch(
     }
 
     disableListMhsWatcher.value = true;
+    disableListDosenWatcher.value = true;
     isLoadingData.value = true;
 
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -186,17 +172,19 @@ watch(
     form.no_surat = extractNo(val.no_surat ?? val.nomor_surat ?? "");
     form.nomor = val.nomor ?? "";
     form.prodi_id = val.prodi_id ?? 0;
-    form.nama_dosen = val.nama_dosen ?? "";
-    form.alamat_dosen = val.alamat_dosen ?? "";
-    form.tugas_dosen = val.tugas_dosen ?? "";
-    form.tugasnya = val.tugasnya ?? "";
+    
+    form.pebimbing1 = val.pebimbing1 ?? "";
+    form.alamat_pebimbing1 = val.alamat_pebimbing1 ?? "";
+    form.tugas_pebimbing1 = val.tugas_pebimbing1 ?? "";
+    
+    form.pebimbing2 = val.pebimbing2 ?? "";
+    form.alamat_pebimbing2 = val.alamat_pebimbing2 ?? "";
+    form.tugas_pebimbing2 = val.tugas_pebimbing2 ?? "";
+
     form.nama_mhs = val.nama_mhs || val.nama_lengkap || "";
     form.nim_nik = val.nim_nik ?? val.nim ?? "";
-    form.fakultas_prodi = val.fakultas_prodi ?? "";
     form.judul_skripsi = val.judul_skripsi ?? "";
     form.masa_penugasan = val.masa_penugasan ?? "";
-    form.tanggal = val.tanggal ? val.tanggal.slice(0, 10) : "";
-    form.jenis_kelamin = val.jenis_kelamin ?? "";
 
     if (form.nim_nik) {
       listMhs.value = {
@@ -206,10 +194,22 @@ watch(
       };
       options.value = [listMhs.value];
     }
+    
+    if (form.pebimbing1) {
+      listDosen1.value = { nama: form.pebimbing1, alamat: form.alamat_pebimbing1 };
+      optionsDosen1.value = [listDosen1.value];
+    }
+    
+    if (form.pebimbing2) {
+      listDosen2.value = { nama: form.pebimbing2, alamat: form.alamat_pebimbing2 };
+      optionsDosen2.value = [listDosen2.value];
+    }
+    
     isLoadingData.value = false;
 
     await nextTick();
     disableListMhsWatcher.value = false;
+    disableListDosenWatcher.value = false;
   },
   { immediate: true }
 );
@@ -239,6 +239,80 @@ const getMhs = debounce(async (params: string) => {
     loading.value = false;
   }
 }, 300);
+
+const listDosen1 = ref<any>(null);
+const listDosen2 = ref<any>(null);
+const disableListDosenWatcher = ref(false);
+
+const optionsDosen1 = ref<any[]>([]);
+const loadingDosen1 = ref(false);
+
+const getDosen1 = debounce(async (params: string) => {
+  const keyword = params.trim();
+  if (!keyword && !props.isEdit) {
+    optionsDosen1.value = [];
+    return;
+  }
+
+  try {
+    loadingDosen1.value = true;
+    const response = await apiGet(`/get-dosen`, { search: keyword });
+    if (response.success) {
+      optionsDosen1.value = response.data?.data || [];
+    }
+  } catch (error) {
+  } finally {
+    loadingDosen1.value = false;
+  }
+}, 300);
+
+const optionsDosen2 = ref<any[]>([]);
+const loadingDosen2 = ref(false);
+
+const getDosen2 = debounce(async (params: string) => {
+  const keyword = params.trim();
+  if (!keyword && !props.isEdit) {
+    optionsDosen2.value = [];
+    return;
+  }
+
+  try {
+    loadingDosen2.value = true;
+    const response = await apiGet(`/get-dosen`, { search: keyword });
+    if (response.success) {
+      optionsDosen2.value = response.data?.data || [];
+    }
+  } catch (error) {
+  } finally {
+    loadingDosen2.value = false;
+  }
+}, 300);
+
+function customNameDosen(params: any) {
+  return params.nidn ? `${params.nama} - ${params.nidn}` : params.nama;
+}
+
+watch(listDosen1, (val) => {
+  if (disableListDosenWatcher.value) return;
+  if (val) {
+    form.pebimbing1 = val.nama;
+    form.alamat_pebimbing1 = val.alamat || val.alamat_lengkap || val.alamat_rumah || val.alamat_tinggal || val.alamat_ktp || val.address || '';
+  } else {
+    form.pebimbing1 = '';
+    form.alamat_pebimbing1 = '';
+  }
+});
+
+watch(listDosen2, (val) => {
+  if (disableListDosenWatcher.value) return;
+  if (val) {
+    form.pebimbing2 = val.nama;
+    form.alamat_pebimbing2 = val.alamat || val.alamat_lengkap || val.alamat_rumah || val.alamat_tinggal || val.alamat_ktp || val.address || '';
+  } else {
+    form.pebimbing2 = '';
+    form.alamat_pebimbing2 = '';
+  }
+});
 
 const emit = defineEmits(["submit"]);
 
@@ -320,73 +394,142 @@ function submitForm() {
               </div>
 
               <hr />
-              <div class="card-title mb-0">Informasi Dosen</div>
+              <div class="card-title mb-0">Informasi Dosen (Pembimbing 1)</div>
 
-              <div class="col-xl-4">
-                <label class="form-label">Nama Dosen :</label>
+              <div class="col-xl-3">
+                <label class="form-label">Cari Dosen Pembimbing 1 :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
+                <Multiselect
+                  v-else
+                  :options="optionsDosen1"
+                  v-model="listDosen1"
+                  :internal-search="false"
+                  @search-change="getDosen1"
+                  label="nama"
+                  track-by="nama"
+                  :searchable="true"
+                  :loading="loadingDosen1"
+                  :custom-label="customNameDosen"
+                  placeholder="Cari Dosen Pembimbing 1"
+                ></Multiselect>
+              </div>
+
+              <div class="col-xl-3">
+                <label class="form-label">Nama Pembimbing 1 :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
                   v-else
                   type="text"
-                  v-model="form.nama_dosen"
+                  v-model="form.pebimbing1"
                   class="form-control"
-                  :class="{ 'is-invalid': errors?.nama_dosen }"
-                  placeholder="Isikan Nama Dosen"
+                  :class="{ 'is-invalid': errors?.pebimbing1 }"
+                  placeholder="Nama Pembimbing 1"
+                  readonly
                 />
-                <div v-if="errors?.nama_dosen" class="invalid-feedback">
-                  {{ errors.nama_dosen[0] }}
+                <div v-if="errors?.pebimbing1" class="invalid-feedback">
+                  {{ errors.pebimbing1[0] }}
                 </div>
               </div>
 
-              <div class="col-xl-4">
-                <label class="form-label">Alamat Dosen :</label>
+              <div class="col-xl-3">
+                <label class="form-label">Alamat Pembimbing 1 :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
                   v-else
                   type="text"
-                  v-model="form.alamat_dosen"
+                  v-model="form.alamat_pebimbing1"
                   class="form-control"
-                  :class="{ 'is-invalid': errors?.alamat_dosen }"
-                  placeholder="Isikan Alamat Dosen"
+                  :class="{ 'is-invalid': errors?.alamat_pebimbing1 }"
+                  placeholder="Alamat Pembimbing 1"
                 />
-                <div v-if="errors?.alamat_dosen" class="invalid-feedback">
-                  {{ errors.alamat_dosen[0] }}
+                <div v-if="errors?.alamat_pebimbing1" class="invalid-feedback">
+                  {{ errors.alamat_pebimbing1[0] }}
                 </div>
               </div>
 
-              <div class="col-xl-4">
-                <label class="form-label">Tugas Dosen :</label>
+              <div class="col-xl-3">
+                <label class="form-label">Tugas Pembimbing 1 :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
                   v-else
                   type="text"
-                  v-model="form.tugas_dosen"
+                  v-model="form.tugas_pebimbing1"
                   class="form-control"
-                  :class="{ 'is-invalid': errors?.tugas_dosen }"
-                  placeholder="Isikan Tugas Dosen (Contoh: Dosen Pembimbing)"
+                  :class="{ 'is-invalid': errors?.tugas_pebimbing1 }"
+                  placeholder="Tugas (misal: Pembimbing 1)"
                 />
-                <div v-if="errors?.tugas_dosen" class="invalid-feedback">
-                  {{ errors.tugas_dosen[0] }}
+                <div v-if="errors?.tugas_pebimbing1" class="invalid-feedback">
+                  {{ errors.tugas_pebimbing1[0] }}
                 </div>
               </div>
 
-              <div class="col-xl-12">
-                <label class="form-label">Deskripsi Tugas (Tugasnya) :</label>
-                <div
-                  v-if="isLoadingData"
-                  class="skeleton-input"
-                  style="height: 62px"
-                ></div>
-                <textarea
+              <hr />
+              <div class="card-title mb-0">Informasi Dosen (Pembimbing 2)</div>
+
+              <div class="col-xl-3">
+                <label class="form-label">Cari Dosen Pembimbing 2 :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
+                <Multiselect
                   v-else
-                  v-model="form.tugasnya"
+                  :options="optionsDosen2"
+                  v-model="listDosen2"
+                  :internal-search="false"
+                  @search-change="getDosen2"
+                  label="nama"
+                  track-by="nama"
+                  :searchable="true"
+                  :loading="loadingDosen2"
+                  :custom-label="customNameDosen"
+                  placeholder="Cari Dosen Pembimbing 2"
+                ></Multiselect>
+              </div>
+
+              <div class="col-xl-3">
+                <label class="form-label">Nama Pembimbing 2 :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
+                <input
+                  v-else
+                  type="text"
+                  v-model="form.pebimbing2"
                   class="form-control"
-                  :class="{ 'is-invalid': errors?.tugasnya }"
-                  rows="3"
-                  placeholder="Isikan Detail Tugas yang Dilakukan"
-                ></textarea>
-                <div v-if="errors?.tugasnya" class="invalid-feedback">
-                  {{ errors.tugasnya[0] }}
+                  :class="{ 'is-invalid': errors?.pebimbing2 }"
+                  placeholder="Nama Pembimbing 2"
+                  readonly
+                />
+                <div v-if="errors?.pebimbing2" class="invalid-feedback">
+                  {{ errors.pebimbing2[0] }}
+                </div>
+              </div>
+
+              <div class="col-xl-3">
+                <label class="form-label">Alamat Pembimbing 2 :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
+                <input
+                  v-else
+                  type="text"
+                  v-model="form.alamat_pebimbing2"
+                  class="form-control"
+                  :class="{ 'is-invalid': errors?.alamat_pebimbing2 }"
+                  placeholder="Alamat Pembimbing 2"
+                />
+                <div v-if="errors?.alamat_pebimbing2" class="invalid-feedback">
+                  {{ errors.alamat_pebimbing2[0] }}
+                </div>
+              </div>
+
+              <div class="col-xl-3">
+                <label class="form-label">Tugas Pembimbing 2 :</label>
+                <div v-if="isLoadingData" class="skeleton-input"></div>
+                <input
+                  v-else
+                  type="text"
+                  v-model="form.tugas_pebimbing2"
+                  class="form-control"
+                  :class="{ 'is-invalid': errors?.tugas_pebimbing2 }"
+                  placeholder="Tugas (misal: Pembimbing 2)"
+                />
+                <div v-if="errors?.tugas_pebimbing2" class="invalid-feedback">
+                  {{ errors.tugas_pebimbing2[0] }}
                 </div>
               </div>
 
@@ -425,22 +568,6 @@ function submitForm() {
                   {{ errors.nim_nik[0] }}
                 </div>
               </div>
-              <div class="col-xl-6">
-                <label class="form-label">Fakultas / Prodi :</label>
-                <div v-if="isLoadingData" class="skeleton-input"></div>
-                <input
-                  v-else
-                  type="text"
-                  v-model="form.fakultas_prodi"
-                  class="form-control"
-                  :class="{ 'is-invalid': errors?.fakultas_prodi }"
-                  :readonly="readonlyField.fakultas_prodi"
-                  placeholder="Isikan Fakultas atau Program Studi"
-                />
-                <div v-if="errors?.fakultas_prodi" class="invalid-feedback">
-                  {{ errors.fakultas_prodi[0] }}
-                </div>
-              </div>
 
               <div class="col-xl-6">
                 <label class="form-label">Masa Penugasan :</label>
@@ -451,25 +578,9 @@ function submitForm() {
                   v-model="form.masa_penugasan"
                   class="form-control"
                   :class="{ 'is-invalid': errors?.masa_penugasan }"
-                  placeholder="Contoh: Semester Ganjil 2023/2024"
                 />
                 <div v-if="errors?.masa_penugasan" class="invalid-feedback">
                   {{ errors.masa_penugasan[0] }}
-                </div>
-              </div>
-
-              <div class="col-xl-12">
-                <label class="form-label">Tanggal Surat :</label>
-                <div v-if="isLoadingData" class="skeleton-input"></div>
-                <input
-                  v-else
-                  type="date"
-                  v-model="form.tanggal"
-                  class="form-control"
-                  :class="{ 'is-invalid': errors?.tanggal }"
-                />
-                <div v-if="errors?.tanggal" class="invalid-feedback">
-                  {{ errors.tanggal[0] }}
                 </div>
               </div>
 
@@ -497,12 +608,16 @@ function submitForm() {
                 <div v-if="isLoadingData" class="skeleton-input" style="width: 150px;"></div>
                 <div v-else class="d-flex align-items-center mt-2">
                   <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_ya" value="ya" v-model="form.petanda_tangan">
-                    <label class="form-check-label" for="ttd_ya">Ya</label>
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_keduanya" value="ya" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_keduanya">tandatangan+stempel</label>
                   </div>
                   <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_tidak" value="tidak" v-model="form.petanda_tangan">
-                    <label class="form-check-label" for="ttd_tidak">Tidak</label>
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_kosong" value="tidak" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_kosong">kosong</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_stempel" value="stempel" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_stempel">stempel saja</label>
                   </div>
                 </div>
                 <div v-if="errors?.petanda_tangan" class="invalid-feedback d-block">

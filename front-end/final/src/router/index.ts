@@ -1744,6 +1744,16 @@ const routes: RouteRecordRaw[] = [
         component: () => import("../view/sk_6/edit/index.vue"),
       },
       {
+        path: `transkip`,
+        name: "transkip",
+        component: () => import("../view/transkip/index.vue"),
+      },
+      {
+        path: `transkip/detail/:id`,
+        name: "transkip-detail",
+        component: () => import("../view/transkip/detail/index.vue"),
+      },
+      {
         path: `print-ijazah`,
         name: "print-ijazah",
         component: () => import("../view/print_ijazah/index.vue"),

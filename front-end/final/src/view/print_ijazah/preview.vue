@@ -266,6 +266,13 @@ export default defineComponent({
               alt="background"
             />
 
+            <!-- Logo Watermark UII -->
+            <img
+              src="/images/logo/uii.png"
+              class="ijazah-watermark"
+              alt="Logo UII"
+            />
+
             <!-- Warning jika template kosong -->
             <div
               v-if="getStaticContent(item.template).length === 0 && getDynamicFields(item.template).length === 0"
@@ -436,6 +443,18 @@ export default defineComponent({
   z-index: 1;
   object-fit: fill; /* fill agar pas dengan ukuran kertas */
   display: block;
+}
+
+.ijazah-watermark {
+  position: absolute;
+  top: 47%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8cm;
+  height: 6.9cm;
+  opacity: 0.1;
+  z-index: 1;
+  object-fit: contain;
 }
 
 .pos-field {

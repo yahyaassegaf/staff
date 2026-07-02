@@ -35,6 +35,7 @@ const defaultForm = {
   alamat_rumah: "",
   kelas_pondok: "",
   tanggal: "",
+  petanda_tangan: 'tidak',
 };
 
 const disableListMhsWatcher = ref(false);
@@ -206,6 +207,7 @@ watch(
     Object.assign(form, val);
 
     form.id = val.id ?? "";
+    form.petanda_tangan = val.petanda_tangan ?? 'tidak';
     form.no_surat = extractNo(val.no_surat ?? val.nomor_surat ?? "");
     form.nomor_surat = val.nomor_surat ?? "";
     form.tanda_tangan_id = val.tanda_tangan_id ?? 0;
@@ -496,6 +498,27 @@ function submitForm() {
                 ></textarea>
                 <div v-if="errors?.alamat_rumah" class="invalid-feedback">
                   {{ errors.alamat_rumah[0] }}
+                </div>
+              </div>
+              <div class="col-xl-12 mt-3">
+                <label class="form-label fw-bold">Pakai Tanda Tangan & Stempel :</label>
+                <div v-if="isLoadingData" class="skeleton-input" style="width: 150px;"></div>
+                <div v-else class="d-flex align-items-center mt-2">
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_keduanya" value="ya" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_keduanya">tandatangan+stempel</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_kosong" value="tidak" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_kosong">kosong</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_stempel" value="stempel" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_stempel">stempel saja</label>
+                  </div>
+                </div>
+                <div v-if="errors?.petanda_tangan" class="invalid-feedback d-block">
+                  {{ errors.petanda_tangan[0] }}
                 </div>
               </div>
             </div>

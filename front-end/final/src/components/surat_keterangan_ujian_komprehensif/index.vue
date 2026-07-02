@@ -34,6 +34,7 @@ const defaultForm = {
   kelas_pondok: "",
   tanggal: "",
   ttd: "",
+  petanda_tangan: 'tidak',
 };
 
 
@@ -174,6 +175,8 @@ watch(
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     Object.assign(form, val);
+
+    form.petanda_tangan = val.petanda_tangan ?? 'tidak';
 
     form.nama_mhs =
       val.nama_mhs || val.nama_lengkap || val.nama_mahasiswa || "";
@@ -509,7 +512,29 @@ function submitForm() {
                   placeholder="Isikan nama kepala prodi"
                 />
               </div>
+              </div>
             </div> -->
+              <div class="col-xl-12 mt-3">
+                <label class="form-label fw-bold">Pakai Tanda Tangan & Stempel :</label>
+                <div v-if="isLoadingData" class="skeleton-input" style="width: 150px;"></div>
+                <div v-else class="d-flex align-items-center mt-2">
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_keduanya" value="ya" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_keduanya">tandatangan+stempel</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_kosong" value="tidak" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_kosong">kosong</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_stempel" value="stempel" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_stempel">stempel saja</label>
+                  </div>
+                </div>
+                <div v-if="errors?.petanda_tangan" class="invalid-feedback d-block">
+                  {{ errors.petanda_tangan[0] }}
+                </div>
+              </div>
           </div>
           <div class="card-footer">
             <button class="btn btn-primary-light btn-wave ms-auto float-end" :disabled="btnLoading">

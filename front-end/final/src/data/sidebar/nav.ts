@@ -320,7 +320,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
       { path: "/spvn", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Pernyataan Melakukan Verifikasi Nilai Mahasiswa" },
       { path: "/spm", type: "link", icon: Svgicons.Teamicon, active: false, selected: false, dirchange: false, title: "Surat Keterangan SPM" },
       // { path: "/sk", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Keterangan" },
-      // { path: "/st", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Tugas" },
+      { path: "/st", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Tugas" },
       // { path: "/hasil-rapat", type: "link", icon: Svgicons.Formsicon, active: false, selected: false, dirchange: false, title: "Hasil Rapat" },
     ]
   },
@@ -333,6 +333,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
       { path: "/mahasiswa", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Mahasiswa" },
       { path: "/template-ijazah", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Template Ijazah" },
       { path: "/print-ijazah", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Print Ijazah" },
+      { path: "/transkip", icon: Svgicons.Chaticon, type: "link", active: false, selected: false, dirchange: false, title: "Transkrip Nilai" },
     ]
   },
 

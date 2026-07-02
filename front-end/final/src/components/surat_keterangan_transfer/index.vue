@@ -35,6 +35,7 @@ const defaultForm = {
   tempat_lahir: "",
   alamat: "",
   universitas_tujuan: "",
+  fakultas: "",
   petanda_tangan: 'tidak',
 };
 
@@ -209,8 +210,7 @@ watch(
 
     form.id = val.id ?? "";
     form.petanda_tangan = val.petanda_tangan ?? 'tidak';
-    form.nomor = val.nomor ?? "";
-    form.no_surat = val.no_surat ?? "";
+    form.no_surat = extractNo(val.no_surat ?? val.nomor_surat ?? "");
     if (!form.no_surat && form.nomor) {
       const match = form.nomor.match(/SU-\s*(\d+)/i) || form.nomor.match(/^(\d+)/);
       form.no_surat = match ? match[1] : "";
@@ -510,12 +510,16 @@ function submitForm() {
                 <div v-if="isLoadingData" class="skeleton-input" style="width: 150px;"></div>
                 <div v-else class="d-flex align-items-center mt-2">
                   <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_ya" value="ya" v-model="form.petanda_tangan">
-                    <label class="form-check-label" for="ttd_ya">Ya</label>
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_keduanya" value="ya" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_keduanya">tandatangan+stempel</label>
                   </div>
                   <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_tidak" value="tidak" v-model="form.petanda_tangan">
-                    <label class="form-check-label" for="ttd_tidak">Tidak</label>
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_kosong" value="tidak" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_kosong">kosong</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_stempel" value="stempel" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_stempel">stempel saja</label>
                   </div>
                 </div>
                 <div v-if="errors?.petanda_tangan" class="invalid-feedback d-block">

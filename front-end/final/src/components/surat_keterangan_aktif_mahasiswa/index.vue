@@ -481,7 +481,7 @@ function submitForm() {
                 </div>
               </div>
 
-              <div class="col-xl-6">
+              <!-- <div class="col-xl-6">
                 <label class="form-label">No. HP / Kontak Ortu:</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
@@ -495,9 +495,9 @@ function submitForm() {
                 <div v-if="errors?.hp_ortu" class="invalid-feedback">
                   {{ errors.hp_ortu[0] }}
                 </div>
-              </div>
+              </div> -->
 
-              <div class="col-xl-6">
+              <div class="col-xl-12">
                 <label class="form-label">Tanggal Surat:</label>
                 <input
                   type="date"
@@ -514,12 +514,16 @@ function submitForm() {
                 <div v-if="isLoadingData" class="skeleton-input" style="width: 150px;"></div>
                 <div v-else class="d-flex align-items-center mt-2">
                   <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_ya" value="ya" v-model="form.petanda_tangan">
-                    <label class="form-check-label" for="ttd_ya">Ya</label>
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_keduanya" value="ya" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_keduanya">tandatangan+stempel</label>
                   </div>
                   <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_tidak" value="tidak" v-model="form.petanda_tangan">
-                    <label class="form-check-label" for="ttd_tidak">Tidak</label>
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_kosong" value="tidak" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_kosong">kosong</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" :name="'petanda_tangan_' + Date.now()" id="ttd_stempel" value="stempel" v-model="form.petanda_tangan">
+                    <label class="form-check-label" for="ttd_stempel">stempel saja</label>
                   </div>
                 </div>
                 <div v-if="errors?.petanda_tangan" class="invalid-feedback d-block">
