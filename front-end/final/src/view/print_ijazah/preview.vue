@@ -43,7 +43,85 @@ export default defineComponent({
     }
 
     function doPrint() {
-      window.print();
+      const printAreaEl = document.querySelector('.print-area') as HTMLElement | null;
+      if (!printAreaEl) return;
+
+      const orientation = printOrientation.value;
+
+      // Create hidden iframe — clean document without any parent layout wrappers
+      // This bypasses ALL Vuetify (.v-application__wrap min-height:100vh),
+      // Vyzor theme (.app-content margin-block-start:5.25rem), and Bootstrap CSS issues
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;top:-10000px;left:-10000px;width:1px;height:1px;border:none;';
+      document.body.appendChild(iframe);
+
+      const iWin = iframe.contentWindow;
+      const iDoc = iframe.contentDocument || iWin?.document;
+      if (!iDoc || !iWin) {
+        document.body.removeChild(iframe);
+        window.print(); // fallback
+        return;
+      }
+
+      iDoc.open();
+      iDoc.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+@page { size: ${orientation}; margin: 0; }
+*,*::before,*::after { margin:0; padding:0; box-sizing:border-box; }
+html, body { margin:0; padding:0; }
+.print-area { margin:0; padding:0; }
+.ijazah-page {
+  position:relative; background:#fff; overflow:hidden;
+  margin:0; padding:0;
+  page-break-inside:avoid;
+  break-inside:avoid;
+}
+.ijazah-page + .ijazah-page {
+  page-break-before:always;
+  break-before:page;
+}
+.ijazah-bg {
+  position:absolute; top:0; left:0; width:100%; height:100%;
+  z-index:1; object-fit:fill; display:block;
+}
+.ijazah-watermark {
+  position:absolute; top:47%; left:50%;
+  transform:translate(-50%,-50%);
+  width:8cm; height:6.9cm; opacity:0.2;
+  z-index:1; object-fit:contain;
+}
+.pos-field { position:absolute; z-index:2; white-space:nowrap; }
+.no-print { display:none !important; }
+.ijazah-notfound { display:none !important; }
+</style></head><body>${printAreaEl.outerHTML}</body></html>`);
+      iDoc.close();
+
+      // Wait for all images to load, then print
+      const imgs = Array.from(iDoc.querySelectorAll('img'));
+      let pending = imgs.filter((i: HTMLImageElement) => !i.complete).length;
+
+      const execPrint = () => {
+        setTimeout(() => {
+          iWin.focus();
+          iWin.print();
+          // Cleanup after print dialog closes
+          setTimeout(() => { if (iframe.parentNode) iframe.parentNode.removeChild(iframe); }, 1000);
+        }, 100);
+      };
+
+      if (pending === 0) {
+        execPrint();
+      } else {
+        const onDone = () => { if (--pending <= 0) execPrint(); };
+        imgs.forEach((img: HTMLImageElement) => {
+          if (!img.complete) {
+            img.addEventListener('load', onDone, { once: true });
+            img.addEventListener('error', onDone, { once: true });
+          }
+        });
+        // Fallback: if images don't load within 5s, print anyway
+        setTimeout(() => { if (pending > 0) { pending = 0; execPrint(); } }, 5000);
+      }
     }
 
     function goBack() {
@@ -314,9 +392,9 @@ export default defineComponent({
               :style="{
                 position: 'absolute',
                 left: '50%',
-                top: '465px',
-                width: '80px',
-                height: '110px',
+                top: '420px',
+                width: '60px',
+                height: '80px',
                 transform: 'translateX(-50%)',
                 border: '2px solid #333',
                 display: 'flex',
@@ -447,12 +525,12 @@ export default defineComponent({
 
 .ijazah-watermark {
   position: absolute;
-  top: 47%;
+  top: 49%;
   left: 50%;
   transform: translate(-50%, -50%);
   width: 8cm;
-  height: 6.9cm;
-  opacity: 0.1;
+  height: 6.3cm;
+  opacity: 0.2;
   z-index: 1;
   object-fit: contain;
 }
@@ -472,10 +550,6 @@ export default defineComponent({
     padding: 0;
   }
 
-  body, html {
-    margin: 0 !important;
-    padding: 0 !important;
-  }
 
   .no-print {
     display: none !important;
@@ -484,25 +558,71 @@ export default defineComponent({
   .preview-wrap {
     background: transparent !important;
     padding: 0 !important;
-    min-height: unset;
+    margin: 0 !important;
+    min-height: unset !important;
+    padding-bottom: 0 !important;
+    overflow: hidden !important;
   }
 
   .print-area {
     gap: 0 !important;
     padding: 0 !important;
+    margin: 0 !important;
     display: block;
+    overflow: hidden !important;
   }
 
   .ijazah-page {
     box-shadow: none !important;
-    page-break-after: always;
     page-break-inside: avoid;
+    break-inside: avoid;
     margin: 0 !important;
+    padding: 0 !important;
     position: relative;
+    overflow: hidden !important;
   }
 
-  .ijazah-page:last-child {
-    page-break-after: auto;
+  .ijazah-page + .ijazah-page {
+    page-break-before: always;
+    break-before: page;
+  }
+}
+</style>
+
+<!-- Unscoped print styles — fallback for Ctrl+P (when user prints without clicking the button) -->
+<style>
+@media print {
+  body, html {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+  #app, .v-application, .v-application__wrap, [data-app] {
+    display: block !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .app-header, .app-sidebar, #sidebar, #responsive-overlay,
+  .footer, footer.footer, .progress-top-bar,
+  .switcher-backdrop, .offcanvas, #back-to-top, .back-to-top {
+    display: none !important;
+  }
+  .page, .main-content, .app-content, .main-content.app-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin-block-start: 0 !important;
+    margin-inline-start: 0 !important;
+    padding-block-start: 0 !important;
+  }
+  .container-fluid, .page-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
   }
 }
 </style>

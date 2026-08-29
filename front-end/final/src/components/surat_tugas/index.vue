@@ -24,12 +24,12 @@ const defaultForm = {
   no_surat: "",
   nomor: "",
   prodi_id: 0,
-  pebimbing1: "",
-  alamat_pebimbing1: "",
-  tugas_pebimbing1: "",
-  pebimbing2: "",
-  alamat_pebimbing2: "",
-  tugas_pebimbing2: "",
+  pembimbing1: "",
+  alamat_pembimbing1: "",
+  tugas_pembimbing1: "",
+  pembimbing2: "",
+  alamat_pembimbing2: "",
+  tugas_pembimbing2: "",
   nama_mhs: "",
   nim_nik: "",
   judul_skripsi: "",
@@ -173,13 +173,13 @@ watch(
     form.nomor = val.nomor ?? "";
     form.prodi_id = val.prodi_id ?? 0;
     
-    form.pebimbing1 = val.pebimbing1 ?? "";
-    form.alamat_pebimbing1 = val.alamat_pebimbing1 ?? "";
-    form.tugas_pebimbing1 = val.tugas_pebimbing1 ?? "";
+    form.pembimbing1 = val.pembimbing1 ?? "";
+    form.alamat_pembimbing1 = val.alamat_pembimbing1 ?? "";
+    // form.tugas_pembimbing1 = val.tugas_pembimbing1 ?? "Pembimbing 1";
     
-    form.pebimbing2 = val.pebimbing2 ?? "";
-    form.alamat_pebimbing2 = val.alamat_pebimbing2 ?? "";
-    form.tugas_pebimbing2 = val.tugas_pebimbing2 ?? "";
+    form.pembimbing2 = val.pembimbing2 ?? "";
+    form.alamat_pembimbing2 = val.alamat_pembimbing2 ?? "";
+    // form.tugas_pembimbing2 = val.tugas_pembimbing2 ?? "";
 
     form.nama_mhs = val.nama_mhs || val.nama_lengkap || "";
     form.nim_nik = val.nim_nik ?? val.nim ?? "";
@@ -195,13 +195,13 @@ watch(
       options.value = [listMhs.value];
     }
     
-    if (form.pebimbing1) {
-      listDosen1.value = { nama: form.pebimbing1, alamat: form.alamat_pebimbing1 };
+    if (form.pembimbing1) {
+      listDosen1.value = { nama: form.pembimbing1, alamat: form.alamat_pembimbing1 };
       optionsDosen1.value = [listDosen1.value];
     }
     
-    if (form.pebimbing2) {
-      listDosen2.value = { nama: form.pebimbing2, alamat: form.alamat_pebimbing2 };
+    if (form.pembimbing2) {
+      listDosen2.value = { nama: form.pembimbing2, alamat: form.alamat_pembimbing2 };
       optionsDosen2.value = [listDosen2.value];
     }
     
@@ -295,22 +295,22 @@ function customNameDosen(params: any) {
 watch(listDosen1, (val) => {
   if (disableListDosenWatcher.value) return;
   if (val) {
-    form.pebimbing1 = val.nama;
-    form.alamat_pebimbing1 = val.alamat || val.alamat_lengkap || val.alamat_rumah || val.alamat_tinggal || val.alamat_ktp || val.address || '';
+    form.pembimbing1 = val.nama;
+    form.alamat_pembimbing1 = val.alamat || val.alamat_lengkap || val.alamat_rumah || val.alamat_tinggal || val.alamat_ktp || val.address || '';
   } else {
-    form.pebimbing1 = '';
-    form.alamat_pebimbing1 = '';
+    form.pembimbing1 = '';
+    form.alamat_pembimbing1 = '';
   }
 });
 
 watch(listDosen2, (val) => {
   if (disableListDosenWatcher.value) return;
   if (val) {
-    form.pebimbing2 = val.nama;
-    form.alamat_pebimbing2 = val.alamat || val.alamat_lengkap || val.alamat_rumah || val.alamat_tinggal || val.alamat_ktp || val.address || '';
+    form.pembimbing2 = val.nama;
+    form.alamat_pembimbing2 = val.alamat || val.alamat_lengkap || val.alamat_rumah || val.alamat_tinggal || val.alamat_ktp || val.address || '';
   } else {
-    form.pebimbing2 = '';
-    form.alamat_pebimbing2 = '';
+    form.pembimbing2 = '';
+    form.alamat_pembimbing2 = '';
   }
 });
 
@@ -396,7 +396,7 @@ function submitForm() {
               <hr />
               <div class="card-title mb-0">Informasi Dosen (Pembimbing 1)</div>
 
-              <div class="col-xl-3">
+              <div class="col-xl-4">
                 <label class="form-label">Cari Dosen Pembimbing 1 :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <Multiselect
@@ -414,59 +414,59 @@ function submitForm() {
                 ></Multiselect>
               </div>
 
-              <div class="col-xl-3">
+              <div class="col-xl-4">
                 <label class="form-label">Nama Pembimbing 1 :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
                   v-else
                   type="text"
-                  v-model="form.pebimbing1"
+                  v-model="form.pembimbing1"
                   class="form-control"
-                  :class="{ 'is-invalid': errors?.pebimbing1 }"
+                  :class="{ 'is-invalid': errors?.pembimbing1 }"
                   placeholder="Nama Pembimbing 1"
                   readonly
                 />
-                <div v-if="errors?.pebimbing1" class="invalid-feedback">
-                  {{ errors.pebimbing1[0] }}
+                <div v-if="errors?.pembimbing1" class="invalid-feedback">
+                  {{ errors.pembimbing1[0] }}
                 </div>
               </div>
 
-              <div class="col-xl-3">
+              <div class="col-xl-4">
                 <label class="form-label">Alamat Pembimbing 1 :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
                   v-else
                   type="text"
-                  v-model="form.alamat_pebimbing1"
+                  v-model="form.alamat_pembimbing1"
                   class="form-control"
-                  :class="{ 'is-invalid': errors?.alamat_pebimbing1 }"
+                  :class="{ 'is-invalid': errors?.alamat_pembimbing1 }"
                   placeholder="Alamat Pembimbing 1"
                 />
-                <div v-if="errors?.alamat_pebimbing1" class="invalid-feedback">
-                  {{ errors.alamat_pebimbing1[0] }}
+                <div v-if="errors?.alamat_pembimbing1" class="invalid-feedback">
+                  {{ errors.alamat_pembimbing1[0] }}
                 </div>
               </div>
 
-              <div class="col-xl-3">
+              <!-- <div class="col-xl-3">
                 <label class="form-label">Tugas Pembimbing 1 :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
                   v-else
                   type="text"
-                  v-model="form.tugas_pebimbing1"
+                  v-model="form.tugas_pembimbing1"
                   class="form-control"
-                  :class="{ 'is-invalid': errors?.tugas_pebimbing1 }"
+                  :class="{ 'is-invalid': errors?.tugas_pembimbing1 }"
                   placeholder="Tugas (misal: Pembimbing 1)"
                 />
-                <div v-if="errors?.tugas_pebimbing1" class="invalid-feedback">
-                  {{ errors.tugas_pebimbing1[0] }}
+                <div v-if="errors?.tugas_pembimbing1" class="invalid-feedback">
+                  {{ errors.tugas_pembimbing1[0] }}
                 </div>
-              </div>
+              </div> -->
 
               <hr />
               <div class="card-title mb-0">Informasi Dosen (Pembimbing 2)</div>
 
-              <div class="col-xl-3">
+              <div class="col-xl-4">
                 <label class="form-label">Cari Dosen Pembimbing 2 :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <Multiselect
@@ -484,54 +484,54 @@ function submitForm() {
                 ></Multiselect>
               </div>
 
-              <div class="col-xl-3">
+              <div class="col-xl-4">
                 <label class="form-label">Nama Pembimbing 2 :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
                   v-else
                   type="text"
-                  v-model="form.pebimbing2"
+                  v-model="form.pembimbing2"
                   class="form-control"
-                  :class="{ 'is-invalid': errors?.pebimbing2 }"
+                  :class="{ 'is-invalid': errors?.pembimbing2 }"
                   placeholder="Nama Pembimbing 2"
                   readonly
                 />
-                <div v-if="errors?.pebimbing2" class="invalid-feedback">
-                  {{ errors.pebimbing2[0] }}
+                <div v-if="errors?.pembimbing2" class="invalid-feedback">
+                  {{ errors.pembimbing2[0] }}
                 </div>
               </div>
 
-              <div class="col-xl-3">
+              <div class="col-xl-4">
                 <label class="form-label">Alamat Pembimbing 2 :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
                   v-else
                   type="text"
-                  v-model="form.alamat_pebimbing2"
+                  v-model="form.alamat_pembimbing2"
                   class="form-control"
-                  :class="{ 'is-invalid': errors?.alamat_pebimbing2 }"
+                  :class="{ 'is-invalid': errors?.alamat_pembimbing2 }"
                   placeholder="Alamat Pembimbing 2"
                 />
-                <div v-if="errors?.alamat_pebimbing2" class="invalid-feedback">
-                  {{ errors.alamat_pebimbing2[0] }}
+                <div v-if="errors?.alamat_pembimbing2" class="invalid-feedback">
+                  {{ errors.alamat_pembimbing2[0] }}
                 </div>
               </div>
 
-              <div class="col-xl-3">
+              <!-- <div class="col-xl-3">
                 <label class="form-label">Tugas Pembimbing 2 :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
                 <input
                   v-else
                   type="text"
-                  v-model="form.tugas_pebimbing2"
+                  v-model="form.tugas_pembimbing2"
                   class="form-control"
-                  :class="{ 'is-invalid': errors?.tugas_pebimbing2 }"
+                  :class="{ 'is-invalid': errors?.tugas_pembimbing2 }"
                   placeholder="Tugas (misal: Pembimbing 2)"
                 />
-                <div v-if="errors?.tugas_pebimbing2" class="invalid-feedback">
-                  {{ errors.tugas_pebimbing2[0] }}
+                <div v-if="errors?.tugas_pembimbing2" class="invalid-feedback">
+                  {{ errors.tugas_pembimbing2[0] }}
                 </div>
-              </div>
+              </div> -->
 
               <hr />
               <div class="card-title mb-0">Informasi Mahasiswa & Penugasan</div>
@@ -597,6 +597,7 @@ function submitForm() {
                   class="form-control"
                   :class="{ 'is-invalid': errors?.judul_skripsi }"
                   rows="3"
+                  dir="auto"
                   placeholder="Isikan Judul Skripsi Mahasiswa"
                 ></textarea>
                 <div v-if="errors?.judul_skripsi" class="invalid-feedback">

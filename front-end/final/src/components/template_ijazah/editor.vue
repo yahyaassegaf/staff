@@ -89,8 +89,7 @@ const ijazahFields = ref([
   { key: 'gelar', label: 'Gelar', x: 300, y: 370, fontSize: 12, fontFamily: 'Times New Roman', fontWeight: 'bold', alignment: 'center' },
 
   // Tanggal & Kota ijazah (right side) - "Bangil, 10 Januari 2021" format
-  { key: 'kota_tempat', label: 'Kota Tempat', x: 520, y: 440, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
-  { key: 'tanggal_ijazah', label: 'Tanggal Ijazah', x: 520, y: 454, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
+  { key: 'kota_tanggal_ijazah', label: 'Kota & Tanggal Ijazah', x: 520, y: 447, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },
 
   // Pejabat penandatangan
   { key: 'nama_rektor', label: 'Nama Rektor', x: 100, y: 530, fontSize: 9, fontFamily: 'Times New Roman', fontWeight: 'normal', alignment: 'center' },

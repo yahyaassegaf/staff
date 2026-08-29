@@ -135,9 +135,17 @@ export default defineComponent({
         );
         openFileExport(res.data);
         Swal.close();
-      } catch (error) {
+      } catch (error: any) {
         Swal.close();
-        toast.error("Gagal mengunduh file PDF");
+        let errorMsg = "Gagal mengunduh file PDF";
+        if (error?.response?.data instanceof Blob) {
+          try {
+            const text = await error.response.data.text();
+            const json = JSON.parse(text);
+            if (json.message) errorMsg = json.message;
+          } catch (e) {}
+        }
+        toast.error(errorMsg);
       }
     }
 

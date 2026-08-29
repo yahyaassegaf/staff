@@ -21,8 +21,8 @@ export default defineComponent({
     const headers = [
       { text: "No", value: "no", sortable: false },
       { text: "Nama Mahasiswa", value: "nama_mhs", sortable: true },
-      { text: "Pembimbing 1", value: "pebimbing1", sortable: true },
-      { text: "Pembimbing 2", value: "pebimbing2", sortable: true },
+      { text: "Pembimbing 1", value: "pembimbing1", sortable: true },
+      { text: "Pembimbing 2", value: "pembimbing2", sortable: true },
       { text: "URL", value: "drive_link", sortable: false },
       { text: "Action", value: "action", sortable: false },
     ];

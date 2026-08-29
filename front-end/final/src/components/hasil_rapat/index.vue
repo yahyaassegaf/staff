@@ -17,7 +17,7 @@ const props = defineProps({
 
 const defaultForm = {
   id: "",
-  nomor_surat: "",
+  no_surat: "",
   prodi_id: 0,
   agenda: "",
   tanggal: "",
@@ -79,7 +79,7 @@ watch(
     Object.assign(form, defaultForm);
 
     form.id = val.id ?? "";
-    form.nomor_surat = val.nomor_surat ?? "";
+    form.no_surat = val.no_surat ?? "";
     form.prodi_id = val.prodi_id ?? 0;
     form.agenda = val.agenda ?? "";
     form.tanggal = val.tanggal ? val.tanggal.slice(0, 10) : "";
@@ -117,6 +117,16 @@ function submitForm() {
           <div class="card-body">
             <div class="row gy-3">
               <div class="col-xl-6">
+                <label class="form-label">No Surat :</label>
+                <input
+                  type="text"
+                  v-model="form.no_surat"
+                  class="form-control"
+                  placeholder="Contoh: 001"
+                />
+              </div>
+
+              <div class="col-xl-6">
                 <label class="form-label">Program Studi Unit:</label>
                 <select class="form-select" v-model="form.prodi_id" required>
                   <option value="0" disabled>Pilih Prodi</option>
@@ -141,7 +151,7 @@ function submitForm() {
                 />
               </div>
 
-              <div class="col-xl-4">
+              <div class="col-xl-6">
                 <label class="form-label">Tanggal :</label>
                 <input
                   type="date"
@@ -151,12 +161,12 @@ function submitForm() {
                 />
               </div>
 
-              <div class="col-xl-4">
+              <div class="col-xl-6">
                 <label class="form-label">Waktu :</label>
                 <input type="time" v-model="form.waktu" class="form-control" />
               </div>
 
-              <div class="col-xl-4">
+              <div class="col-xl-6">
                 <label class="form-label">Tempat :</label>
                 <input
                   type="text"

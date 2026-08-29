@@ -91,11 +91,12 @@ export default defineComponent({
         loading.value = true;
         errors.value = {};
         
-        // Convert fields_positions and teks_statis to JSON string
+        // Convert fields_positions to JSON string (required by backend validation as string)
+        // Send teks_statis as raw array - apiPut sends JSON body, model cast handles encoding
         const formData = {
           ...form,
           fields_positions: JSON.stringify(form.fields_positions || {}),
-          teks_statis: form.teks_statis ? JSON.stringify(form.teks_statis) : null,
+          teks_statis: form.teks_statis ? [...form.teks_statis] : null,
         };
 
         console.log('SUBMIT formData teks_statis:', formData.teks_statis);

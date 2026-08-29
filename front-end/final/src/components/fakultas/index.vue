@@ -19,7 +19,8 @@ const defaultForm = {
   nama_fakultas: "",
   dekan: "",
   nidn_dekan: "",
-  tanda_tangan_id: null as null | number,
+  nidn_dekan: "",
+  tanda_tangan_id: [] as any[],
   prodi: [],
 };
 
@@ -81,19 +82,12 @@ watch(
       // Simulasi loading untuk efek skeleton
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Simpan tanda_tangan_id sebelum Object.assign
-      const savedTandaTanganId = val.tanda_tangan_id
-        ? Number(val.tanda_tangan_id)
-        : null;
-
       // Reset form then assign
       Object.assign(form, defaultForm);
       Object.assign(form, val);
-      // Ensure form.prodi is an array for Multiselect
+      // Ensure form.prodi and form.tanda_tangan_id is an array for Multiselect
       if (!form.prodi) form.prodi = [];
-
-      // Set tanda_tangan_id dengan nilai yang sudah disimpan
-      form.tanda_tangan_id = savedTandaTanganId;
+      if (!form.tanda_tangan_id) form.tanda_tangan_id = [];
 
       isLoadingData.value = false;
     }
@@ -196,21 +190,18 @@ function submitForm() {
               <div class="col-xl-12">
                 <label class="form-label">Tanda Tangan (Dekan) :</label>
                 <div v-if="isLoadingData" class="skeleton-input"></div>
-                <select
+                <Multiselect
                   v-else
                   v-model="form.tanda_tangan_id"
-                  class="form-select"
+                  :options="listTandaTangan"
+                  :multiple="true"
+                  :close-on-select="false"
+                  :clear-on-select="false"
+                  placeholder="Pilih Tanda Tangan"
+                  label="nama"
+                  track-by="id"
                   :class="{ 'is-invalid': errors?.tanda_tangan_id }"
-                >
-                  <option :value="null">-- Pilih Tanda Tangan --</option>
-                  <option
-                    v-for="ttd in listTandaTangan"
-                    :key="ttd.id"
-                    :value="Number(ttd.id)"
-                  >
-                    {{ ttd.nama }}
-                  </option>
-                </select>
+                ></Multiselect>
                 <div v-if="errors?.tanda_tangan_id" class="invalid-feedback">
                   {{ errors.tanda_tangan_id[0] }}
                 </div>

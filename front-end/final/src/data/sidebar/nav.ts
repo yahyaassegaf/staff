@@ -321,7 +321,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
       { path: "/spm", type: "link", icon: Svgicons.Teamicon, active: false, selected: false, dirchange: false, title: "Surat Keterangan SPM" },
       // { path: "/sk", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Keterangan" },
       { path: "/st", type: "link", icon: Svgicons.Timelineicon, active: false, selected: false, dirchange: false, title: "Surat Tugas" },
-      // { path: "/hasil-rapat", type: "link", icon: Svgicons.Formsicon, active: false, selected: false, dirchange: false, title: "Hasil Rapat" },
+      { path: "/hasil-rapat", type: "link", icon: Svgicons.Formsicon, active: false, selected: false, dirchange: false, title: "Hasil Rapat" },
     ]
   },
   {
