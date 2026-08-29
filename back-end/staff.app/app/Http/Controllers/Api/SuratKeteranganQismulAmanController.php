@@ -110,6 +110,7 @@ class SuratKeteranganQismulAmanController extends Controller
                 'tanggal_berlaku_dari' => 'required|date',
                 'tanggal_berlaku_sampai' => 'required|date',
                 'tanggal' => 'required|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -147,7 +148,7 @@ class SuratKeteranganQismulAmanController extends Controller
             $skqa->tanggal = $validate['tanggal'];
             $skqa->user_id = Auth::user()->id;
             $skqa->status = $validate['status'] ?? 'pending';
-            $skqa->petanda_tangan = 'tidak';
+            $skqa->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $skqa->save();
 
             $Nomor              = new NoSurat();
@@ -288,6 +289,7 @@ class SuratKeteranganQismulAmanController extends Controller
                 'tanggal_berlaku_dari' => 'required|date',
                 'tanggal_berlaku_sampai' => 'required|date',
                 'tanggal' => 'required|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ]);
 
             if ($validator->fails()) {
@@ -328,6 +330,7 @@ class SuratKeteranganQismulAmanController extends Controller
             $skqa->tanggal_berlaku_dari = $validate['tanggal_berlaku_dari'];
             $skqa->tanggal_berlaku_sampai = $validate['tanggal_berlaku_sampai'];
             $skqa->tanggal = $validate['tanggal'];
+            $skqa->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
 
             // Delete old file from Google Drive if exists
             if (!empty($oldDriveFileId)) {
@@ -444,10 +447,21 @@ class SuratKeteranganQismulAmanController extends Controller
     {
         $settingJabatan = \App\Models\SettingJabatan::with('tandaTangan')->where('kunci_jabatan', 'ketua_qismul_aman')->first();
         $tddBase64 = '';
-        if ($settingJabatan && $settingJabatan->tandaTangan && $settingJabatan->tandaTangan->gambar) {
-            $tddPath = base_path('../public_html/' . $settingJabatan->tandaTangan->gambar);
-            if (file_exists($tddPath)) {
-                $tddBase64 = SuratService::getBase64Image($tddPath);
+        $stempelBase64 = '';
+
+        if (isset($data->petanda_tangan) && in_array($data->petanda_tangan, ['ya', 'stempel'])) {
+            $stempelPath = base_path('../public_html/img/stempel.png');
+            if (file_exists($stempelPath)) {
+                $stempelBase64 = SuratService::getBase64Image($stempelPath, 'image/png');
+            }
+        }
+
+        if (isset($data->petanda_tangan) && in_array($data->petanda_tangan, ['ya'])) {
+            if ($settingJabatan && $settingJabatan->tandaTangan && $settingJabatan->tandaTangan->gambar) {
+                $tddPath = base_path('../public_html/' . $settingJabatan->tandaTangan->gambar);
+                if (file_exists($tddPath)) {
+                    $tddBase64 = SuratService::getBase64Image($tddPath);
+                }
             }
         }
 
@@ -470,6 +484,8 @@ class SuratKeteranganQismulAmanController extends Controller
             'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
             'kopBase64' => $kopBase64,
             'ttd' => $tddBase64,
+            'stempel' => $stempelBase64,
+                    'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak'),
         ];
     }
 

@@ -92,7 +92,7 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 'alamat_ortu' => 'required|string',
                 'hp_ortu' => 'nullable|string|max:50',
                 'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -109,7 +109,7 @@ class SuratKeteranganAktifMahasiswaController extends Controller
 
             $no_surat = $validate['no_surat'];
 
-            $noSurat = SuratService::formatNomorSurat('SKAM', $no_surat, $validate['tanggal'], $validate['prodi_id']);
+            $noSurat = SuratService::formatNomorSurat('SKAM', $no_surat ?? '', $validate['tanggal'], $validate['prodi_id']);
 
             $skam = new SuratKeteranganAktifMahasiswa();
             $skam->nomor_surat = $noSurat;
@@ -122,6 +122,7 @@ class SuratKeteranganAktifMahasiswaController extends Controller
             $skam->tanggal_lahir = $validate['tanggal_lahir'];
             $skam->prodi_mhs = $validate['prodi_mhs'];
             $skam->semester = $validate['semester'];
+            $skam->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $skam->tahun_akademik = $validate['tahun_akademik'];
             $skam->nama_ortu = $validate['nama_ortu'];
             $skam->nik_ortu = null;
@@ -130,13 +131,12 @@ class SuratKeteranganAktifMahasiswaController extends Controller
             $skam->hp_ortu = $validate['hp_ortu'] ?? null;
             $skam->tanggal = $validate['tanggal'];
             $skam->user_id = Auth::user()->id;
-            $skam->jenis_kelamin = Auth::user()->jenis_kelamin;
-            $skam->status = 'pending';
-            $skam->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
+            $skam->jenis_kelamin  = Auth::user()->jenis_kelamin;
+            $skam->status         = 'pending';
             $skam->save();
 
             $Nomor              = new NoSurat();
-            $Nomor->nomor = $no_surat;
+            $Nomor->nomor       = $no_surat;
             $Nomor->user_id     = Auth::user()->id;
             $Nomor->save();
 
@@ -185,7 +185,8 @@ class SuratKeteranganAktifMahasiswaController extends Controller
             Log::error($th);
             return response()->json([
                 'status' => false,
-                'message' => 'Data gagal ditambahkan'
+                'message' => 'Data gagal ditambahkan',
+                'error' => $th->getMessage() . ' di baris ' . $th->getLine()
             ]);
         }
     }
@@ -271,7 +272,7 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 'alamat_ortu' => 'required|string',
                 'hp_ortu' => 'nullable|string|max:50',
                 'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ]);
 
             if ($validator->fails()) {
@@ -313,6 +314,7 @@ class SuratKeteranganAktifMahasiswaController extends Controller
                 'alamat_ortu'    => $validate['alamat_ortu'],
                 'hp_ortu'        => $validate['hp_ortu'] ?? null,
                 'tanggal'        => $validate['tanggal'],
+                // 'alasan'         => $validate['alasan'],
                 'jenis_kelamin'  => Auth::user()->jenis_kelamin,
                 'user_id'        => Auth::user()->id,
                 'petanda_tangan' => $validate['petanda_tangan'] ?? 'tidak',
@@ -320,7 +322,7 @@ class SuratKeteranganAktifMahasiswaController extends Controller
 
             $skam->fill($dataToUpdate);
 
-            $noSurat = \App\Services\SuratService::formatNomorSurat('SKAM', $validate['no_surat'], $validate['tanggal'], $validate['prodi_id']);
+            $noSurat = \App\Services\SuratService::formatNomorSurat('SKAM', $validate['no_surat'] ?? '', $validate['tanggal'], $validate['prodi_id']);
             $skam->nomor_surat = $noSurat;
 
             // Delete old file from Google Drive if exists
@@ -400,8 +402,6 @@ class SuratKeteranganAktifMahasiswaController extends Controller
             // $noSurat = \App\Services\SuratService::formatNomorSurat('SKAM', $validate['no_surat'], $validate['tanggal'], $validate['prodi_id'] ?? null);
             // $data->nomor_surat = $noSurat;
 
-
-
             $skam->delete();
 
             return response()->json([
@@ -447,21 +447,21 @@ class SuratKeteranganAktifMahasiswaController extends Controller
         $stempelBase64 = '';
         $tddBase64 = '';
 
-        if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
-            $stempelPath = base_path('../public_html/img/stempel.png');
-            if (file_exists($stempelPath)) {
-                $stempelBase64 = SuratService::getBase64Image($stempelPath);
-            }
-
-            if (!empty($data->ttd)) {
+        if (isset($data->petanda_tangan) && in_array($data->petanda_tangan, ['ya', 'stempel'])) {
+            if ($data->petanda_tangan === 'ya' && !empty($data->ttd)) {
                 if (str_starts_with($data->ttd, 'data:image')) {
                     $tddBase64 = $data->ttd;
                 } else {
                     $tddPath = base_path('../public_html/' . $data->ttd);
                     if (file_exists($tddPath)) {
-                        $tddBase64 = SuratService::getBase64Image($tddPath);
+                        $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
                     }
                 }
+            }
+
+            $stempelPath = base_path('../public_html/img/stempel.png');
+            if (file_exists($stempelPath)) {
+                $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
             }
         }
 
@@ -491,6 +491,7 @@ class SuratKeteranganAktifMahasiswaController extends Controller
             'nidn_dekan' => $data->nidn_kepala_prodi ? $data->nidn_kepala_prodi : $data->nidn_dekan,
             'kopBase64' => $kopBase64,
             'stempel' => $stempelBase64,
+            'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak'),
             'ttd' => $tddBase64,
         ];
     }

@@ -80,7 +80,7 @@ class PrintIjazahController extends Controller
             }
 
             // Helper function untuk parsing tanggal
-            $formatTanggal = function($tgl) {
+            $formatTanggal = function ($tgl) {
                 if (empty($tgl)) return '';
                 try {
                     // Coba parse dengan Carbon dan paksa ke bahasa Indonesia
@@ -133,7 +133,10 @@ class PrintIjazahController extends Controller
 
                 // Kota (bisa dikonfigurasi atau dari prodi)
                 'kota_tempat'              => 'Bangil',
+                'kota_tanggal_ijazah'      => 'Bangil, ' . $tanggalIjazahFormatted,
             ];
+
+            \Illuminate\Support\Facades\Log::info('Debug PrintIjazahController kota_tanggal_ijazah:', ['value' => $fieldMap['kota_tanggal_ijazah'] ?? 'NULL']);
 
             return [
                 'mahasiswa'  => $fieldMap,

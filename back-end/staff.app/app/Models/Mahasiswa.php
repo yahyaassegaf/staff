@@ -18,4 +18,14 @@ class Mahasiswa extends Model
     {
         return $this->belongsTo(Batch::class, 'batch_id');
     }
+
+    public function transkip()
+    {
+        return $this->hasOne(Transkip::class, 'mahasiswa_id');
+    }
+
+    public function nilaiMahasiswa()
+    {
+        return $this->hasMany(NilaiMahasiswa::class, 'mahasiswa_id');
+    }
 }

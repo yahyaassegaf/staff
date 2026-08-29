@@ -93,7 +93,7 @@ class SuratKeteranganSpmController extends Controller
                 'tahun' => 'required|string|max:100',
                 'semester' => 'required|string|max:50',
                 'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -112,26 +112,26 @@ class SuratKeteranganSpmController extends Controller
 
             $noSurat = SuratService::formatNomorSurat('STSPM', $no_surat, $validate['tanggal'], $validate['prodi_id']);
 
-            $spm = new SuratKeteranganSpm();
-            $spm->nomor_surat = $noSurat;
-            $spm->prodi_id = $validate['prodi_id'];
-            $spm->nama_lengkap = $validate['nama_lengkap'];
-            $spm->nim = $validate['nim'];
-            $spm->tempat_lahir = $validate['tempat_lahir'];
-            $spm->tanggal_lahir = $validate['tanggal_lahir'];
-            $spm->prodi_mhs = $validate['prodi_mhs'];
-            $spm->alamat = $validate['alamat'];
-            $spm->nama_ortu = $validate['nama_ortu'];
-            $spm->tempat_tugas = $validate['tempat_tugas'];
-            $spm->alamat_tugas = $validate['alamat_tugas'];
-            $spm->tahun = $validate['tahun'];
-            $spm->semester = $validate['semester'];
-            $spm->tanggal = $validate['tanggal'];
-            $spm->user_id = Auth::user()->id;
-            $spm->jenis_kelamin = Auth::user()->jenis_kelamin;
-            $spm->status = 'pending';
-            $spm->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
-            $spm->save();
+            $skspm = new SuratKeteranganSpm();
+            $skspm->nomor_surat = $noSurat;
+            $skspm->prodi_id = $validate['prodi_id'];
+            $skspm->nama_lengkap = $validate['nama_lengkap'];
+            $skspm->nim = $validate['nim'];
+            $skspm->tempat_lahir = $validate['tempat_lahir'];
+            $skspm->tanggal_lahir = $validate['tanggal_lahir'];
+            $skspm->prodi_mhs = $validate['prodi_mhs'];
+            $skspm->alamat = $validate['alamat'];
+            $skspm->nama_ortu = $validate['nama_ortu'];
+            $skspm->tempat_tugas = $validate['tempat_tugas'];
+            $skspm->alamat_tugas = $validate['alamat_tugas'];
+            $skspm->tahun = $validate['tahun'];
+            $skspm->semester = $validate['semester'];
+            $skspm->tanggal = $validate['tanggal'];
+            $skspm->user_id = Auth::user()->id;
+            $skspm->jenis_kelamin = Auth::user()->jenis_kelamin;
+            $skspm->status = 'pending';
+            $skspm->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
+            $skspm->save();
 
             $Nomor              = new NoSurat();
             $Nomor->nomor = $no_surat;
@@ -156,7 +156,7 @@ class SuratKeteranganSpmController extends Controller
                     'prodi.nidn_kepala as nidn_kepala_prodi',
                     \DB::raw('COALESCE(tanda_tangan.tdd, tanda_tangan.gambar) as ttd')
                 )
-                ->where('surat_keterangan_spm.id', $spm->id)
+                ->where('surat_keterangan_spm.id', $skspm->id)
                 ->first();
 
             if ($data) {
@@ -273,7 +273,7 @@ class SuratKeteranganSpmController extends Controller
                 'tahun' => 'required|string|max:100',
                 'semester' => 'required|string|max:50',
                 'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ]);
 
             if ($validator->fails()) {
@@ -449,24 +449,26 @@ class SuratKeteranganSpmController extends Controller
             $pengawasNama = $settingJabatan->tandaTangan->nama;
         }
 
-        if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
-            $stempelPath = base_path('../public_html/img/stempel.png');
-            if (file_exists($stempelPath)) {
-                $stempelBase64 = SuratService::getBase64Image($stempelPath);
-            }
-
-            if (!empty($data->ttd)) {
+        if (isset($data->petanda_tangan) && in_array($data->petanda_tangan, ['ya', 'stempel', 'kosong'])) {
+            if ($data->petanda_tangan === 'ya' && !empty($data->ttd)) {
                 if (str_starts_with($data->ttd, 'data:image')) {
                     $tddBase64 = $data->ttd;
                 } else {
                     $tddPath = base_path('../public_html/' . $data->ttd);
                     if (file_exists($tddPath)) {
-                        $tddBase64 = SuratService::getBase64Image($tddPath);
+                        $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
                     }
                 }
             }
 
-            if ($settingJabatan && $settingJabatan->tandaTangan) {
+            if (in_array($data->petanda_tangan, ['ya', 'stempel'])) {
+                $stempelPath = base_path('../public_html/img/stempel.png');
+                if (file_exists($stempelPath)) {
+                    $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+                }
+            }
+
+            if ($data->petanda_tangan === 'ya' && $settingJabatan && $settingJabatan->tandaTangan) {
                 $foundGambar = false;
                 if (!empty($settingJabatan->tandaTangan->gambar)) {
                     $pengawasPath = base_path('../public_html/' . $settingJabatan->tandaTangan->gambar);
@@ -475,7 +477,7 @@ class SuratKeteranganSpmController extends Controller
                         $foundGambar = true;
                     }
                 }
-                
+
                 if (!$foundGambar && !empty($settingJabatan->tandaTangan->tdd)) {
                     $pengawasTtdBase64 = $settingJabatan->tandaTangan->tdd;
                 }
@@ -505,6 +507,7 @@ class SuratKeteranganSpmController extends Controller
             'nidn_kepala_prodi' => $data->nidn_kepala_prodi,
             'kopBase64' => $kopBase64,
             'stempel' => $stempelBase64,
+                    'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak'),
             'ttd' => $tddBase64,
             'pengawas_nama' => $pengawasNama,
             'pengawas_ttd' => $pengawasTtdBase64

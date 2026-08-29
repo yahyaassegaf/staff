@@ -36,12 +36,12 @@ class SuratService
         $replacements = [];
         foreach ($tags as $tag) {
             $replacements["{{$tag}}"] = match ($tag) {
-                'NO'              => $nomor,
+                'NO', 'NOMOR'     => $nomor,
                 'TGL'             => $tgl->format('d'),
                 'BULAN'           => $tgl->format('m'),
                 'TAHUN'           => $tgl->format('Y'),
-                'PRODI'           => $prodiAlias,
-                'ALIAS-FAKULTAS'  => $aliasFakultas,
+                'PRODI', 'ALIAS_PRODI', 'ALIAS-PRODI' => $prodiAlias,
+                'ALIAS-FAKULTAS', 'ALIAS_FAKULTAS'  => $aliasFakultas,
                 default           => "{{$tag}}", // biarkan tag asli jika tidak dikenali
             };
         }
@@ -133,7 +133,7 @@ class SuratService
         return "SU-{$nomor}/" . self::$institusi . "/{$unit}/" . self::$kodeSurat . "/{$bulan}/{$tahun}";
     }
 
-    static function NoHasilRapat(int $nomor, string $unit)
+    static function NoHasilRapat(string $nomor, string $unit)
     {
         $bulan = date('m');
         $tahun = date('Y');

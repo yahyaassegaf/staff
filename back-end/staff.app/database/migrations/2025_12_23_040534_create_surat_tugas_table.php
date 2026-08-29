@@ -14,19 +14,18 @@ return new class extends Migration
         Schema::create('surat_tugas', function (Blueprint $table) {
             $table->id();
             $table->string('nomor');
-            $table->string('nama_dosen');
-            $table->string('alamat_dosen');
-            $table->string('tugas_dosen');
-            $table->text('tugasnya');
+            $table->string('pebimbing1');
+            $table->string('alamat_pebimbing1');
+            $table->string('tugas_pebimbing1');
+            $table->string('pebimbing2');
+            $table->string('alamat_pebimbing2');
+            $table->string('tugas_pebimbing2');
             $table->string('nama_mhs');
             $table->string('nim_nik');
-            $table->string('fakultas_prodi');
             $table->text('judul_skripsi');
             $table->string('masa_penugasan');
-            $table->date('tanggal');
             $table->integer('user_id');
             $table->integer('prodi_id');
-             $table->enum('jenis_kelamin',['L','P'])->nullable();
             $table->string('drive_file_id')->nullable();
             $table->string('local_path')->nullable();
             $table->string('drive_link')->nullable();

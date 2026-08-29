@@ -214,9 +214,14 @@ class MahasiswaController extends Controller
             // );
             $user = $request->user();
             $where = null;
+            $prodi = null;
+
             if ($user && $user->prodi_id) {
                 $prodi = $user->prodi->alias;
                 // $prodi2 = strval($prodi);
+                if ($prodi == 'HKI') {
+                    $prodi = 'AS-HK';
+                }
 
                 $where = [
                     ['mst_prodi.alias', '=', $prodi]

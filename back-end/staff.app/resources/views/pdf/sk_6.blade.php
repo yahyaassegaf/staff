@@ -178,7 +178,7 @@
         <tr>
             <td width="55%"></td>
             <td width="45%" style="text-align:center;">
-                Bangil, {{ $tanggal_surat }}<br>
+                Pasuruan, {{ $tanggal_surat }}<br>
                 Ketua Program Studi,<br>
                 <br><br><br>
                 ( {{ $kaprodi_nama }} )

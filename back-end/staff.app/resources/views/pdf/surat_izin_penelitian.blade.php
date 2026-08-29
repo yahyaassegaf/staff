@@ -190,7 +190,7 @@
 
             <!-- BLOK KANAN -->
             <td width="40%" style="text-align:center;">
-                Bangil, {{ $tanggal }}<br>
+                Pasuruan, {{ $tanggal }}<br>
                 Dekan Fakultas {{ $fakultas_name }}<br>
 
                 <!-- AREA TTD (OVERLAY AMAN) -->

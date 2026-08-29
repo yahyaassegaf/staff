@@ -73,6 +73,7 @@ class HasilRapatController extends Controller
         DB::beginTransaction();
         try {
             $validator = Validator::make($request->all(), [
+                'no_surat' => 'nullable|string|max:255',
                 'prodi_id' => 'required|exists:prodi,id',
                 'agenda' => 'required|string|max:255',
                 'tanggal' => 'required|date',
@@ -92,13 +93,11 @@ class HasilRapatController extends Controller
 
             $validate = $validator->validated();
 
-            // Penomoran Otomatis
-            $aliasProdi = \App\Models\Prodi::find($validate['prodi_id'])->alias;
-            $no = \App\Models\NoSurat::orderByDesc('id')->value('nomor') ?? 0;
-            $no_next = str_pad($no + 1, 3, '0', STR_PAD_LEFT);
-            $unit = 'K.' . strtoupper($aliasProdi);
-
-            $nomorSurat = \App\Services\SuratService::NoHasilRapat($no_next, $unit);
+            $no_surat = $validate['no_surat'] ?? null;
+            $nomorSurat = null;
+            if ($no_surat) {
+                $nomorSurat = \App\Services\SuratService::formatNomorSurat('STHR', $no_surat, $validate['tanggal'], $validate['prodi_id']);
+            }
 
             $hasilRapat = new HasilRapat();
             $hasilRapat->nomor_surat = $nomorSurat;
@@ -109,22 +108,8 @@ class HasilRapatController extends Controller
             $hasilRapat->tempat = $validate['tempat'] ?? null;
             $hasilRapat->pembahasan = $validate['pembahasan'] ?? null;
             $hasilRapat->status = 'pending';
+            $hasilRapat->user_id = Auth::user()->id;
             $hasilRapat->save();
-
-            // Simpan log nomor
-            $newNo = new \App\Models\NoSurat();
-            $newNo->nomor = $no_next;
-            $newNo->user_id = Auth::user()->id;
-            $newNo->save();
-
-            // Simpan ke log surat
-            $log = new \App\Models\LogSurat();
-            $log->nomor = $no_next;
-            $log->nomor_surat = $nomorSurat;
-            $log->nama_surat = 'Hasil Rapat';
-            $log->user_id = Auth::user()->id;
-            $log->save();
-            Log::info('masuk');
             if (!empty($validate['anggota_ids'])) {
                 foreach ($validate['anggota_ids'] as $userId) {
                     $anggota = new AnggotaRapat();
@@ -134,12 +119,47 @@ class HasilRapatController extends Controller
                 }
             }
 
+            // Generate PDF dan simpan local_path (setelah commit agar data sudah final)
+            $data = HasilRapat::with(['prodi'])->find($hasilRapat->id);
+            if ($data) {
+                $anggotaList = AnggotaRapat::with('user')->where('hasil_rapat_id', $hasilRapat->id)->get();
+                $kopPath = base_path('../public_html/img/kop.jpg');
+                $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
+                $formatSurat = \App\Models\JenisSurat::where('alias', 'STHR')->value('format_surat');
+
+                $pdfData = [
+                    'nomor_surat' => $data->nomor_surat ?? null,
+                    'format_surat' => $formatSurat,
+                    'agenda' => $data->agenda,
+                    'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
+                    'waktu' => $data->waktu,
+                    'tempat' => $data->tempat,
+                    'pembahasan' => $data->pembahasan,
+                    'anggota' => $anggotaList,
+                    'kopBase64' => $kopBase64,
+                ];
+
+                $directory = base_path('../public_html/pdf/Umum/Hasil Rapat/');
+                $pdf = Pdf::loadView('pdf.v_hasil_rapat', $pdfData)->setPaper('a4', 'portrait');
+                $fileName = 'hasil_rapat_' . str_replace('/', '_', $data->nomor_surat ?? 'tanpa_nomor') . '_' . uniqid() . '.pdf';
+                if (!file_exists($directory)) mkdir($directory, 0755, true);
+
+                $path = $directory . $fileName;
+                $pdf->save($path);
+
+                $data->update(['local_path' => $path]);
+
+                $nameTable = 'Hasil Rapat';
+                $prodiName = $data->prodi->nama ?? 'Umum';
+                UploudSuratToDrive::dispatch($data->id, $nameTable, $prodiName, HasilRapat::class);
+            }
+
             DB::commit();
             return response()->json(['status' => true, 'message' => 'Data berhasil ditambahkan']);
         } catch (\Throwable $th) {
             DB::rollBack();
-            Log::info($th);
-            return response()->json(['status' => false, 'message' => 'Data gagal ditambahkan']);
+            Log::error("HasilRapat Store Error: " . $th->getMessage() . " | Baris: " . $th->getLine() . " | File: " . $th->getFile());
+            return response()->json(['status' => false, 'message' => 'Data gagal ditambahkan', 'error' => $th->getMessage()], 500);
         }
     }
 
@@ -149,6 +169,19 @@ class HasilRapatController extends Controller
         if (!$hasilRapat) {
             return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
         }
+
+        // Ekstrak no_surat asli dari nomor_surat (misal "SU-69532/..." -> "69532")
+        if ($hasilRapat->nomor_surat) {
+            $parts = explode('/', $hasilRapat->nomor_surat);
+            $firstPart = $parts[0];
+            if (strpos($firstPart, '-') !== false) {
+                $firstPart = substr($firstPart, strpos($firstPart, '-') + 1);
+            }
+            $hasilRapat->no_surat = $firstPart;
+        } else {
+            $hasilRapat->no_surat = null;
+        }
+
         return response()->json(['status' => true, 'data' => $hasilRapat]);
     }
 
@@ -163,6 +196,7 @@ class HasilRapatController extends Controller
             $oldLocalPath = $hasilRapat->local_path;
 
             $validator = Validator::make($request->all(), [
+                'no_surat' => 'nullable|string|max:255',
                 'agenda' => 'required|string|max:255',
                 'tanggal' => 'required|date',
                 'waktu' => 'nullable',
@@ -181,6 +215,10 @@ class HasilRapatController extends Controller
 
             $validate = $validator->validated();
 
+            $no_surat = $validate['no_surat'] ?? null;
+            if ($no_surat) {
+                $hasilRapat->nomor_surat = \App\Services\SuratService::formatNomorSurat('STHR', $no_surat, $validate['tanggal'], $hasilRapat->prodi_id);
+            }
             $hasilRapat->agenda = $validate['agenda'];
             $hasilRapat->tanggal = $validate['tanggal'];
             $hasilRapat->waktu = $validate['waktu'] ?? null;
@@ -211,17 +249,17 @@ class HasilRapatController extends Controller
             $hasilRapat->status = 'pending';
             $hasilRapat->save();
 
-            DB::commit();
-
             // Re-fetch record with joins to build the new PDF
             $data = HasilRapat::with(['prodi'])->find($id);
             if ($data) {
                 $anggota = AnggotaRapat::with('user')->where('hasil_rapat_id', $id)->get();
                 $kopPath = base_path('../public_html/img/kop.jpg');
                 $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
+                $formatSurat = \App\Models\JenisSurat::where('alias', 'STHR')->value('format_surat');
 
                 $pdfData = [
-                    'nomor_surat' => $data->nomor_surat,
+                    'nomor_surat' => $data->nomor_surat ?? null,
+                    'format_surat' => $formatSurat,
                     'agenda' => $data->agenda,
                     'tanggal' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
                     'waktu' => $data->waktu,
@@ -231,25 +269,27 @@ class HasilRapatController extends Controller
                     'kopBase64' => $kopBase64,
                 ];
 
-                $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi->nama ?? 'Umum');
-                $directory = base_path('../public_html/pdf/' . $prodiName . '/HasilRapatController/');
+                $directory = base_path('../public_html/pdf/Umum/Hasil Rapat/');
                 $pdf = Pdf::loadView('pdf.v_hasil_rapat', $pdfData)->setPaper('a4', 'portrait');
-                $fileName = 'hasil_rapat_' . str_replace('/', '_', $data->nomor_surat) . '_' . uniqid() . '.pdf';
+                $fileName = 'hasil_rapat_' . str_replace('/', '_', $data->nomor_surat ?? 'tanpa_nomor') . '_' . uniqid() . '.pdf';
                 if (!file_exists($directory)) mkdir($directory, 0755, true);
- 
+
                 $path = $directory . $fileName;
                 $pdf->save($path);
- 
+
                 $data->update(['local_path' => $path]);
 
                 $nameTable = 'Hasil Rapat';
                 $prodiName = $data->prodi->nama ?? 'Umum';
                 UploudSuratToDrive::dispatch($data->id, $nameTable, $prodiName, HasilRapat::class);
             }
+
+            DB::commit();
             return response()->json(['status' => true, 'message' => 'Data berhasil diupdate']);
         } catch (\Throwable $th) {
             DB::rollBack();
-            return response()->json(['status' => false, 'message' => 'Data gagal diupdate']);
+            Log::error("HasilRapat Update Error: " . $th->getMessage() . " | Baris: " . $th->getLine() . " | File: " . $th->getFile());
+            return response()->json(['status' => false, 'message' => 'Data gagal diupdate', 'error' => $th->getMessage()], 500);
         }
     }
 
@@ -264,14 +304,34 @@ class HasilRapatController extends Controller
     public function downloadPdf($id)
     {
         try {
+            Log::info('downloadPdf called', ['id' => $id]);
+
             $data = HasilRapat::find($id);
 
             if (!$data) {
+                Log::warning('downloadPdf: Data tidak ditemukan', ['id' => $id]);
                 return response()->json(['status' => false, 'message' => 'Data tidak ditemukan'], 404);
             }
 
-            if (empty($data->local_path) || !file_exists($data->local_path)) {
-                return response()->json(['status' => false, 'message' => 'File PDF tidak ditemukan di server'], 404);
+            Log::info('downloadPdf: Data found', [
+                'id' => $data->id,
+                'local_path' => $data->local_path,
+                'drive_link' => $data->drive_link,
+            ]);
+
+            if (empty($data->local_path)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'File PDF belum digenerate. Path kosong.'
+                ], 404);
+            }
+
+            if (!file_exists($data->local_path)) {
+                Log::warning('downloadPdf: File tidak ditemukan di disk', ['path' => $data->local_path]);
+                return response()->json([
+                    'status' => false,
+                    'message' => 'File PDF tidak ditemukan di server. Path: ' . $data->local_path
+                ], 404);
             }
 
             $fileName = basename($data->local_path);
@@ -281,8 +341,15 @@ class HasilRapatController extends Controller
                 'Content-Disposition' => 'inline; filename="' . $fileName . '"'
             ]);
         } catch (\Throwable $th) {
-            \Illuminate\Support\Facades\Log::error($th->getMessage());
-            return response()->json(['status' => false, 'message' => 'Gagal download PDF']);
+            Log::error('downloadPdf error', [
+                'id' => $id,
+                'message' => $th->getMessage(),
+                'trace' => $th->getTraceAsString(),
+            ]);
+            return response()->json([
+                'status' => false,
+                'message' => 'Gagal download PDF: ' . $th->getMessage()
+            ], 500);
         }
     }
 

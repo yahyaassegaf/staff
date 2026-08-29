@@ -183,7 +183,7 @@
 
             <!-- BLOK KANAN -->
             <td width="45%" style="text-align:center; vertical-align: top;">
-                Bangil, {{ $tanggal }}<br>
+                Pasuruan, {{ $tanggal }}<br>
                 Dekan {{ $nama_fakultas }}<br>
 
                 <!-- AREA TTD (OVERLAY AMAN) -->

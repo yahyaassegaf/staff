@@ -7,8 +7,7 @@
     <style>
         /* ===== PAGE ===== */
         @page {
-            size: A4;
-            margin: 0;
+            margin: 0cm 2cm 1cm 2cm;
         }
 
         body {
@@ -16,17 +15,17 @@
             font-size: 11pt;
             line-height: 1.5;
             color: #000;
-            margin: 0;
         }
 
         /* ===== KOP SURAT ===== */
         .kop {
-            margin-top: 1cm;
-            margin-left: -1cm;
-            margin-right: -1cm;
+            margin-top: 0.1cm;
+            margin-left: -1.5cm;
+            margin-right: -1.5cm;
         }
 
         .kop img {
+            margin-top: 0px;
             width: 100%;
             height: auto;
             display: block;
@@ -34,9 +33,7 @@
 
         /* ===== KONTEN ===== */
         .content {
-            padding-right: 2.5cm;
             padding-bottom: 1cm;
-            padding-left: 2.5cm;
         }
 
         .text-center {
@@ -49,6 +46,10 @@
 
         .text-bold {
             font-weight: bold;
+        }
+
+        .text-italic {
+            font-style: italic;
         }
 
         .text-underline {
@@ -66,116 +67,209 @@
         }
 
         .margin-bottom-20 {
+            margin-bottom: 20px;
+        }
+
+        .margin-bottom-10 {
             margin-bottom: 10px;
         }
+
+        .table-list td {
+            padding: 3px 2px;
+        }
     </style>
+    @php
+        $fontFile = base_path('../public_html/fonts/Amiri-Regular.ttf');
+        $fontPath = file_exists($fontFile) ? str_replace('\\', '/', realpath($fontFile)) : null;
+    @endphp
+    @if ($fontPath)
+        <style>
+            @font-face {
+                font-family: 'Amiri';
+                font-style: normal;
+                font-weight: normal;
+                src: url('{{ $fontPath }}') format('truetype');
+            }
+
+            @font-face {
+                font-family: 'Amiri';
+                font-style: normal;
+                font-weight: bold;
+                src: url('{{ $fontPath }}') format('truetype');
+            }
+
+            @font-face {
+                font-family: 'Amiri';
+                font-style: italic;
+                font-weight: normal;
+                src: url('{{ $fontPath }}') format('truetype');
+            }
+
+            @font-face {
+                font-family: 'Amiri';
+                font-style: italic;
+                font-weight: bold;
+                src: url('{{ $fontPath }}') format('truetype');
+            }
+        </style>
+    @endif
 </head>
 
 <body>
 
     <!-- KOP SURAT -->
     <div class="kop">
-        @if(isset($kopBase64))
-        <img src="{{ $kopBase64 }}" alt="Kop Surat">
+        @if (isset($kopBase64))
+            <img src="{{ $kopBase64 }}" alt="Kop Surat">
         @endif
     </div>
 
     <!-- ISI SURAT -->
     <div class="content">
 
-        <div class="text-center text-bold text-underline">
+        <div class="text-center text-bold text-underline" style="letter-spacing: 5px; font-size: 14pt;">
             SURAT TUGAS
         </div>
-        <div class="text-center margin-bottom-10">
-            Nomor: {{ $nomor }}
+        <div class="text-center margin-bottom-20">
+            Nomor : {{ $nomor }}
         </div>
 
-        <p class="text-justify">
-            Yang bertanda tangan di bawah ini menerangkan bahwa:
-        </p>
-
-        <!-- DATA DOSEN -->
-        <table class="margin-bottom-20">
+        <table class="table-list">
             <tr>
-                <td width="30%">Nama Dosen</td>
-                <td width="5%">:</td>
-                <td>{{ $nama_dosen }}</td>
+                <td width="4%">1.</td>
+                <td width="36%">Lembaga yang memberi tugas</td>
+                <td width="3%">:</td>
+                <td width="57%">{{ $lembaga_pemberi_tugas ?? '-' }}</td>
             </tr>
             <tr>
-                <td>Alamat Dosen</td>
+                <td>2.</td>
+                <td>Yang diberi tugas</td>
                 <td>:</td>
-                <td>{{ $alamat_dosen }}</td>
+                <td></td>
             </tr>
+
+            <!-- DATA DOSEN -->
+            @if (isset($dosens) && count($dosens) > 0)
+                @foreach ($dosens as $index => $dosen)
+                    <tr>
+                        <td></td>
+                        <td>{{ chr(97 + $index) }}. Nama</td>
+                        <td>:</td>
+                        <td class="text-bold">{{ $dosen['nama'] }}</td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td style="padding-left: 15px;">Alamat</td>
+                        <td>:</td>
+                        <td>{{ $dosen['alamat'] }}</td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td style="padding-left: 15px;">Tugas</td>
+                        <td>:</td>
+                        <td>{{ $dosen['tugas'] }}</td>
+                    </tr>
+                @endforeach
+            @else
+                <tr>
+                    <td></td>
+                    <td>a. Nama</td>
+                    <td>:</td>
+                    <td class="text-bold">{{ $nama_dosen ?? '' }}</td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td style="padding-left: 15px;">Alamat</td>
+                    <td>:</td>
+                    <td>{{ $alamat_dosen ?? '' }}</td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td style="padding-left: 15px;">Tugas</td>
+                    <td>:</td>
+                    <td>{{ $tugas_dosen ?? '' }}</td>
+                </tr>
+            @endif
+
             <tr>
-                <td>Tugas Dosen</td>
+                <td>3.</td>
+                <td>Diberi Tugas untuk</td>
                 <td>:</td>
-                <td>{{ $tugas_dosen }}</td>
+                <td>{{ $tugasnya ?? 'Membimbing Skripsi' }}</td>
             </tr>
-        </table>
 
-        <p class="text-justify">
-            Untuk melaksanakan tugas yaitu {{ $tugasnya }} terhadap mahasiswa:
-        </p>
-
-        <!-- DATA MAHASISWA -->
-        <table class="margin-bottom-20">
+            <!-- DATA MAHASISWA -->
             <tr>
-                <td width="30%">Nama Mahasiswa</td>
-                <td width="5%">:</td>
-                <td>{{ $nama_mhs }}</td>
+                <td></td>
+                <td>a. Nama</td>
+                <td>:</td>
+                <td class="text-bold">{{ $nama_mhs }}</td>
             </tr>
             <tr>
-                <td>NIM / NIK</td>
+                <td></td>
+                <td>b. NIM / NIMKO</td>
                 <td>:</td>
                 <td>{{ $nim_nik }}</td>
             </tr>
             <tr>
-                <td>Fakultas / Prodi</td>
+                <td></td>
+                <td>c. Jurusan / Prodi</td>
                 <td>:</td>
                 <td>{{ $fakultas_prodi }}</td>
             </tr>
             <tr>
-                <td>Judul Skripsi</td>
+                <td></td>
+                <td style="vertical-align: top;">d. Judul Skripsi</td>
+                <td style="vertical-align: top;">:</td>
+                <td class="text-bold"
+                    style="vertical-align: top; font-family: 'DejaVu Sans', sans-serif;">
+                    "{{ $judul_skripsi }}"</td>
+            </tr>
+
+            <tr>
+                <td>4.</td>
+                <td>Masa penugasan</td>
                 <td>:</td>
-                <td>{{ $judul_skripsi }}</td>
+                <td>{{ $masa_penugasan }} s/d selesai</td>
+            </tr>
+            <tr>
+                <td>5.</td>
+                <td>Keterangan lain-lain</td>
+                <td>:</td>
+                <td>{{ $keterangan_lain ?? 'Harap dilaksanakan dengan penuh tanggung jawab.' }}</td>
             </tr>
         </table>
 
-        <p class="text-justify">
-            Masa penugasan ini berlaku selama {{ $masa_penugasan }}.
-        </p>
-
-        <p class="text-justify">
-            Demikian surat tugas ini kami sampaikan agar dapat dilaksanakan dengan penuh tanggung jawab.
-        </p>
-
-        <table class="ttd" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">
+        <!-- TANDA TANGAN -->
+        <table class="ttd" width="100%" cellpadding="0" cellspacing="0" style="margin-top:50px;">
             <tr>
-                <td width="60%"></td>
-                <td width="40%" class="text-center">
-                    Bangil, {{ $tanggal }}<br>
-                    Kepala Prodi
-                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -20px; margin-bottom: -30px;">
+                <td width="55%"></td>
+                <td width="45%" class="text-center">
+                    Pasuruan, {{ $tanggal ?? '' }}<br>
+                    Dekan Fakultas {{ $fakultas ?? '' }}
+                    <table width="100%" cellpadding="0" cellspacing="0"
+                        style="margin-top: -20px; margin-bottom: -45px;">
                         <tr>
                             <td style="height: 155px; text-align:center; vertical-align:middle; padding:0;">
                                 <div style="position: relative; width: 100%; height: 155px;">
-                                    @if(!empty($stempel))
-                                    <img src="{{ $stempel }}" style="position: absolute; left: -10px; top: 5px; width: 115px; height: 115px; z-index: 2;">
+                                    @if (!empty($stempel))
+                                        <img src="{{ $stempel }}"
+                                            style="position: absolute; left: -10px; top: 5px; width: 115px; height: 115px; z-index: 2;">
                                     @endif
-                                    
-                                    @if(!empty($ttd))
-                                    <img src="{{ $ttd }}" style="position: absolute; left: 0px; top: 20px; width: 200px; z-index: 1;">
 
+                                    @if (!empty($ttd))
+                                        <img src="{{ $ttd }}"
+                                            style="position: absolute; left: 20px; top: 20px; width: 200px; z-index: 1;">
                                     @endif
                                 </div>
                             </td>
                         </tr>
                     </table>
 
-                    <div class="nama-ttd">
-                        <strong>{{ $nama_kepala }}</strong>
+                    <div class="text-bold text-underline">
+                        {{ $nama_kepala ?? '' }}
                     </div>
-                    NIY: {{ $nidn_kepala }}
+                    NIDN. {{ $nidn_kepala ?? '' }}
                 </td>
             </tr>
         </table>

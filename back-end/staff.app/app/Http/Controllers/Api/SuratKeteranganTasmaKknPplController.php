@@ -106,6 +106,7 @@ class SuratKeteranganTasmaKknPplController extends Controller
                 'alamat_rumah' => 'required|string',
                 'kelas_pondok' => 'required|string|max:255',
                 'tanggal' => 'required|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -144,7 +145,7 @@ class SuratKeteranganTasmaKknPplController extends Controller
             $sktkp->tanggal       = $validate['tanggal'];
             $sktkp->user_id       = Auth::user()->id;
             $sktkp->status        = 'pending';
-            $sktkp->petanda_tangan = 'tidak';
+            $sktkp->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $sktkp->save();
 
             $Nomor                = new NoSurat();
@@ -286,6 +287,7 @@ class SuratKeteranganTasmaKknPplController extends Controller
                 'alamat_rumah' => 'required|string',
                 'kelas_pondok' => 'required|string|max:255',
                 'tanggal' => 'required|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ]);
 
             if ($validator->fails()) {
@@ -343,8 +345,8 @@ class SuratKeteranganTasmaKknPplController extends Controller
 
             $sktkp->drive_file_id = null;
             $sktkp->drive_link = null;
-            $sktkp->status = 'pending';
-            $sktkp->petanda_tangan = 'tidak';
+            $sktkp->tanggal = $validate['tanggal'];
+            $sktkp->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $sktkp->save();
 
             // Re-fetch record with joins to build the new PDF
@@ -460,15 +462,25 @@ class SuratKeteranganTasmaKknPplController extends Controller
 
         if ($settingTasma && $settingTasma->tandaTangan) {
             $namaKetua = $settingTasma->tandaTangan->nama;
-            if ($settingTasma->tandaTangan->gambar) {
-                $tddBase64 = \App\Services\SuratService::getBase64Image(base_path('../public_html/' . $settingTasma->tandaTangan->gambar));
-            } elseif ($settingTasma->tandaTangan->tdd) {
-                $tddBase64 = $settingTasma->tandaTangan->tdd;
+        }
+
+        if (isset($data->petanda_tangan) && in_array($data->petanda_tangan, ['ya'])) {
+            if ($settingTasma && $settingTasma->tandaTangan) {
+                if ($settingTasma->tandaTangan->gambar) {
+                    $tddBase64 = \App\Services\SuratService::getBase64Image(base_path('../public_html/' . $settingTasma->tandaTangan->gambar));
+                } elseif ($settingTasma->tandaTangan->tdd) {
+                    $tddBase64 = $settingTasma->tandaTangan->tdd;
+                }
             }
         }
 
-        $stempelPath = base_path('../public_html/img/stempel.png');
-        $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+        $stempelBase64 = '';
+        if (isset($data->petanda_tangan) && in_array($data->petanda_tangan, ['ya', 'stempel'])) {
+            $stempelPath = base_path('../public_html/img/stempel.png');
+            if (file_exists($stempelPath)) {
+                $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+            }
+        }
 
         return [
             'nomor_surat' => $data->nomor_surat,
@@ -487,6 +499,7 @@ class SuratKeteranganTasmaKknPplController extends Controller
             'kopBase64' => $kopBase64,
             'ttd' => $tddBase64,
             'stempel' => $stempelBase64,
+                    'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak'),
         ];
     }
 

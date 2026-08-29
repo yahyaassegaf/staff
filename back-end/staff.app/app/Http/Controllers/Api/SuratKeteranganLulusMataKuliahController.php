@@ -103,7 +103,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
                 'alamat_rumah' => 'required|string',
                 'kelas_pondok' => 'required|string|max:255',
                 'tanggal' => 'nullable|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -137,8 +137,8 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             $sklmk->tanggal         = $validate['tanggal'] ?? date('Y-m-d');
             $sklmk->user_id         = Auth::user()->id;
             $sklmk->jenis_kelamin   = Auth::user()->jenis_kelamin;
-            $sklmk->status          = $validate['status'] ?? 'pending';
             $sklmk->petanda_tangan  = $validate['petanda_tangan'] ?? 'tidak';
+            $sklmk->status = 'pending';
             $sklmk->save();
 
             $Nomor                  = new NoSurat();
@@ -157,7 +157,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             $data = SuratKeteranganLulusMataKuliah::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_lulus_mata_kuliah.prodi_id')
                 ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
                 ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
-                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'fakultas.tanda_tangan_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
                 ->select(
                     'surat_keterangan_lulus_mata_kuliah.*',
                     'prodi.nama as nama_prodi',
@@ -286,7 +286,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
                 'tanggal' => 'required|date',
                 'drive_file_id' => 'nullable|string',
                 'status' => 'nullable|in:pending,uploaded,failed',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ]);
 
             if ($validator->fails()) {
@@ -342,7 +342,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             $data = SuratKeteranganLulusMataKuliah::leftJoin('prodi', 'prodi.id', '=', 'surat_keterangan_lulus_mata_kuliah.prodi_id')
                 ->leftJoin('fakultas_prodi', 'fakultas_prodi.prodi_id', '=', 'prodi.id')
                 ->leftJoin('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
-                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'fakultas.tanda_tangan_id')
+                ->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'prodi.tanda_tangan_id')
                 ->select(
                     'surat_keterangan_lulus_mata_kuliah.*',
                     'prodi.nama as nama_prodi',
@@ -443,20 +443,14 @@ class SuratKeteranganLulusMataKuliahController extends Controller
 
     private function buildPdfData($data)
     {
-        Log::info($data->nama_kepala_prodi);
         $kopPath = base_path('../public_html/img/kop.jpg');
         $kopBase64 = SuratService::getBase64Image($kopPath);
 
         $stempelBase64 = '';
         $tddBase64 = '';
 
-        if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
-            $stempelPath = base_path('../public_html/img/stempel.png');
-            if (file_exists($stempelPath)) {
-                $stempelBase64 = SuratService::getBase64Image($stempelPath);
-            }
-
-            if (!empty($data->ttd)) {
+        if (isset($data->petanda_tangan) && in_array($data->petanda_tangan, ['ya', 'stempel'])) {
+            if ($data->petanda_tangan === 'ya' && !empty($data->ttd)) {
                 if (str_starts_with($data->ttd, 'data:image')) {
                     $tddBase64 = $data->ttd;
                 } else {
@@ -465,6 +459,11 @@ class SuratKeteranganLulusMataKuliahController extends Controller
                         $tddBase64 = SuratService::getBase64Image($tddPath);
                     }
                 }
+            }
+
+            $stempelPath = base_path('../public_html/img/stempel.png');
+            if (file_exists($stempelPath)) {
+                $stempelBase64 = SuratService::getBase64Image($stempelPath);
             }
         }
 
@@ -483,6 +482,7 @@ class SuratKeteranganLulusMataKuliahController extends Controller
             'nidn_dekan' => $data->nidn_kepala_prodi ? $data->nidn_kepala_prodi : $data->nidn_dekan,
             'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
             'stempel' => $stempelBase64,
+            'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak'),
             'ttd' => $tddBase64,
             'kopBase64' => $kopBase64,
         ];

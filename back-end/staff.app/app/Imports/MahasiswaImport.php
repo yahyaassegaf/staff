@@ -175,13 +175,12 @@ class MahasiswaImport implements ToCollection, WithHeadingRow, WithEvents, Skips
         }
     }
 
-    /**
-     * Mencari Prodi ID berdasarkan Alias atau Nama
-     */
     protected function resolveProdiId(string $identifier): ?int
     {
         $identifier = trim($identifier);
         if (empty($identifier)) return null;
+
+        $upperIdentifier = strtoupper($identifier);
 
         // Jika identifier adalah angka, coba cari langsung sebagai ID
         if (is_numeric($identifier)) {
@@ -189,7 +188,21 @@ class MahasiswaImport implements ToCollection, WithHeadingRow, WithEvents, Skips
             if ($prodi) return (int) $prodi->id;
         }
 
-        // Cari berdasarkan Alias (PBA, pba, dll)
+        // --- Custom Mapping SPI / SKI ---
+        // Jika di Excel tertulis SPI atau SKI, kita cari alias ski, spi, SKI, atau SPI di database
+        if (in_array($upperIdentifier, ['SPI', 'SKI'])) {
+            $prodi = Prodi::whereIn('alias', ['ski', 'SKI', 'spi', 'SPI'])->first();
+            if ($prodi) return (int) $prodi->id;
+        }
+
+        // --- Custom Mapping HKI / AS-HK / AS-HKI ---
+        // Jika di Excel tertulis HKI, AS-HK, atau AS-HKI, kita cari berbagai kombinasinya di database
+        if (in_array($upperIdentifier, ['HKI', 'AS-HK', 'AS-HKI'])) {
+            $prodi = Prodi::whereIn('alias', ['as-hk', 'AS-HK', 'as-hki', 'AS-HKI', 'hki', 'HKI'])->first();
+            if ($prodi) return (int) $prodi->id;
+        }
+
+        // Cari berdasarkan Alias reguler (PBA, pba, dll)
         $prodi = Prodi::where('alias', $identifier)->first();
         if ($prodi) return (int) $prodi->id;
 

@@ -106,8 +106,8 @@ class SuratKeteranganKknController extends Controller
                 'prodi_mhs' => 'required|string|max:255',
                 'alamat_rumah' => 'required|string',
                 'kelas_pondok' => 'required|string|max:255',
-                'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'tanggal' => 'nullable|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -144,8 +144,8 @@ class SuratKeteranganKknController extends Controller
             $skk->kelas_pondok    = $validate['kelas_pondok'];
             $skk->tanggal         = $validate['tanggal'];
             $skk->user_id         = Auth::user()->id;
-            $skk->status          = 'pending';
             $skk->petanda_tangan  = $validate['petanda_tangan'] ?? 'tidak';
+            $skk->status          = 'pending';
             $skk->save();
 
             $Nomor                = new NoSurat();
@@ -180,21 +180,23 @@ class SuratKeteranganKknController extends Controller
                 $tddBase64 = '';
                 $stempBase64 = '';
 
-                if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
-                    if (!empty($data->ttd)) {
-                if (str_starts_with($data->ttd, 'data:image')) {
-                    $tddBase64 = $data->ttd;
-                } else {
-                    $tddPath = base_path('../public_html/' . $data->ttd);
-                    if (file_exists($tddPath)) {
-                        $tddBase64 = SuratService::getBase64Image($tddPath);
-                    }
-                }
-            }
-
+                if (in_array($data->petanda_tangan, ['ya', 'stempel'])) {
                     $stempPath = base_path('../public_html/img/stempel.png');
                     if (file_exists($stempPath)) {
                         $stempBase64 = SuratService::getBase64Image($stempPath);
+                    }
+                }
+                
+                if (in_array($data->petanda_tangan, ['ya'])) {
+                    if (!empty($data->ttd)) {
+                        if (str_starts_with($data->ttd, 'data:image')) {
+                            $tddBase64 = $data->ttd;
+                        } else {
+                            $tddPath = base_path('../public_html/' . $data->ttd);
+                            if (file_exists($tddPath)) {
+                                $tddBase64 = SuratService::getBase64Image($tddPath);
+                            }
+                        }
                     }
                 }
 
@@ -331,7 +333,7 @@ class SuratKeteranganKknController extends Controller
                 'alamat_rumah' => 'required|string',
                 'kelas_pondok' => 'required|string|max:255',
                 'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ]);
 
             if ($validator->fails()) {
@@ -370,6 +372,7 @@ class SuratKeteranganKknController extends Controller
             $skk->alamat_rumah = $validate['alamat_rumah'];
             $skk->kelas_pondok = $validate['kelas_pondok'];
             $skk->tanggal = $validate['tanggal'];
+            $skk->prodi_id = $validate['prodi_id'];
             $skk->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $skk->save();
 
@@ -407,21 +410,23 @@ class SuratKeteranganKknController extends Controller
                 $tddBase64 = '';
                 $stempBase64 = '';
 
-                if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
-                    if (!empty($data->ttd)) {
-                if (str_starts_with($data->ttd, 'data:image')) {
-                    $tddBase64 = $data->ttd;
-                } else {
-                    $tddPath = base_path('../public_html/' . $data->ttd);
-                    if (file_exists($tddPath)) {
-                        $tddBase64 = SuratService::getBase64Image($tddPath);
-                    }
-                }
-            }
-
+                if (in_array($data->petanda_tangan, ['ya', 'stempel'])) {
                     $stempPath = base_path('../public_html/img/stempel.png');
                     if (file_exists($stempPath)) {
                         $stempBase64 = SuratService::getBase64Image($stempPath);
+                    }
+                }
+                
+                if (in_array($data->petanda_tangan, ['ya'])) {
+                    if (!empty($data->ttd)) {
+                        if (str_starts_with($data->ttd, 'data:image')) {
+                            $tddBase64 = $data->ttd;
+                        } else {
+                            $tddPath = base_path('../public_html/' . $data->ttd);
+                            if (file_exists($tddPath)) {
+                                $tddBase64 = SuratService::getBase64Image($tddPath);
+                            }
+                        }
                     }
                 }
 

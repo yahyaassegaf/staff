@@ -160,7 +160,7 @@
                 <div class="nama-ttd">
                     {{ $nama_kepala_prodi }}
                 </div>
-            </td>
+</td>
         </tr>
     </table>
 
@@ -236,7 +236,7 @@
                 <div class="nama-ttd">
                     {{ $nama_kepala_prodi }}
                 </div>
-            </td>
+</td>
         </tr>
     </table>
 

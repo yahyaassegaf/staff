@@ -206,7 +206,7 @@
 
                 <!-- Kanan: Kaprodi -->
                 <td width="45%" class="text-center" style="vertical-align: top;">
-                    Bangil, {{ $tanggal_surat }}<br>
+                    Pasuruan, {{ $tanggal_surat }}<br>
                     Kaprodi {{ $alias_prodi ?? $prodi_mhs }}
                     <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -25px; margin-bottom: -35px;">
                         <tr>

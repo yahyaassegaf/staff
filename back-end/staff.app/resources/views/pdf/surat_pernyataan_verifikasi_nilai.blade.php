@@ -171,7 +171,7 @@
 
             <!-- BLOK KANAN -->
             <td width="40%" style="text-align:center;">
-                Bangil, {{ $tanggal }}<br>
+                Pasuruan, {{ $tanggal }}<br>
                 {{ $staff }}<br>
 
                 <!-- AREA TTD (OVERLAY AMAN) -->

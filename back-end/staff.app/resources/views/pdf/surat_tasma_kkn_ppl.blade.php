@@ -186,7 +186,7 @@
 
             <!-- BLOK KANAN -->
             <td width="40%" style="text-align:center;">
-                Bangil, {{ $tanggal_surat }}<br>
+                Pasuruan, {{ $tanggal_surat }}<br>
                 Ketua TASMA, KKN & PPL<br>
 
                 <!-- AREA TTD (OVERLAY AMAN) -->

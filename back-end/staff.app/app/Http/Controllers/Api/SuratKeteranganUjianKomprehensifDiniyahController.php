@@ -88,6 +88,7 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
                 'tanggal'       => 'required|date',
                 'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
                 'ttd'           => 'nullable|string',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -133,7 +134,7 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
             $data->user_id = Auth::user()->id;
             $data->jenis_kelamin = Auth::user()->jenis_kelamin;
             $data->status = 'pending';
-            $data->petanda_tangan = 'tidak';
+            $data->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $data->save();
 
             $Nomor = new NoSurat();
@@ -173,15 +174,22 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
                 $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
                 
                 $tddBase64 = '';
-                if (!empty($ttdKetua)) {
-                    $tddPath = base_path('../public_html/' . $ttdKetua);
-                    if (file_exists($tddPath)) {
-                        $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                if (isset($refetched->petanda_tangan) && in_array($refetched->petanda_tangan, ['ya'])) {
+                    if (!empty($ttdKetua)) {
+                        $tddPath = base_path('../public_html/' . $ttdKetua);
+                        if (file_exists($tddPath)) {
+                            $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                        }
                     }
                 }
                 
-                $stempelPath = base_path('../public_html/img/stempel.png');
-                $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+                $stempelBase64 = '';
+                if (isset($refetched->petanda_tangan) && in_array($refetched->petanda_tangan, ['ya', 'stempel'])) {
+                    $stempelPath = base_path('../public_html/img/stempel.png');
+                    if (file_exists($stempelPath)) {
+                        $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+                    }
+                }
 
                 $jabatan = 'Ketua / Koordinator Komprehensip';
                 $pdfData = [
@@ -199,7 +207,8 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
                     'jabatan_penandatangan' => $jabatan,
                     'kopBase64' => $kopBase64,
                     'ttd' => $tddBase64,
-                    'stempel' => $stempelBase64
+                    'stempel' => $stempelBase64,
+                    'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak')
                 ];
 
                 $pdf = Pdf::loadView('pdf.komprehensif', $pdfData)->setPaper('a4', 'portrait');
@@ -309,6 +318,7 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
                 'tanggal' => 'sometimes|date',
                 'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
                 'ttd' => 'nullable|string',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ]);
 
             if ($validator->fails()) {
@@ -393,7 +403,7 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
             $data->drive_file_id = null;
             $data->drive_link = null;
             $data->status = 'pending';
-            $data->petanda_tangan = 'tidak';
+            $data->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $data->save();
 
             // Re-fetch record with joins to build the new PDF
@@ -420,11 +430,23 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
                 $kopPath = base_path('../public_html/img/kop.jpg');
                 $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
                 
-                $tddPath = base_path('../public_html/' . $ttdKetua);
-                $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                $tddBase64 = '';
+                if (isset($refetched->petanda_tangan) && in_array($refetched->petanda_tangan, ['ya'])) {
+                    if (!empty($ttdKetua)) {
+                        $tddPath = base_path('../public_html/' . $ttdKetua);
+                        if (file_exists($tddPath)) {
+                            $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                        }
+                    }
+                }
                 
-                $stempelPath = base_path('../public_html/img/stempel.png');
-                $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+                $stempelBase64 = '';
+                if (isset($refetched->petanda_tangan) && in_array($refetched->petanda_tangan, ['ya', 'stempel'])) {
+                    $stempelPath = base_path('../public_html/img/stempel.png');
+                    if (file_exists($stempelPath)) {
+                        $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
+                    }
+                }
 
                 $jabatan = 'Ketua / Koordinator Komprehensip';
                 $pdfData = [
@@ -442,7 +464,8 @@ class SuratKeteranganUjianKomprehensifDiniyahController extends Controller
                     'jabatan_penandatangan' => $jabatan,
                     'kopBase64' => $kopBase64,
                     'ttd' => $tddBase64,
-                    'stempel' => $stempelBase64
+                    'stempel' => $stempelBase64,
+                    'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak')
                 ];
 
                 $pdf = Pdf::loadView('pdf.komprehensif', $pdfData)->setPaper('a4', 'portrait');

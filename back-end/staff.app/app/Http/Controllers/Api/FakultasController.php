@@ -15,14 +15,12 @@ class FakultasController extends Controller
     public function index(Request $request)
     {
         $data = Fakultas::query();
-        $data->leftJoin('tanda_tangan', 'tanda_tangan.id', '=', 'fakultas.tanda_tangan_id');
         $data->select(
             'fakultas.id',
             'fakultas.nama as nama_fakultas',
             'fakultas.kode as kode_fakultas',
             'fakultas.dekan as dekan_fakultas',
-            'fakultas.tanda_tangan_id',
-            'tanda_tangan.nama as nama_ttd'
+            'fakultas.tanda_tangan_id'
         );
 
         if ($request->filled('search')) {
@@ -61,6 +59,14 @@ class FakultasController extends Controller
                 ->pluck('prodi.nama')
                 ->implode(', ');
 
+            $ttdIds = is_string($fakultas->tanda_tangan_id) ? json_decode($fakultas->tanda_tangan_id, true) : $fakultas->tanda_tangan_id;
+            if (is_array($ttdIds) && count($ttdIds) > 0) {
+                $ttdNames = \App\Models\TandaTangan::whereIn('id', $ttdIds)->pluck('nama')->implode(', ');
+            } else {
+                $ttdNames = null;
+            }
+
+            $fakultas->nama_ttd = $ttdNames;
             $fakultas->nama_prodi = $prodis;
             return $fakultas;
         });
@@ -83,7 +89,8 @@ class FakultasController extends Controller
                 'nama_fakultas' => 'required',
                 'dekan'        => 'required',
                 'nidn_dekan'   => 'nullable|string|max:100',
-                'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
+                'tanda_tangan_id' => 'nullable|array',
+                'tanda_tangan_id.*' => 'exists:tanda_tangan,id',
                 'prodi'        => 'required|array',
                 'prodi.*.id'   => 'required|exists:prodi,id',
             ]);
@@ -103,7 +110,13 @@ class FakultasController extends Controller
             $fakultas->kode  = $validate['kode_fakultas'];
             $fakultas->dekan = $validate['dekan'];
             $fakultas->nidn_dekan = $validate['nidn_dekan'] ?? null;
-            $fakultas->tanda_tangan_id = $validate['tanda_tangan_id'] ?? null;
+            $ttd_ids = null;
+            if (isset($validate['tanda_tangan_id']) && is_array($validate['tanda_tangan_id'])) {
+                $ttd_ids = array_map(function($item) {
+                    return is_array($item) ? $item['id'] : $item;
+                }, $validate['tanda_tangan_id']);
+            }
+            $fakultas->tanda_tangan_id = $ttd_ids;
             $fakultas->save();
 
             foreach ($request->prodi as $selectedProdi) {
@@ -142,15 +155,21 @@ class FakultasController extends Controller
             ->select('prodi.*')
             ->get();
 
-        $data = [
-            'id' => $fakultas->id,
-            'nama_fakultas' => $fakultas->nama,
-            'kode_fakultas' => $fakultas->kode,
-            'dekan' => $fakultas->dekan,
-            'nidn_dekan' => $fakultas->nidn_dekan,
-            'tanda_tangan_id' => $fakultas->tanda_tangan_id,
-            'prodi' => $linkedProdis
-        ];
+            $ttdData = [];
+            $ttdIds = is_string($fakultas->tanda_tangan_id) ? json_decode($fakultas->tanda_tangan_id, true) : $fakultas->tanda_tangan_id;
+            if (is_array($ttdIds) && count($ttdIds) > 0) {
+                $ttdData = \App\Models\TandaTangan::whereIn('id', $ttdIds)->get();
+            }
+
+            $data = [
+                'id' => $fakultas->id,
+                'nama_fakultas' => $fakultas->nama,
+                'kode_fakultas' => $fakultas->kode,
+                'dekan' => $fakultas->dekan,
+                'nidn_dekan' => $fakultas->nidn_dekan,
+                'tanda_tangan_id' => $ttdData,
+                'prodi' => $linkedProdis
+            ];
 
         return response()->json([
             'status' => true,
@@ -168,7 +187,8 @@ class FakultasController extends Controller
                 'nama_fakultas' => 'required',
                 'dekan'        => 'required',
                 'nidn_dekan'   => 'nullable|string|max:100',
-                'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
+                'tanda_tangan_id' => 'nullable|array',
+                'tanda_tangan_id.*' => 'exists:tanda_tangan,id',
                 'prodi'        => 'required|array',
             ]);
 
@@ -196,7 +216,17 @@ class FakultasController extends Controller
             $fakultas->kode  = $validate['kode_fakultas'];
             $fakultas->dekan = $validate['dekan'];
             $fakultas->nidn_dekan = $validate['nidn_dekan'] ?? $fakultas->nidn_dekan;
-            $fakultas->tanda_tangan_id = $validate['tanda_tangan_id'] ?? $fakultas->tanda_tangan_id;
+            $ttd_ids = $fakultas->tanda_tangan_id;
+            if (array_key_exists('tanda_tangan_id', $validate)) {
+                if (is_array($validate['tanda_tangan_id'])) {
+                    $ttd_ids = array_map(function($item) {
+                        return is_array($item) ? $item['id'] : $item;
+                    }, $validate['tanda_tangan_id']);
+                } else {
+                    $ttd_ids = null;
+                }
+            }
+            $fakultas->tanda_tangan_id = $ttd_ids;
             $fakultas->save();
 
             // Sync Prodis (Delete all, create new)

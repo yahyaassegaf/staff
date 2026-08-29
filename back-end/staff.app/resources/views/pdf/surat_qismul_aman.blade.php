@@ -174,9 +174,23 @@
         <tr>
             <td width="50%"></td>
             <td width="50%" style="text-align:center;">
-                Bangil, {{ $tanggal_surat }}<br>
+                Pasuruan, {{ $tanggal_surat }}<br>
                 Ketua Qismul Aman<br>
-                <br><br><br>
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -15px; margin-bottom: -20px;">
+                    <tr>
+                        <td style="height: 125px; text-align:center; vertical-align:middle; padding: 0;">
+                            <div style="position: relative; width: 100%; height: 125px;">
+                                @if(!empty($stempel))
+                                <img src="{{ $stempel }}" style="position: absolute; left: 15px; top: 5px; width: 110px; height: 110px; z-index: 2;">
+                                @endif
+
+                                @if(!empty($ttd))
+                                <img src="{{ $ttd }}" style="position: absolute; left: 25px; top: 15px; width: 200px; z-index: 1;">
+                                @endif
+                            </div>
+                        </td>
+                    </tr>
+                </table>
                 {{ $ketua }}
             </td>
         </tr>

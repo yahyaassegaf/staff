@@ -83,7 +83,7 @@ class SuratIzinPenelitianController extends Controller
                 'semester' => 'required|string|max:255',
                 'dari_tanggal' => 'required|date',
                 'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -105,16 +105,15 @@ class SuratIzinPenelitianController extends Controller
             $sip->nomor = $formattedNoSurat;
             $sip->nama = $validate['nama'];
             $sip->nim = $validate['nim'];
-            $sip->prodi_mhs = $validate['prodi_mhs'] ?? null;
-            $sip->kepada = $validate['kepada'] ?? null;
+            $sip->kepada = $validate['kepada'];
+            $sip->prodi_id = $validate['prodi_id'];
+            $sip->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $sip->semester = $validate['semester'];
             $sip->dari_tanggal = $validate['dari_tanggal'];
             $sip->tanggal = $validate['tanggal'];
-            $sip->prodi_id = $validate['prodi_id'];
             $sip->user_id = Auth::user()->id;
             $sip->jenis_kelamin = Auth::user()->jenis_kelamin;
             $sip->status = 'pending';
-            $sip->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $sip->save();
 
             $Nomor = new NoSurat();
@@ -155,21 +154,23 @@ class SuratIzinPenelitianController extends Controller
                 $tddBase64 = '';
                 $stempelBase64 = '';
 
-                if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
-                    if (!empty($data->ttd)) {
-                if (str_starts_with($data->ttd, 'data:image')) {
-                    $tddBase64 = $data->ttd;
-                } else {
-                    $tddPath = base_path('../public_html/' . $data->ttd);
-                    if (file_exists($tddPath)) {
-                        $tddBase64 = SuratService::getBase64Image($tddPath);
-                    }
-                }
-            }
-
+                if (in_array($data->petanda_tangan, ['ya', 'stempel'])) {
                     $stempelPath = base_path('../public_html/img/stempel.png');
                     if (file_exists($stempelPath)) {
                         $stempelBase64 = SuratService::getBase64Image($stempelPath);
+                    }
+                }
+
+                if (in_array($data->petanda_tangan, ['ya'])) {
+                    if (!empty($data->ttd)) {
+                        if (str_starts_with($data->ttd, 'data:image')) {
+                            $tddBase64 = $data->ttd;
+                        } else {
+                            $tddPath = base_path('../public_html/' . $data->ttd);
+                            if (file_exists($tddPath)) {
+                                $tddBase64 = SuratService::getBase64Image($tddPath);
+                            }
+                        }
                     }
                 }
 
@@ -187,10 +188,9 @@ class SuratIzinPenelitianController extends Controller
                     'fakultas_name' => $data->fakultas_name,
                     'kopBase64' => $kopBase64,
                     'ttd' => $tddBase64,
-                    'stempel' => $stempelBase64
+                    'stempel' => $stempelBase64,
+                    'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak')
                 ];
-
-                //$data->nama_ttd
 
                 $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi_name ?? 'UMUM');
                 $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratIzinPenelitianController/');
@@ -294,7 +294,7 @@ class SuratIzinPenelitianController extends Controller
                 'semester' => 'required|string|max:255',
                 'dari_tanggal' => 'required|date',
                 'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ]);
 
             if ($validator->fails()) {
@@ -376,21 +376,23 @@ class SuratIzinPenelitianController extends Controller
                 $tddBase64 = '';
                 $stempelBase64 = '';
 
-                if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
-                    if (!empty($data->ttd)) {
-                if (str_starts_with($data->ttd, 'data:image')) {
-                    $tddBase64 = $data->ttd;
-                } else {
-                    $tddPath = base_path('../public_html/' . $data->ttd);
-                    if (file_exists($tddPath)) {
-                        $tddBase64 = SuratService::getBase64Image($tddPath);
-                    }
-                }
-            }
-
+                if (in_array($data->petanda_tangan, ['ya', 'stempel'])) {
                     $stempelPath = base_path('../public_html/img/stempel.png');
                     if (file_exists($stempelPath)) {
                         $stempelBase64 = SuratService::getBase64Image($stempelPath);
+                    }
+                }
+
+                if (in_array($data->petanda_tangan, ['ya'])) {
+                    if (!empty($data->ttd)) {
+                        if (str_starts_with($data->ttd, 'data:image')) {
+                            $tddBase64 = $data->ttd;
+                        } else {
+                            $tddPath = base_path('../public_html/' . $data->ttd);
+                            if (file_exists($tddPath)) {
+                                $tddBase64 = SuratService::getBase64Image($tddPath);
+                            }
+                        }
                     }
                 }
 
@@ -406,10 +408,10 @@ class SuratIzinPenelitianController extends Controller
                     'nidn_dekan' => $data->nidn_dekan,
                     'prodi_name' => $data->prodi_name,
                     'fakultas_name' => $data->fakultas_name,
-
                     'kopBase64' => $kopBase64,
                     'ttd' => $tddBase64,
-                    'stempel' => $stempelBase64
+                    'stempel' => $stempelBase64,
+                    'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak')
                 ];
 
                 $prodiName = Auth::user()?->prodi ? Auth::user()->prodi->nama : ($data->prodi_name ?? 'UMUM');

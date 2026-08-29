@@ -169,7 +169,7 @@
         <tr>
             <td width="60%"></td>
             <td width="40%" class="text-center">
-                Bangil, {{ $tanggal_surat }}<br>
+                Pasuruan, {{ $tanggal_surat }}<br>
                 Ketua / Koordinator Komprehensif<br>
 
                 <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: -20px; margin-bottom: -25px;">

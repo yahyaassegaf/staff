@@ -139,7 +139,7 @@
 
                 <!-- BLOK KANAN -->
                 <td width="40%" style="text-align:center;">
-                    Bangil, {{ $tanggal }}<br>
+                    Pasuruan, {{ $tanggal }}<br>
                     Kepala Prodi
                     <!-- AREA TTD (OVERLAY AMAN) -->
                     <table width="100%" cellpadding="0" cellspacing="0"
@@ -154,7 +154,7 @@
                                     @if(!empty($stempel))
                                     <img src="{{ $stempel }}" style="position: absolute; left: -10px; top: 5px; width: 110px; height: 110px; z-index: 2;">
                                     @endif
-                                    
+
                                     @if(!empty($ttd))
                                     <img src="{{ $ttd }}" style="position: absolute; left: 0px; top: 15px; width: 200px; z-index: 1;">
 

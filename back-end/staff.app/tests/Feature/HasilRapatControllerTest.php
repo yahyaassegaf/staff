@@ -4,12 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\HasilRapat;
 use App\Models\AnggotaRapat;
+use App\Models\JenisSurat;
 use App\Models\Level;
+use App\Models\LogSurat;
 use App\Models\Prodi;
 use App\Models\User;
-use App\Models\NoSurat;
-use App\Models\LogSurat;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -17,7 +17,7 @@ use Tests\TestCase;
 
 class HasilRapatControllerTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseMigrations;
 
     private $staffLevel;
     private $adminLevel;
@@ -103,6 +103,22 @@ class HasilRapatControllerTest extends TestCase
             'prodi_id' => $this->prodiPba->id,
             'jenis_kelamin' => 'P',
             'email' => 'dosenpba2@example.com'
+        ]);
+
+        // 5. Setup JenisSurat untuk STHR
+        if (!\Illuminate\Support\Facades\Schema::hasTable('jenis_surat')) {
+            \Illuminate\Support\Facades\Schema::create('jenis_surat', function (\Illuminate\Database\Schema\Blueprint $table) {
+                $table->id();
+                $table->string('alias', 255);
+                $table->string('format_surat', 255);
+                $table->string('nama', 255)->nullable();
+                $table->timestamps();
+            });
+        }
+
+        JenisSurat::create([
+            'alias' => 'STHR',
+            'format_surat' => 'SU-{NO}/UII.085/K.{PRODI}/PP.00/{BULAN}/{TAHUN}',
         ]);
     }
 
@@ -236,12 +252,13 @@ class HasilRapatControllerTest extends TestCase
     }
 
     /**
-     * Test store hasil rapat successfully
+     * Test store hasil rapat successfully with no_surat
      */
-    public function test_store_hasil_rapat()
+    public function test_store_hasil_rapat_with_no_surat()
     {
         $response = $this->actingAs($this->staffUser, 'sanctum')
             ->postJson('/api/hasil-rapat', [
+                'no_surat' => '001',
                 'prodi_id' => $this->prodiPba->id,
                 'agenda' => 'Rapat Rencana Strategis PBA',
                 'tanggal' => '2026-05-25',
@@ -269,6 +286,10 @@ class HasilRapatControllerTest extends TestCase
 
         $hasilRapat = HasilRapat::where('agenda', 'Rapat Rencana Strategis PBA')->first();
 
+        // Assert nomor_surat is formatted using SuratService::formatNomorSurat('STHR', ...)
+        $expectedNomor = \App\Services\SuratService::formatNomorSurat('STHR', '001', '2026-05-25', $this->prodiPba->id);
+        $this->assertEquals($expectedNomor, $hasilRapat->nomor_surat);
+
         // Assert Anggota Rapat entries
         $this->assertDatabaseHas('anggota_rapat', [
             'hasil_rapat_id' => $hasilRapat->id,
@@ -278,19 +299,30 @@ class HasilRapatControllerTest extends TestCase
             'hasil_rapat_id' => $hasilRapat->id,
             'user_id' => $this->memberUser2->id
         ]);
+    }
 
-        // Assert NoSurat is updated
-        $this->assertDatabaseHas('nomor', [
-            'nomor' => '001',
-            'user_id' => $this->staffUser->id
-        ]);
+    /**
+     * Test store hasil rapat without no_surat (nomor_surat should be null)
+     */
+    public function test_store_hasil_rapat_without_no_surat()
+    {
+        $response = $this->actingAs($this->staffUser, 'sanctum')
+            ->postJson('/api/hasil-rapat', [
+                'prodi_id' => $this->prodiPba->id,
+                'agenda' => 'Rapat Tanpa Nomor Surat',
+                'tanggal' => '2026-05-25',
+                'waktu' => '10:00',
+                'tempat' => 'Meeting Room B',
+            ]);
 
-        // Assert LogSurat is saved
-        $this->assertDatabaseHas('log_surat', [
-            'nomor' => '001',
-            'nama_surat' => 'Hasil Rapat',
-            'user_id' => $this->staffUser->id
-        ]);
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => true,
+                'message' => 'Data berhasil ditambahkan'
+            ]);
+
+        $hasilRapat = HasilRapat::where('agenda', 'Rapat Tanpa Nomor Surat')->first();
+        $this->assertNull($hasilRapat->nomor_surat);
     }
 
     /**
@@ -365,7 +397,7 @@ class HasilRapatControllerTest extends TestCase
     }
 
     /**
-     * Test update hasil rapat, sync members, drive delete, and generate PDF
+     * Test update hasil rapat with no_surat
      */
     public function test_update_hasil_rapat()
     {
@@ -390,6 +422,7 @@ class HasilRapatControllerTest extends TestCase
 
         $response = $this->actingAs($this->staffUser, 'sanctum')
             ->putJson("/api/hasil-rapat/{$hasil->id}", [
+                'no_surat' => '002',
                 'agenda' => 'Agenda Rapat Baru Update',
                 'tanggal' => '2026-05-26',
                 'waktu' => '13:00',
@@ -407,14 +440,17 @@ class HasilRapatControllerTest extends TestCase
             ]);
 
         // Assert fields updated
-        $this->assertDatabaseHas('hasil_rapat', [
-            'id' => $hasil->id,
-            'agenda' => 'Agenda Rapat Baru Update',
-            'tanggal' => '2026-05-26',
-            'waktu' => '13:00',
-            'status' => 'pending',
-            'drive_file_id' => null // old drive ID cleared
-        ]);
+        $updatedHasil = HasilRapat::find($hasil->id);
+
+        $this->assertEquals('Agenda Rapat Baru Update', $updatedHasil->agenda);
+        $this->assertEquals('2026-05-26', $updatedHasil->tanggal);
+        $this->assertEquals('13:00', $updatedHasil->waktu);
+        $this->assertEquals('pending', $updatedHasil->status);
+        $this->assertNull($updatedHasil->drive_file_id);
+
+        // Assert nomor_surat is re-formatted
+        $expectedNomor = \App\Services\SuratService::formatNomorSurat('STHR', '002', '2026-05-26', $this->prodiPba->id);
+        $this->assertEquals($expectedNomor, $updatedHasil->nomor_surat);
 
         // Assert memberUser2 is removed and memberUser1 is synced
         $this->assertDatabaseHas('anggota_rapat', [
@@ -427,12 +463,37 @@ class HasilRapatControllerTest extends TestCase
         ]);
 
         // Assert local_path is set in the database
-        $updatedHasil = HasilRapat::find($hasil->id);
         $this->assertNotNull($updatedHasil->local_path);
         $this->assertFileExists($updatedHasil->local_path);
 
         // Assert dispatching of UploudSuratToDrive job
         Queue::assertPushed(\App\Jobs\UploudSuratToDrive::class);
+    }
+
+    /**
+     * Test update hasil rapat without no_surat keeps existing nomor_surat
+     */
+    public function test_update_hasil_rapat_without_no_surat_keeps_existing()
+    {
+        $hasil = HasilRapat::create([
+            'nomor_surat' => 'SU-001/UII.085/K.PBA/PP.00/05/2026',
+            'prodi_id' => $this->prodiPba->id,
+            'agenda' => 'Agenda Rapat Lama',
+            'tanggal' => '2026-05-25',
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($this->staffUser, 'sanctum')
+            ->putJson("/api/hasil-rapat/{$hasil->id}", [
+                'agenda' => 'Agenda Rapat Update Tanpa No Surat',
+                'tanggal' => '2026-05-26',
+            ]);
+
+        $response->assertStatus(200);
+
+        // nomor_surat should remain unchanged
+        $updatedHasil = HasilRapat::find($hasil->id);
+        $this->assertEquals('SU-001/UII.085/K.PBA/PP.00/05/2026', $updatedHasil->nomor_surat);
     }
 
     /**
@@ -467,15 +528,23 @@ class HasilRapatControllerTest extends TestCase
      */
     public function test_download_pdf()
     {
+        // Buat file dummy
+        $dummyPath = base_path('../public_html/pdf/hasil_rapat_dummy_' . time() . '.pdf');
+        if (!is_dir(dirname($dummyPath))) {
+            mkdir(dirname($dummyPath), 0777, true);
+        }
+        file_put_contents($dummyPath, 'dummy pdf content');
+
         $hasil = HasilRapat::create([
             'nomor_surat' => 'SU-001/UII.085/K.PBA/PP.00/05/2026',
             'prodi_id' => $this->prodiPba->id,
             'agenda' => 'Rapat Unduh PDF',
             'tanggal' => '2026-05-25',
-            'status' => 'pending'
+            'status' => 'pending',
+            'local_path' => $dummyPath
         ]);
 
-        $response = $this->getJson("/api/hasil-rapat/download-pdf/{$hasil->id}");
+        $response = $this->actingAs($this->staffUser, 'sanctum')->getJson("/api/hasil-rapat/download-pdf/{$hasil->id}");
 
         $response->assertStatus(200)
             ->assertHeader('Content-Type', 'application/pdf');

@@ -36,6 +36,7 @@ class SuratKeteranganDaftarS2Controller extends Controller
         }
 
         $login = Auth::user()->prodi;
+        log::info('login : ' . json_encode($login->id));
         if ($login) {
             $data->where('surat_keterangan_daftar_s2.prodi_id', $login->id);
         }
@@ -64,6 +65,8 @@ class SuratKeteranganDaftarS2Controller extends Controller
 
         $data = $data->paginate($request->input('limit', 10));
 
+        Log::info('data : ' . json_encode($data));
+
         return response()->json(
             [
                 'status' => true,
@@ -84,7 +87,8 @@ class SuratKeteranganDaftarS2Controller extends Controller
                 'nim' => 'required|string|max:255',
                 'prodi' => 'required|string|max:255',
                 'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'alasan' => 'nullable|string',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -110,10 +114,10 @@ class SuratKeteranganDaftarS2Controller extends Controller
             $s2->nim = $validate['nim'];
             $s2->prodi = $validate['prodi'];
             $s2->tanggal = $validate['tanggal'];
+            $s2->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $s2->user_id = Auth::user()->id;
             $s2->jenis_kelamin = Auth::user()->jenis_kelamin;
             $s2->status = 'pending';
-            $s2->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $s2->save();
 
             $Nomor              = new NoSurat();
@@ -251,7 +255,8 @@ class SuratKeteranganDaftarS2Controller extends Controller
                 'nim' => 'required|string|max:255',
                 'prodi' => 'required|string|max:255',
                 'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'alasan' => 'nullable|string',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ]);
 
             if ($validator->fails()) {
@@ -326,14 +331,14 @@ class SuratKeteranganDaftarS2Controller extends Controller
                 $directory = base_path('../public_html/pdf/' . $prodiFolder . '/SuratKeteranganDaftarS2Controller');
                 $pdf = Pdf::loadView('pdf.surat_keterangan_daftar_s2', $pdfData)->setPaper('a4', 'portrait');
                 $fileName = 'surat_keterangan_daftar_s2_' . $data->nim . '_' . uniqid() . '.pdf';
- 
+
                 if (!\Illuminate\Support\Facades\File::exists($directory)) {
                     \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
                 }
- 
+
                 $path = $directory . '/' . $fileName;
                 $pdf->save($path);
- 
+
                 $data->update(['local_path' => $path]);
 
                 $nameTable = 'Surat Keterangan Daftar S2';
@@ -409,12 +414,14 @@ class SuratKeteranganDaftarS2Controller extends Controller
         $stempelBase64 = '';
         $tddBase64 = '';
 
-        if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
+        if (isset($data->petanda_tangan) && in_array($data->petanda_tangan, ['ya', 'stempel'])) {
             $stempelPath = base_path('../public_html/img/stempel.png');
             if (file_exists($stempelPath)) {
                 $stempelBase64 = SuratService::getBase64Image($stempelPath);
             }
+        }
 
+        if (isset($data->petanda_tangan) && in_array($data->petanda_tangan, ['ya'])) {
             $ttdImage = ($jabatan && $jabatan->tandaTangan) ? ($jabatan->tandaTangan->tdd ?? $jabatan->tandaTangan->gambar) : $data->ttd;
             if (!empty($ttdImage)) {
                 if (str_starts_with($ttdImage, 'data:image')) {
@@ -444,6 +451,7 @@ class SuratKeteranganDaftarS2Controller extends Controller
             'nidn_kepala_prodi' => $jabatan ? $jabatan->nidn : $data->nidn_kepala_prodi,
             'kopBase64' => $kopBase64,
             'stempel' => $stempelBase64,
+            'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak'),
             'ttd' => $tddBase64
         ];
     }

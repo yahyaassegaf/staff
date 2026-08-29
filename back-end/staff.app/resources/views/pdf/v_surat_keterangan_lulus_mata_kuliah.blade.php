@@ -185,17 +185,17 @@
 
             <!-- BLOK KANAN -->
             <td width="40%" style="text-align:center;">
-                Bangil, {{ $tanggal_surat }}<br>
+                Pasuruan, {{ $tanggal_surat }}<br>
                 Ketua Prodi {{ $alias_prodi }}<br>
 
                 <!-- AREA TTD (OVERLAY AMAN) -->
-                <div style="position: relative; width: 280px; height: 120px; margin: 0 auto; margin-top: -10px; margin-bottom: -35px;">
+                <div style="position: relative; width: 280px; height: 130px; margin: 0 auto; margin-top: -10px; margin-bottom: -35px;">
                     @if(!empty($stempel))
-                    <img src="{{ $stempel }}" style="position: absolute; left: 20px; top: -5px; width: 110px; height: 110px; z-index: 2;">
+                    <img src="{{ $stempel }}" style="position: absolute; left: 20px; top: 5px; width: 110px; height: 110px; z-index: 2;">
                     @endif
 
                     @if(!empty($ttd))
-                    <img src="{{ $ttd }}" style="position: absolute; left: 70px; top: 10px; max-width:220px; max-height: 90px; object-fit: contain; z-index: 1;">
+                    <img src="{{ $ttd }}" style="position: absolute; left: 60px; top: -5px; max-width:250px; max-height: 135px; object-fit: contain; z-index: 1;">
                     @endif
                 </div>
                 <div class="nama-ttd" style="margin-top:4px;">

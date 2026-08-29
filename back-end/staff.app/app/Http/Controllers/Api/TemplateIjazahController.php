@@ -101,7 +101,7 @@ class TemplateIjazahController extends Controller
             $templateIjazah->ukuran_kertas = $validate['ukuran_kertas'];
             $templateIjazah->orientasi = $validate['orientasi'];
             $templateIjazah->is_active = $validate['is_active'] ?? 'aktif';
-            
+
             if (isset($validate['teks_statis'])) {
                 $teksStatis = $validate['teks_statis'];
                 if (is_string($teksStatis)) {
@@ -144,7 +144,6 @@ class TemplateIjazahController extends Controller
                     'message' => 'Data tidak ditemukan'
                 ], 404);
             }
-
             // Load positional fields from posisi_template and convert back into expected JSON 
             $positions = \App\Models\PosisiTemplate::where('template_id', $id)->get();
             $fields_positions = [];
@@ -228,13 +227,13 @@ class TemplateIjazahController extends Controller
             } else if ($request->has('prodi_id') && empty($request->prodi_id)) {
                 $templateIjazah->prodi_id = null;
             }
-            
+
             if (array_key_exists('jenjang', $validate)) {
                 $templateIjazah->jenjang = $validate['jenjang'];
             } else if ($request->has('jenjang') && empty($request->jenjang)) {
                 $templateIjazah->jenjang = null;
             }
-            
+
             $templateIjazah->nama_template = $validate['nama_template'];
 
             if ($request->hasFile('file_background')) {
@@ -251,16 +250,24 @@ class TemplateIjazahController extends Controller
 
             if (array_key_exists('teks_statis', $validate)) {
                 $teksStatis = $validate['teks_statis'];
-                if ($teksStatis && $teksStatis !== '[]' && $teksStatis !== 'null') {
+                Log::info('teks_statis received:', ['type' => gettype($teksStatis), 'value' => $teksStatis]);
+                
+                if ($teksStatis !== null && $teksStatis !== '' && $teksStatis !== '[]' && $teksStatis !== 'null') {
+                    // Handle both array (from JSON body) and string (from form-data) inputs
                     if (is_string($teksStatis)) {
-                        $templateIjazah->teks_statis = json_decode($teksStatis, true);
-                    } else {
+                        $decoded = json_decode($teksStatis, true);
+                        $templateIjazah->teks_statis = $decoded;
+                    } else if (is_array($teksStatis)) {
                         $templateIjazah->teks_statis = $teksStatis;
                     }
                 } else {
                     $templateIjazah->teks_statis = null;
                 }
+                Log::info('teks_statis to save:', ['value' => $templateIjazah->teks_statis]);
             }
+
+
+
 
             $templateIjazah->user_id = Auth::user()->id;
 
@@ -273,6 +280,9 @@ class TemplateIjazahController extends Controller
                 $posRaw = $validate['fields_positions'];
                 $positions = is_string($posRaw) ? json_decode($posRaw, true) : $posRaw;
                 
+                \Illuminate\Support\Facades\Log::info('DEBUG POSITIONS ARRAY:', is_array($positions) ? array_keys($positions) : []);
+                file_put_contents(public_path('debug_positions.txt'), "Received fields:\n" . print_r(is_array($positions) ? array_keys($positions) : [], true));
+
                 if (is_array($positions)) {
                     $keysToKeep = array_keys($positions);
                     \App\Models\PosisiTemplate::where('template_id', $templateIjazah->id)

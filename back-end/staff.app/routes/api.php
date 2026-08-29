@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\BatchController;
 use App\Http\Controllers\Api\JenisSuratController;
 use App\Http\Controllers\Api\SuratKeteranganSpmController;
 use App\Http\Controllers\Api\SuratKeteranganDaftarS2Controller;
+use App\Http\Controllers\Api\TranskipController;
 
 // Route::get('/user', function (Request $request) {
 //     return $request->user();
@@ -163,6 +164,7 @@ Route::post('/surat-tugas', [SuratTugasController::class, 'store'])->middleware(
 Route::put('/surat-tugas/{id}', [SuratTugasController::class, 'update'])->middleware('auth:sanctum');
 Route::delete('/surat-tugas/{id}', [SuratTugasController::class, 'destroy'])->middleware('auth:sanctum');
 Route::get('/surat-tugas/download-pdf/{id}', [SuratTugasController::class, 'downloadPdf'])->middleware('auth:sanctum');
+Route::get('/get-dosen', [SuratTugasController::class, 'getDosen'])->middleware('auth:sanctum');
 
 // Surat Keterangan Transfer Routes
 Route::get('/surat-keterangan-transfer', [SuratKeteranganTransferController::class, 'index'])->middleware('auth:sanctum');
@@ -183,11 +185,11 @@ Route::get('/surat-izin-penelitian/download-pdf/{id}', [SuratIzinPenelitianContr
 
 // Hasil Rapat Routes
 Route::get('/hasil-rapat', [HasilRapatController::class, 'index'])->middleware('auth:sanctum');
+Route::get('/hasil-rapat/download-pdf/{id}', [HasilRapatController::class, 'downloadPdf'])->middleware('auth:sanctum');
 Route::get('/hasil-rapat/{id}', [HasilRapatController::class, 'show'])->middleware('auth:sanctum');
 Route::post('/hasil-rapat', [HasilRapatController::class, 'store'])->middleware('auth:sanctum');
 Route::put('/hasil-rapat/{id}', [HasilRapatController::class, 'update'])->middleware('auth:sanctum');
 Route::delete('/hasil-rapat/{id}', [HasilRapatController::class, 'destroy'])->middleware('auth:sanctum');
-Route::get('/hasil-rapat/download-pdf/{id}', [HasilRapatController::class, 'downloadPdf'])->middleware('auth:sanctum');
 
 // Tanda Tangan Routes
 Route::get('/tanda-tangan', [TandaTanganController::class, 'index'])->middleware('auth:sanctum');
@@ -227,20 +229,6 @@ Route::put('/batch/{id}', [BatchController::class, 'update'])->middleware('auth:
 Route::delete('/batch/{id}', [BatchController::class, 'destroy'])->middleware('auth:sanctum');
 
 // Print Ijazah
-Route::get('/debug-fakultas/{batch_id}', function ($batch_id) {
-    $mahasiswas = \App\Models\Mahasiswa::where('batch_id', $batch_id)->get();
-    $prodiIds = $mahasiswas->pluck('prodi_id')->unique()->filter()->toArray();
-    $fakultasList = \Illuminate\Support\Facades\DB::table('fakultas_prodi')
-        ->join('fakultas', 'fakultas.id', '=', 'fakultas_prodi.fakultas_id')
-        ->whereIn('fakultas_prodi.prodi_id', $prodiIds)
-        ->select('fakultas_prodi.prodi_id', 'fakultas.nama', 'fakultas.alias', 'fakultas.nidn_dekan', 'fakultas.dekan')
-        ->get()
-        ->keyBy('prodi_id');
-    return response()->json([
-        'prodiIds' => $prodiIds,
-        'fakultasList' => $fakultasList
-    ]);
-});
 
 Route::get('/print-ijazah/batch/{batch_id}', [\App\Http\Controllers\Api\PrintIjazahController::class, 'getBatchPrint'])->middleware('auth:sanctum');
 
@@ -269,3 +257,17 @@ Route::get('/sk6/download-pdf/{id}', [\App\Http\Controllers\Api\Sk6Controller::c
 // File Manager Routes
 Route::get('/file-manager/list', [\App\Http\Controllers\Api\FileManagerController::class, 'index'])->middleware('auth:sanctum');
 Route::get('/file-manager/download-zip', [\App\Http\Controllers\Api\FileManagerController::class, 'downloadZip'])->middleware('auth:sanctum');
+
+// Transkip Routes
+Route::get('/transkip', [TranskipController::class, 'index'])->middleware('auth:sanctum');
+Route::get('/transkip/predikat', [TranskipController::class, 'getPredikat'])->middleware('auth:sanctum');
+Route::get('/transkip/{id}', [TranskipController::class, 'show'])->middleware('auth:sanctum');
+Route::get('/transkip/{id}/nilai', [TranskipController::class, 'getNilai'])->middleware('auth:sanctum');
+Route::post('/transkip/{id}/nilai/refresh', [TranskipController::class, 'refreshNilai'])->middleware('auth:sanctum');
+Route::post('/transkip', [TranskipController::class, 'store'])->middleware('auth:sanctum');
+Route::post('/transkip/nilai', [TranskipController::class, 'storeNilai'])->middleware('auth:sanctum');
+
+Route::get('/run-migration-temp', function () {
+    \Illuminate\Support\Facades\DB::statement('ALTER TABLE fakultas MODIFY tanda_tangan_id VARCHAR(255) NULL;');
+    return response()->json(['success' => true]);
+});

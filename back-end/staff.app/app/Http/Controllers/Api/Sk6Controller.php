@@ -163,8 +163,8 @@ class Sk6Controller extends Controller
             $sklmk->tanggal = $tanggal;
             $sklmk->user_id = $user->id;
             $sklmk->jenis_kelamin = $user->jenis_kelamin;
-            $sklmk->status = 'pending';
             $sklmk->petanda_tangan = 'tidak';
+            $sklmk->status = 'pending';
             $sklmk->save();
 
             $nomorSklmkObj = new NoSurat();
@@ -193,8 +193,8 @@ class Sk6Controller extends Controller
             $skak->tanggal = $tanggal;
             $skak->user_id = $user->id;
             $skak->jenis_kelamin = $user->jenis_kelamin;
-            $skak->status = 'pending';
             $skak->petanda_tangan = 'tidak';
+            $skak->status = 'pending';
             $skak->save();
 
             $nomorSkakObj = new NoSurat();
@@ -229,8 +229,8 @@ class Sk6Controller extends Controller
             $sktkp->tanggal = $tanggal;
             $sktkp->user_id = $user->id;
             $sktkp->jenis_kelamin = $user->jenis_kelamin;
-            $sktkp->status = 'pending';
             $sktkp->petanda_tangan = 'tidak';
+            $sktkp->status = 'pending';
             $sktkp->save();
 
             $nomorSktkpObj = new NoSurat();
@@ -266,8 +266,8 @@ class Sk6Controller extends Controller
             $skqa->tanggal_berlaku_sampai = $validate['tanggal_berlaku_sampai'] ?? null;
             $skqa->user_id = $user->id;
             $skqa->jenis_kelamin = $user->jenis_kelamin;
-            $skqa->status = 'pending';
             $skqa->petanda_tangan = 'tidak';
+            $skqa->status = 'pending';
             $skqa->save();
 
             $nomorSkqaObj = new NoSurat();
@@ -303,8 +303,8 @@ class Sk6Controller extends Controller
             $skukd->tanggal = $tanggal;
             $skukd->user_id = $user->id;
             $skukd->jenis_kelamin = $user->jenis_kelamin;
-            $skukd->status = 'pending';
             $skukd->petanda_tangan = 'tidak';
+            $skukd->status = 'pending';
             $skukd->save();
 
             $nomorSkukdObj = new NoSurat();
@@ -333,7 +333,6 @@ class Sk6Controller extends Controller
             $sk6->save();
 
             DB::commit();
-
             // Re-fetch record and details to build the new PDF
             $sklmkRefetched = $this->getSklmkDetail($sk6->surat_keterangan_lulus_mata_kuliah_id);
             if ($sklmkRefetched) {
@@ -646,6 +645,7 @@ class Sk6Controller extends Controller
                 $sklmk->tanggal = $tanggal;
                 $sklmk->jenis_kelamin = $user->jenis_kelamin;
                 $sklmk->petanda_tangan = 'tidak';
+                $sklmk->status = 'pending';
                 $sklmk->save();
             }
 
@@ -663,6 +663,7 @@ class Sk6Controller extends Controller
                 $skak->tanggal = $tanggal;
                 $skak->jenis_kelamin = $user->jenis_kelamin;
                 $skak->petanda_tangan = 'tidak';
+                $skak->status = 'pending';
                 $skak->save();
             }
 
@@ -680,6 +681,7 @@ class Sk6Controller extends Controller
                 $sktkp->tanggal = $tanggal;
                 $sktkp->jenis_kelamin = $user->jenis_kelamin;
                 $sktkp->petanda_tangan = 'tidak';
+                $sktkp->status = 'pending';
                 $sktkp->save();
             }
 
@@ -704,6 +706,7 @@ class Sk6Controller extends Controller
                 $skqa->tanggal_berlaku_sampai = $validate['tanggal_berlaku_sampai'] ?? null;
                 $skqa->jenis_kelamin = $user->jenis_kelamin;
                 $skqa->petanda_tangan = 'tidak';
+                $skqa->status = 'pending';
                 $skqa->save();
             }
 
@@ -727,6 +730,7 @@ class Sk6Controller extends Controller
                 $skukd->tanggal = $tanggal;
                 $skukd->jenis_kelamin = $user->jenis_kelamin;
                 $skukd->petanda_tangan = 'tidak';
+                $skukd->status = 'pending';
                 $skukd->save();
             }
 
@@ -919,7 +923,7 @@ class Sk6Controller extends Controller
 
         $ttdSkak = $this->getTtdJabatan('kepala_biro_keuangan');
         $ttdSktkp = $this->getTtdJabatan('ketua_tasma');
-        
+
         if ($skukd && $skukd->tanda_tangan_id) {
             $tandaTangan = \App\Models\TandaTangan::find($skukd->tanda_tangan_id);
             $ttdBase64 = '';
@@ -983,6 +987,7 @@ class Sk6Controller extends Controller
             'skqa_nama' => $ttdSkqa['nama'] ?: 'Ust. Fathul Munif',
             'skqa_ttd' => $ttdSkqa['ttd'],
             'stempel' => $stempelBase64,
+            'petanda_tangan' => 'tidak',
         ];
     }
 
@@ -1084,6 +1089,8 @@ class Sk6Controller extends Controller
                 'nidn_dekan' => $data->nidn_dekan,
                 'tanggal_surat' => \App\Services\SuratService::formatTanggalIndonesian($data->tanggal),
                 'stempel' => $stempelBase64,
+                'petanda_tangan' => 'tidak',
+
                 'ttd' => $tddBase64,
                 'kopBase64' => $kopBase64,
             ];
@@ -1155,6 +1162,8 @@ class Sk6Controller extends Controller
                 'kopBase64' => $kopBase64,
                 'ttd' => $tddBase64,
                 'stempel' => $stempelBase64,
+                'petanda_tangan' => 'tidak',
+
             ];
 
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.administrasi_keuangan', $pdfData)->setPaper('a4', 'portrait');
@@ -1230,6 +1239,8 @@ class Sk6Controller extends Controller
                 'kopBase64' => $kopBase64,
                 'ttd' => $tddBase64,
                 'stempel' => $stempelBase64,
+                'petanda_tangan' => 'tidak',
+
             ];
 
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.surat_tasma_kkn_ppl', $pdfData)->setPaper('a4', 'portrait');
@@ -1280,10 +1291,10 @@ class Sk6Controller extends Controller
 
             $kopPath = base_path('../public_html/img/kop.jpg');
             $kopBase64 = \App\Services\SuratService::getBase64Image($kopPath);
-            
+
             $tddPath = base_path('../public_html/' . $ttdKetua);
             $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
-            
+
             $stempelPath = base_path('../public_html/img/stempel.png');
             $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
 
@@ -1302,7 +1313,8 @@ class Sk6Controller extends Controller
                 'jabatan_penandatangan' => 'Ketua / Koordinator Komprehensip',
                 'kopBase64' => $kopBase64,
                 'ttd' => $tddBase64,
-                'stempel' => $stempelBase64
+                'stempel' => $stempelBase64,
+                'petanda_tangan' => 'tidak',
             ];
 
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.komprehensif', $pdfData)->setPaper('a4', 'portrait');

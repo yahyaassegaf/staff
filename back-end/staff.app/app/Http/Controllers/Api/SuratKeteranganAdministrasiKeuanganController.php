@@ -87,6 +87,7 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
                 'kelas_pondok'  => 'required|string|max:255',
                 'tanggal'       => 'required|date',
                 'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -127,7 +128,7 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
             }
             $data->jenis_kelamin = Auth::user()->jenis_kelamin;
             $data->status = 'pending';
-            $data->petanda_tangan = 'tidak';
+            $data->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $data->user_id      = Auth::user()->id;
             $data->save();
 
@@ -260,6 +261,7 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
                 'kelas_pondok'  => 'required|string|max:255',
                 'tanggal'       => 'required|date',
                 'tanda_tangan_id' => 'nullable|exists:tanda_tangan,id',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ]);
 
             if ($validator->fails()) {
@@ -323,7 +325,7 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
             $data->drive_file_id = null;
             $data->drive_link = null;
             $data->status = 'pending';
-            $data->petanda_tangan = 'tidak';
+            $data->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $data->save();
 
             // Re-fetch record with joins to build the new PDF
@@ -348,14 +350,14 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
                 $directory = base_path('../public_html/pdf/' . $prodiName . '/SuratKeteranganAdministrasiKeuanganController');
                 $pdf = Pdf::loadView('pdf.administrasi_keuangan', $pdfData)->setPaper('a4', 'portrait');
                 $fileName = 'surat_keterangan_administrasi_keuangan_' . $refetched->nim . '_' . uniqid() . '.pdf';
- 
+
                 if (!\Illuminate\Support\Facades\File::exists($directory)) {
                     \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
                 }
- 
+
                 $path = $directory . '/' . $fileName;
                 $pdf->save($path);
- 
+
                 $refetched->update(['local_path' => $path]);
 
                 $nameTable = 'Surat Keterangan Administrasi Keuangan';
@@ -436,11 +438,21 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
         $kopPath = base_path('../public_html/img/kop.jpg');
         $kopBase64 = SuratService::getBase64Image($kopPath);
 
-        $tddPath = base_path('../public_html/' . $ttdKetua);
-        $tddBase64 = SuratService::getBase64Image($tddPath);
+        $tddBase64 = '';
+        if (isset($data->petanda_tangan) && in_array($data->petanda_tangan, ['ya'])) {
+            $tddPath = base_path('../public_html/' . $ttdKetua);
+            if (file_exists($tddPath) && is_file($tddPath)) {
+                $tddBase64 = SuratService::getBase64Image($tddPath);
+            }
+        }
 
-        $stempelPath = base_path('../public_html/img/stempel.png');
-        $stempelBase64 = SuratService::getBase64Image($stempelPath);
+        $stempelBase64 = '';
+        if (isset($data->petanda_tangan) && in_array($data->petanda_tangan, ['ya', 'stempel'])) {
+            $stempelPath = base_path('../public_html/img/stempel.png');
+            if (file_exists($stempelPath) && is_file($stempelPath)) {
+                $stempelBase64 = SuratService::getBase64Image($stempelPath, 'image/png');
+            }
+        }
 
         return [
             'nomor_surat' => $data->nomor_surat,
@@ -458,6 +470,7 @@ class SuratKeteranganAdministrasiKeuanganController extends Controller
             'kopBase64' => $kopBase64,
             'ttd' => $tddBase64,
             'stempel' => $stempelBase64,
+                    'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak'),
         ];
     }
 }

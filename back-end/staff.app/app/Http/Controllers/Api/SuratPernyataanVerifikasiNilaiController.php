@@ -81,7 +81,8 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 'nim' => 'required|string|max:255',
                 'prodi' => 'required|string|max:255',
                 'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'alasan' => 'nullable|string',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -128,8 +129,9 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
             $surat->prodi_id = $validate['prodi_id'];
             $surat->jenis_kelamin = Auth::user()->jenis_kelamin;
             $surat->user_id = Auth::user()->id;
-            $surat->status = 'pending';
+            $surat->alasan = $validate['alasan'] ?? null;
             $surat->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
+            $surat->status = 'pending';
             $surat->save();
 
             $Nomor              = new NoSurat();
@@ -185,8 +187,8 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 $tddBase64 = '';
                 $stempelBase64 = '';
 
-                if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
-                    if (!empty($ttdDb)) {
+                if (in_array($data->petanda_tangan, ['ya', 'stempel'])) {
+                    if (!empty($ttdDb) && $data->petanda_tangan === 'ya') {
                         if (str_starts_with($ttdDb, 'data:image')) {
                             $tddBase64 = $ttdDb;
                         } else {
@@ -223,6 +225,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                     'kopBase64' => $kopBase64,
                     'ttd' => $tddBase64,
                     'stempel' => $stempelBase64,
+                    'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak'),
                 ];
 
                 $pdf = Pdf::loadView('pdf.surat_pernyataan_verifikasi_nilai', $pdfData)
@@ -340,7 +343,8 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                 'nim' => 'required|string|max:255',
                 'prodi' => 'required|string|max:255',
                 'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'alasan' => 'nullable|string',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ]);
 
             if ($validator->fails()) {
@@ -391,6 +395,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
             $surat->tanggal = $validate['tanggal'];
             $surat->prodi_id = $validate['prodi_id'];
             $surat->jenis_kelamin = Auth::user()->jenis_kelamin;
+            $surat->alasan = $validate['alasan'] ?? null;
             $surat->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
 
             // Delete old file from Google Drive if exists
@@ -484,6 +489,7 @@ class SuratPernyataanVerifikasiNilaiController extends Controller
                     'kopBase64' => $kopBase64,
                     'ttd' => $tddBase64,
                     'stempel' => $stempelBase64,
+                    'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak'),
                 ];
 
                 $pdf = Pdf::loadView('pdf.surat_pernyataan_verifikasi_nilai', $pdfData)

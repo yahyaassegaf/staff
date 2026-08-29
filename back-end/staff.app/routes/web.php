@@ -9,3 +9,11 @@ Route::get('/', function () {
 
 
 Route::get('/testing', [\App\Http\Controllers\TestingController::class, 'index']);
+
+Route::get('/testing', [\App\Http\Controllers\TestingController::class, 'index']);
+
+
+
+
+
+

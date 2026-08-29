@@ -105,7 +105,9 @@ class SuratKeteranganPplController extends Controller
                 'alamat_rumah' => 'required|string',
                 'kelas_pondok' => 'required|string|max:255',
                 'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'kelas_pondok' => 'required|string|max:255',
+                'tanggal' => 'required|date',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -186,16 +188,21 @@ class SuratKeteranganPplController extends Controller
                 $tddBase64 = '';
                 $stempelBase64 = '';
 
-                if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
-                    if (!empty($data->ttd)) {
-                        $tddPath = base_path('../public_html/' . $data->ttd);
-                        if (file_exists($tddPath)) {
-                            $tddBase64 = SuratService::getBase64Image($tddPath);
+                if (isset($data->petanda_tangan) && in_array($data->petanda_tangan, ['ya', 'stempel'])) {
+                    if ($data->petanda_tangan === 'ya' && !empty($data->ttd)) {
+                        if (str_starts_with($data->ttd, 'data:image')) {
+                            $tddBase64 = $data->ttd;
+                        } else {
+                            $tddPath = base_path('../public_html/' . $data->ttd);
+                            if (file_exists($tddPath)) {
+                                $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                            }
                         }
                     }
+
                     $stempelPath = base_path('../public_html/img/stempel.png');
                     if (file_exists($stempelPath)) {
-                        $stempelBase64 = SuratService::getBase64Image($stempelPath);
+                        $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
                     }
                 }
 
@@ -216,6 +223,7 @@ class SuratKeteranganPplController extends Controller
                     'kopBase64' => $kopBase64,
                     'ttd' => $tddBase64,
                     'stempel' => $stempelBase64,
+                    'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak'),
                 ];
 
                 $pdf = Pdf::loadView('pdf.ppl', $pdfData)->setPaper('a4', 'portrait');
@@ -329,7 +337,7 @@ class SuratKeteranganPplController extends Controller
                 'alamat_rumah' => 'required|string',
                 'kelas_pondok' => 'required|string|max:255',
                 'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ]);
 
             if ($validator->fails()) {
@@ -406,16 +414,21 @@ class SuratKeteranganPplController extends Controller
                 $tddBase64 = '';
                 $stempelBase64 = '';
 
-                if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
-                    if (!empty($data->ttd)) {
-                        $tddPath = base_path('../public_html/' . $data->ttd);
-                        if (file_exists($tddPath)) {
-                            $tddBase64 = SuratService::getBase64Image($tddPath);
+                if (isset($data->petanda_tangan) && in_array($data->petanda_tangan, ['ya', 'stempel'])) {
+                    if ($data->petanda_tangan === 'ya' && !empty($data->ttd)) {
+                        if (str_starts_with($data->ttd, 'data:image')) {
+                            $tddBase64 = $data->ttd;
+                        } else {
+                            $tddPath = base_path('../public_html/' . $data->ttd);
+                            if (file_exists($tddPath)) {
+                                $tddBase64 = \App\Services\SuratService::getBase64Image($tddPath);
+                            }
                         }
                     }
+
                     $stempelPath = base_path('../public_html/img/stempel.png');
                     if (file_exists($stempelPath)) {
-                        $stempelBase64 = SuratService::getBase64Image($stempelPath);
+                        $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
                     }
                 }
 
@@ -436,6 +449,7 @@ class SuratKeteranganPplController extends Controller
                     'kopBase64' => $kopBase64,
                     'ttd' => $tddBase64,
                     'stempel' => $stempelBase64,
+                    'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak'),
                 ];
 
                 $pdf = Pdf::loadView('pdf.ppl', $pdfData)->setPaper('a4', 'portrait');

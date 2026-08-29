@@ -88,7 +88,7 @@ class SuratKeteranganTransferController extends Controller
                 'alamat' => 'nullable|string',
                 'universitas_tujuan' => 'nullable|string|max:255',
                 'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ], [
                 'no_surat.unique' => 'Nomor surat sudah terpakai',
             ]);
@@ -130,19 +130,12 @@ class SuratKeteranganTransferController extends Controller
             $skt->tahun_akademik = $validate['tahun_akademik'] ?? null;
             $skt->alamat = $validate['alamat'] ?? null;
             $skt->universitas_tujuan = $validate['universitas_tujuan'] ?? null;
-            // Set tahun_akademik from th_akademik if provided
-            // if (!empty($validate['th_akademik_id'])) {
-            //     $thAkademik = ThAkademik::find($validate['th_akademik']);
-            //     $skt->tahun_akademik = $thAkademik ? $thAkademik->nama . ' ' . $thAkademik->semester : $validate['tahun_akademik'];
-            // } else {
-            //     $skt->tahun_akademik = $validate['tahun_akademik'] ?? '';
-            // }
             $skt->tanggal = $validate['tanggal'];
             $skt->user_id = Auth::user()->id;
             $skt->prodi_id = $validate['prodi_id'];
+            $skt->petanda_tangan  = $validate['petanda_tangan'] ?? 'tidak';
             $skt->jenis_kelamin = Auth::user()->jenis_kelamin;
             $skt->status = 'pending';
-            $skt->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
             $skt->save();
 
             $Nomor = new NoSurat();
@@ -285,7 +278,7 @@ class SuratKeteranganTransferController extends Controller
                 'alamat' => 'nullable|string',
                 'universitas_tujuan' => 'nullable|string|max:255',
                 'tanggal' => 'required|date',
-                'petanda_tangan' => 'nullable|in:ya,tidak',
+                'petanda_tangan' => 'nullable|in:ya,tidak,stempel',
             ]);
 
             if ($validator->fails()) {
@@ -336,8 +329,8 @@ class SuratKeteranganTransferController extends Controller
             $skt->universitas_tujuan = $validate['universitas_tujuan'] ?? $skt->universitas_tujuan;
             $skt->tanggal = $validate['tanggal'];
             $skt->prodi_id = $validate['prodi_id'];
-            $skt->jenis_kelamin = Auth::user()->jenis_kelamin;
             $skt->petanda_tangan = $validate['petanda_tangan'] ?? 'tidak';
+            $skt->jenis_kelamin = Auth::user()->jenis_kelamin;
 
             // Delete old file from Google Drive if exists
             if (!empty($oldDriveFileId)) {
@@ -497,13 +490,8 @@ class SuratKeteranganTransferController extends Controller
         $stempelBase64 = '';
         $ttdBase64 = '';
 
-        if (isset($data->petanda_tangan) && $data->petanda_tangan === 'ya') {
-            $stempelPath = base_path('../public_html/img/stempel.png');
-            if (file_exists($stempelPath)) {
-                $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
-            }
-
-            if (!empty($data->ttd)) {
+        if (isset($data->petanda_tangan) && in_array($data->petanda_tangan, ['ya', 'stempel'])) {
+            if ($data->petanda_tangan === 'ya' && !empty($data->ttd)) {
                 if (str_starts_with($data->ttd, 'data:image')) {
                     $ttdBase64 = $data->ttd;
                 } else {
@@ -512,6 +500,11 @@ class SuratKeteranganTransferController extends Controller
                         $ttdBase64 = \App\Services\SuratService::getBase64Image($ttdPath);
                     }
                 }
+            }
+
+            $stempelPath = base_path('../public_html/img/stempel.png');
+            if (file_exists($stempelPath)) {
+                $stempelBase64 = \App\Services\SuratService::getBase64Image($stempelPath, 'image/png');
             }
         }
 
@@ -552,7 +545,8 @@ class SuratKeteranganTransferController extends Controller
             'universitas_tujuan' => $universitasTujuan,
             'kopBase64' => $kopBase64,
             'ttd' => $ttdBase64,
-            'stempel' => $stempelBase64
+            'stempel' => $stempelBase64,
+                    'petanda_tangan' => $data->petanda_tangan ?? ($petandaTangan ?? 'tidak')
         ];
     }
 

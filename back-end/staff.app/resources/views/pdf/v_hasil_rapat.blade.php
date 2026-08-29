@@ -7,8 +7,7 @@
     <style>
         /* ===== PAGE ===== */
         @page {
-            size: A4;
-            margin: 0;
+            margin: 0cm 2cm 1cm 2cm;
         }
 
         body {
@@ -16,17 +15,17 @@
             font-size: 11pt;
             line-height: 1.5;
             color: #000;
-            margin: 0;
         }
 
         /* ===== KOP SURAT ===== */
         .kop {
-            margin-top: 1cm;
-            margin-left: -1cm;
-            margin-right: -1cm;
+            margin-top: 0.1cm;
+            margin-left: -1.5cm;
+            margin-right: -1.5cm;
         }
 
         .kop img {
+            margin-top: 0px;
             width: 100%;
             height: auto;
             display: block;
@@ -34,9 +33,7 @@
 
         /* ===== KONTEN ===== */
         .content {
-            padding-right: 2.5cm;
             padding-bottom: 1cm;
-            padding-left: 2.5cm;
         }
 
         .text-center {
@@ -192,7 +189,6 @@
         @else
         <p><em>Tidak ada data anggota rapat.</em></p>
         @endif
-
         <!-- PENUTUP -->
         <p class="margin-top-20 text-justify">
             Demikian notula rapat ini dibuat untuk dapat dipergunakan sebagaimana mestinya.
